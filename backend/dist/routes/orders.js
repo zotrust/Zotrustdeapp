@@ -270,7 +270,7 @@ router.post('/:id/prepare-accept', auth_1.authenticateToken, async (req, res) =>
                 otp: otp,
                 otpHash: otpHash,
                 blockchain: {
-                    contractAddress: process.env.CONTRACT_ADDRESS || '0x878A2a0d3452533F7a2cB0E3053258AB66C03d0F',
+                    contractAddress: process.env.CONTRACT_ADDRESS || '0x6722FE6DdCe1F7389daa70aD5C65e51f9F375E6e',
                     tradeId: parseInt(orderId),
                     network: 'BSC Testnet',
                     chainId: 97
@@ -605,7 +605,7 @@ router.post('/:id/prepare-lock', auth_1.authenticateToken, async (req, res) => {
                 otpHash: otpHash,
                 blockchain: {
                     tradeId: tradeId,
-                    contractAddress: process.env.CONTRACT_ADDRESS || '0x878A2a0d3452533F7a2cB0E3053258AB66C03d0F',
+                    contractAddress: process.env.CONTRACT_ADDRESS || '0x6722FE6DdCe1F7389daa70aD5C65e51f9F375E6e',
                     network: 'BSC Testnet',
                     chainId: 97
                 }
@@ -632,7 +632,33 @@ router.post('/:id/lock-funds', auth_1.authenticateToken, async (req, res) => {
         console.log('👤 LOCK FUNDS: User address:', user?.address);
         console.log('📡 LOCK FUNDS: TX Hash:', txHash);
         console.log('🔐 LOCK FUNDS: OTP Hash:', otpHash);
-        console.log('🆔 LOCK FUNDS: Blockchain Trade ID:', blockchainTradeId);
+        console.log('🆔 LOCK FUNDS: Blockchain Trade ID (raw):', blockchainTradeId);
+        console.log('🆔 LOCK FUNDS: Blockchain Trade ID (type):', typeof blockchainTradeId);
+        // Validate required fields
+        if (!txHash || !otpHash || !blockchainTradeId) {
+            console.log('❌ LOCK FUNDS: Missing required fields', {
+                txHash: !!txHash,
+                otpHash: !!otpHash,
+                blockchainTradeId: !!blockchainTradeId
+            });
+            return res.status(400).json({
+                success: false,
+                error: 'Transaction hash, OTP hash, and blockchain trade ID are required'
+            });
+        }
+        // Validate and convert blockchainTradeId to integer
+        const tradeIdNumber = parseInt(String(blockchainTradeId), 10);
+        if (isNaN(tradeIdNumber) || tradeIdNumber <= 0) {
+            console.log('❌ LOCK FUNDS: Invalid blockchain trade ID', {
+                received: blockchainTradeId,
+                parsed: tradeIdNumber
+            });
+            return res.status(400).json({
+                success: false,
+                error: 'Invalid blockchain trade ID. Must be a positive integer.'
+            });
+        }
+        console.log('✅ LOCK FUNDS: Validated blockchain trade ID:', tradeIdNumber);
         // Fetch order
         const orderResult = await database_1.default.query('SELECT * FROM orders WHERE id = $1', [orderId]);
         if (orderResult.rows.length === 0) {
@@ -665,14 +691,25 @@ router.post('/:id/lock-funds', auth_1.authenticateToken, async (req, res) => {
         const otpExpiresAt = new Date(Date.now() + (2 * 60 * 60 * 1000));
         // Update order with blockchain details
         console.log('💾 LOCK FUNDS: Updating order with blockchain details');
-        await database_1.default.query(`UPDATE orders SET 
+        console.log('💾 LOCK FUNDS: Values to save:', {
+            lockExpiresAt,
+            otpHash,
+            txHash,
+            blockchain_trade_id: tradeIdNumber,
+            create_trade_tx_hash: createTradeTxHash,
+            orderId
+        });
+        const updateResult = await database_1.default.query(`UPDATE orders SET 
         state = 'LOCKED', 
         lock_expires_at = $1,
         otp_hash = $2,
         tx_hash = $3,
         blockchain_trade_id = $4,
         create_trade_tx_hash = $5
-       WHERE id = $6`, [lockExpiresAt, otpHash, txHash, blockchainTradeId, createTradeTxHash, orderId]);
+       WHERE id = $6
+       RETURNING blockchain_trade_id`, [lockExpiresAt, otpHash, txHash, tradeIdNumber, createTradeTxHash, orderId]);
+        console.log('✅ LOCK FUNDS: Order updated successfully');
+        console.log('✅ LOCK FUNDS: Saved blockchain_trade_id:', updateResult.rows[0]?.blockchain_trade_id);
         // Create transaction record
         console.log('💳 LOCK FUNDS: Creating transaction record');
         const transactionNumber = `TXN-${Date.now()}-${orderId}`;
@@ -718,7 +755,7 @@ router.post('/:id/lock-funds', auth_1.authenticateToken, async (req, res) => {
         }
         // Log lock funds
         console.log('📝 LOCK FUNDS: Logging audit trail');
-        await database_1.default.query('INSERT INTO audit_logs (user_address, action, resource_type, resource_id, details, ip_address) VALUES ($1, $2, $3, $4, $5, $6)', [user.address, 'LOCK_FUNDS', 'order', orderId, JSON.stringify({ txHash, blockchainTradeId }), req.ip]);
+        await database_1.default.query('INSERT INTO audit_logs (user_address, action, resource_type, resource_id, details, ip_address) VALUES ($1, $2, $3, $4, $5, $6)', [user.address, 'LOCK_FUNDS', 'order', orderId, JSON.stringify({ txHash, blockchainTradeId: tradeIdNumber }), req.ip]);
         const response = {
             success: true,
             data: {
@@ -727,7 +764,7 @@ router.post('/:id/lock-funds', auth_1.authenticateToken, async (req, res) => {
                 lockExpiresAt,
                 lockDurationHours: 2,
                 txHash: txHash,
-                blockchainTradeId: blockchainTradeId,
+                blockchainTradeId: tradeIdNumber,
                 message: 'Funds locked successfully on blockchain!'
             }
         };

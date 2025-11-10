@@ -1,7 +1,7 @@
 // Script to whitelist native BNB (address(0)) in the smart contract
 const { ethers } = require('ethers');
 
-const CONTRACT_ADDRESS = '0x878A2a0d3452533F7a2cB0E3053258AB66C03d0F';
+const CONTRACT_ADDRESS = '0x6722FE6DdCe1F7389daa70aD5C65e51f9F375E6e';
 const RPC_URL = 'https://data-seed-prebsc-1-s1.binance.org:8545/';
 
 // Minimal ABI for setAllowedToken function

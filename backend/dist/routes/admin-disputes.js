@@ -355,20 +355,55 @@ router.post('/appeals/:appealId/resolve', auth_1.authenticateAdmin, async (req, 
             });
         }
         const appeal = appealResult.rows[0];
+        // Get order details
+        const orderResult = await database_1.default.query('SELECT * FROM orders WHERE id = $1', [appeal.order_id]);
+        if (orderResult.rows.length === 0) {
+            return res.status(404).json({
+                success: false,
+                error: 'Order not found'
+            });
+        }
+        const order = orderResult.rows[0];
+        // Determine new order state based on resolution
+        let newOrderState = '';
+        if (value.resolution === 'TRANSFER_TO_BUYER') {
+            newOrderState = 'RELEASED';
+        }
+        else if (value.resolution === 'REFUND_TO_SELLER') {
+            newOrderState = 'REFUNDED';
+        }
+        else if (value.resolution === 'SPLIT_REFUND') {
+            newOrderState = 'REFUNDED'; // For split refund, mark as refunded
+        }
+        // Update order state
+        await database_1.default.query('UPDATE orders SET state = $1 WHERE id = $2', [newOrderState, appeal.order_id]);
+        // Update appeal status
+        await database_1.default.query('UPDATE appeals SET status = $1 WHERE id = $2', ['RESOLVED', appealId]);
         // Update dispute status
-        await database_1.default.query('UPDATE disputes SET status = $1, resolution = $2, resolution_reason = $3, resolved_at = $4, resolved_by = $5 WHERE id = $6', ['RESOLVED', value.resolution, value.resolution_reason, new Date(), 'ADMIN', appeal.dispute_id]);
+        await database_1.default.query('UPDATE disputes SET status = $1, resolution = $2, resolution_reason = $3, resolved_at = $4, resolved_by = $5 WHERE id = $6', ['RESOLVED', value.resolution, value.resolution_reason, new Date(), req.user?.address || 'ADMIN', appeal.dispute_id]);
         // Log timeline event
         await database_1.default.query(`INSERT INTO dispute_timeline (dispute_id, order_id, event_type, event_description, created_by, metadata)
        VALUES ($1, $2, 'APPEAL_RESOLVED', $3, $4, $5)`, [
             appeal.dispute_id,
             appeal.order_id,
             `Appeal resolved: ${value.resolution}`,
-            'ADMIN',
-            JSON.stringify({ resolution: value.resolution, reason: value.resolution_reason })
+            req.user?.address || 'ADMIN',
+            JSON.stringify({
+                resolution: value.resolution,
+                reason: value.resolution_reason,
+                order_state: newOrderState
+            })
         ]);
         res.json({
             success: true,
-            message: 'Appeal resolved successfully'
+            message: 'Appeal resolved successfully',
+            data: {
+                appealId: parseInt(appealId),
+                orderId: appeal.order_id,
+                resolution: value.resolution,
+                newOrderState,
+                disputeId: appeal.dispute_id
+            }
         });
     }
     catch (error) {

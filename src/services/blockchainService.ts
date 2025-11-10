@@ -1,5 +1,5 @@
 import { ethers } from 'ethers';
-import { ZOTRUST_CONTRACT_ABI, ZOTRUST_CONTRACT_ADDRESS } from '../config/contracts';
+import { ZOTRUST_CONTRACT_ABI, ZOTRUST_CONTRACT_ADDRESS, BSC_MAINNET_RPC } from '../config/contracts';
 import { useWalletStore } from '../stores/walletStore';
 import { walletConnectService } from './walletConnectService';
 
@@ -115,17 +115,37 @@ export class BlockchainService {
       this.provider = provider;
       this.signer = await provider.getSigner();
       
+      const address = await this.signer.getAddress();
+      console.log('✅ Signer created, address:', address);
+      
       // Initialize contract with signer (for write operations)
       this.contract = new ethers.Contract(
         ZOTRUST_CONTRACT_ADDRESS,
         ZOTRUST_CONTRACT_ABI,
         this.signer
       );
-
-      const address = await this.signer.getAddress();
-      console.log('✅ Blockchain service initialized');
-      console.log('📋 Contract:', ZOTRUST_CONTRACT_ADDRESS);
-      console.log('👛 Wallet:', address);
+      
+      console.log('✅ Contract initialized');
+      console.log('📋 Contract Address:', ZOTRUST_CONTRACT_ADDRESS);
+      console.log('👛 Wallet Address:', address);
+      
+      // Verify contract is accessible (read-only call)
+      try {
+        const network = await provider.getNetwork();
+        console.log('🌐 Network:', network.name, 'Chain ID:', network.chainId.toString());
+        
+        // Try a simple read call to verify contract is accessible
+        if (this.contract) {
+          try {
+            const admin = await this.contract.admin();
+            console.log('✅ Contract is accessible, admin:', admin);
+          } catch (readError: any) {
+            console.warn('⚠️ Could not read from contract (might be expected):', readError.message);
+          }
+        }
+      } catch (networkError: any) {
+        console.warn('⚠️ Could not get network info:', networkError.message);
+      }
       
       // Detect wallet type for better error messages
       const detectedWalletType = this.detectWalletType();
@@ -236,8 +256,25 @@ export class BlockchainService {
     buyer: string; // Buyer address (caller is always seller)
     isNativeBNB?: boolean; // Flag for native BNB
   }): Promise<{ tradeId: number; txHash: string }> {
-    if (!this.contract || !this.signer) {
+    // Ensure provider and contract are initialized with correct wallet
+    const walletType = useWalletStore.getState()?.walletType;
+    if (!this.contract || !this.signer || !this.provider) {
+      console.log('🔄 Re-initializing blockchain service for createTrade...');
       await this.init();
+    }
+    
+    // Double-check for WalletConnect
+    if (walletType === 'walletconnect') {
+      console.log('🔄 Ensuring WalletConnect provider is ready for createTrade...');
+      await this.init();
+      
+      // Verify we have everything
+      if (!this.provider || !this.signer || !this.contract) {
+        throw new Error('WalletConnect provider not ready. Please ensure your wallet is connected via WalletConnect.');
+      }
+      
+      const signerAddress = await this.signer.getAddress();
+      console.log('✅ WalletConnect ready, signer address:', signerAddress);
     }
 
     try {
@@ -246,6 +283,7 @@ export class BlockchainService {
       console.log('💰 Amount:', orderData.amount);
       console.log('👤 Buyer:', orderData.buyer);
       console.log('🔍 Is Native BNB?', orderData.isNativeBNB);
+      console.log('👛 Wallet Type:', walletType);
 
       // Convert amount to wei (18 decimals)
       const amountWei = ethers.parseUnits(orderData.amount, 18);
@@ -260,12 +298,96 @@ export class BlockchainService {
         console.log('📝 Creating trade with ERC20 token (WBNB/USDT/USDC)');
       }
 
-      // Call createTrade function - NEW P2PEscrowV2 signature: createTrade(token, amount, buyer)
-      const tx = await this.contract!.createTrade(
-        orderData.token,
-        amountWei,
-        orderData.buyer
-      );
+      // Verify contract and signer are ready
+      if (!this.contract) {
+        throw new Error('Contract not initialized. Please reconnect your wallet.');
+      }
+      if (!this.signer) {
+        throw new Error('Signer not available. Please reconnect your wallet.');
+      }
+      
+      // Verify contract has createTrade function
+      if (!this.contract.createTrade) {
+        throw new Error('createTrade function not found in contract. Please check the contract ABI.');
+      }
+      
+      // Get trade counter before transaction (for fallback method)
+      let tradeCounterBefore = 0;
+      try {
+        if (this.contract && this.contract.tradeCounter) {
+          tradeCounterBefore = Number(await this.contract.tradeCounter());
+          console.log('📊 Trade counter before transaction:', tradeCounterBefore);
+        }
+      } catch (counterError: any) {
+        console.warn('⚠️ Could not get trade counter before transaction:', counterError.message);
+      }
+
+      // For WalletConnect, estimate gas and add buffer
+      let tx;
+      if (walletType === 'walletconnect') {
+        console.log('🔧 WalletConnect detected - estimating gas for createTrade...');
+        try {
+          // Estimate gas first
+          console.log('⛽ Estimating gas...');
+          const gasEstimate = await this.contract.createTrade.estimateGas(
+            orderData.token,
+            amountWei,
+            orderData.buyer
+          );
+          
+          // Add 30% buffer for WalletConnect
+          const gasLimit = (gasEstimate * 130n) / 100n;
+          
+          console.log('⛽ Estimated gas:', gasEstimate.toString());
+          console.log('⛽ Gas limit with buffer:', gasLimit.toString());
+          
+          console.log('📝 Sending createTrade transaction with explicit gas...');
+          tx = await this.contract.createTrade(
+            orderData.token,
+            amountWei,
+            orderData.buyer,
+            {
+              gasLimit: gasLimit
+            }
+          );
+          console.log('✅ Transaction sent with explicit gas');
+        } catch (gasError: any) {
+          console.warn('⚠️ Gas estimation failed, trying without explicit gas:', gasError);
+          console.error('⚠️ Gas estimation error details:', {
+            code: gasError.code,
+            message: gasError.message,
+            reason: gasError.reason
+          });
+          // Fallback: try without explicit gas limit
+          try {
+            console.log('📝 Attempting createTrade without explicit gas...');
+            tx = await this.contract.createTrade(
+              orderData.token,
+              amountWei,
+              orderData.buyer
+            );
+            console.log('✅ Transaction sent without explicit gas');
+          } catch (fallbackError: any) {
+            console.error('❌ createTrade failed even without explicit gas:', fallbackError);
+            console.error('❌ Fallback error details:', {
+              code: fallbackError.code,
+              message: fallbackError.message,
+              reason: fallbackError.reason,
+              data: fallbackError.data
+            });
+            throw fallbackError;
+          }
+        }
+      } else {
+        // Standard wallet (MetaMask, etc.)
+        console.log('📝 Sending createTrade transaction (standard wallet)...');
+        tx = await this.contract.createTrade(
+          orderData.token,
+          amountWei,
+          orderData.buyer
+        );
+        console.log('✅ Transaction sent');
+      }
       
       console.log('📡 Transaction sent:', tx.hash);
       console.log('⏳ Waiting for confirmation...');
@@ -273,45 +395,234 @@ export class BlockchainService {
       const receipt = await tx.wait();
       console.log('✅ Trade created on blockchain!');
       console.log('📦 Block number:', receipt.blockNumber);
-
-      // Parse trade ID from events
-      // Find TradeCreated event
-      const tradeCreatedEvent = receipt.logs.find((log: any) => {
-        try {
-          const parsed = this.contract!.interface.parseLog(log);
-          return parsed?.name === 'TradeCreated';
-        } catch {
-          return false;
-        }
-      });
-
-      let tradeId = 0;
-      if (tradeCreatedEvent) {
-        const parsed = this.contract!.interface.parseLog(tradeCreatedEvent);
-        tradeId = Number(parsed?.args?.tradeId || 0);
-        console.log('✅ Trade ID from blockchain:', tradeId);
+      console.log('📋 Receipt status:', receipt.status);
+      
+      // Verify transaction succeeded
+      if (receipt.status !== 1) {
+        throw new Error(`Transaction failed on blockchain. Status: ${receipt.status}. Please check on BSCScan: ${tx.hash}`);
       }
 
+      // Parse trade ID from events using ethers event filtering (more reliable)
+      console.log('🔍 Parsing transaction receipt for TradeCreated event...');
+      console.log('📋 Receipt logs count:', receipt.logs.length);
+      
+      let tradeId = 0;
+      
+      // Method 1: Use ethers event filtering (most reliable)
+      try {
+        const tradeCreatedFilter = this.contract!.filters.TradeCreated();
+        const events = await this.contract!.queryFilter(tradeCreatedFilter, receipt.blockNumber, receipt.blockNumber);
+        
+        // Find the event from this specific transaction
+        const ourEvent = events.find((event: any) => {
+          return event.transactionHash === tx.hash;
+        });
+        
+        // Check if it's an EventLog (has args) and extract tradeId
+        if (ourEvent && 'args' in ourEvent && ourEvent.args) {
+          const eventArgs = ourEvent.args as any;
+          tradeId = Number(eventArgs.tradeId || 0);
+          console.log('✅ TradeCreated event found via queryFilter!');
+          console.log('✅ Trade ID from event:', tradeId);
+          console.log('📊 Event args:', {
+            tradeId: eventArgs.tradeId?.toString(),
+            seller: eventArgs.seller,
+            buyer: eventArgs.buyer,
+            token: eventArgs.token,
+            amount: eventArgs.amount?.toString()
+          });
+        }
+      } catch (filterError: any) {
+        console.warn('⚠️ Event filtering failed, trying direct log parsing:', filterError.message);
+      }
+
+      // Method 2: If event filtering didn't work, try parsing logs directly
+      if (tradeId === 0) {
+        console.log('🔄 Trying direct log parsing...');
+        for (let i = 0; i < receipt.logs.length; i++) {
+          const log = receipt.logs[i];
+          try {
+            // Check if this log is from our contract
+            if (log.address.toLowerCase() !== ZOTRUST_CONTRACT_ADDRESS.toLowerCase()) {
+              continue;
+            }
+            
+            const parsed = this.contract!.interface.parseLog({
+              topics: log.topics || [],
+              data: log.data || '0x'
+            });
+            
+            console.log(`📋 Log ${i}: Event name: ${parsed?.name}`);
+            
+            if (parsed?.name === 'TradeCreated') {
+              tradeId = Number(parsed.args?.tradeId || 0);
+              console.log('✅ TradeCreated event found via direct parsing!');
+              console.log('✅ Trade ID from event:', tradeId);
+              console.log('📊 Event args:', parsed.args);
+              break;
+            }
+          } catch (parseError: any) {
+            // This log doesn't belong to our contract or can't be parsed, skip it
+            continue;
+          }
+        }
+      }
+
+      // Method 3: Fallback - Get trade ID from contract state (tradeCounter)
+      if (tradeId === 0 || isNaN(tradeId)) {
+        console.warn('⚠️ TradeCreated event not found, trying fallback method...');
+        try {
+          console.log('🔄 Fallback: Getting trade ID from contract state...');
+          
+          const signerAddress = await this.signer!.getAddress();
+          console.log('👛 Signer address for verification:', signerAddress);
+          
+          // Get the current trade counter from the contract
+          if (this.contract && this.contract.tradeCounter) {
+            const tradeCounterAfter = Number(await this.contract.tradeCounter());
+            console.log('📊 Trade counter after transaction:', tradeCounterAfter);
+            console.log('📊 Trade counter before transaction:', tradeCounterBefore);
+            
+            // Strategy: Search through recent trade IDs to find the one that matches
+            // Start from tradeCounterAfter and go backwards, or try tradeCounterBefore + 1
+            const candidates: number[] = [];
+            
+            // Add candidates based on counter logic
+            if (tradeCounterAfter > 0) {
+              candidates.push(tradeCounterAfter);
+            }
+            if (tradeCounterBefore > 0) {
+              candidates.push(tradeCounterBefore + 1);
+            }
+            
+            // Also check a few recent trades in case of race conditions
+            const maxRecentTrades = 5;
+            for (let i = 1; i <= maxRecentTrades && tradeCounterAfter - i > 0; i++) {
+              candidates.push(tradeCounterAfter - i);
+            }
+            
+            // Remove duplicates and sort
+            const uniqueCandidates = [...new Set(candidates)].sort((a, b) => b - a);
+            console.log('🔍 Searching through candidate trade IDs:', uniqueCandidates);
+            
+            // Try each candidate
+            for (const candidateId of uniqueCandidates) {
+              try {
+                console.log(`🔍 Checking trade ID ${candidateId}...`);
+                const trade = await this.contract.trades(candidateId);
+                
+                // Check if trade exists and has valid data
+                if (trade && trade.seller) {
+                  const tradeSeller = trade.seller.toLowerCase();
+                  const tradeBuyer = trade.buyer?.toLowerCase() || '';
+                  const expectedBuyer = orderData.buyer.toLowerCase();
+                  
+                  console.log(`📊 Trade ${candidateId} details:`, {
+                    seller: tradeSeller,
+                    buyer: tradeBuyer,
+                    expectedBuyer: expectedBuyer,
+                    token: trade.token,
+                    amount: trade.amount?.toString()
+                  });
+                  
+                  // Verify seller matches
+                  if (tradeSeller === signerAddress.toLowerCase()) {
+                    // Also verify buyer matches if available
+                    if (!tradeBuyer || tradeBuyer === expectedBuyer || tradeBuyer === '0x0000000000000000000000000000000000000000') {
+                      tradeId = candidateId;
+                      console.log('✅ Found matching trade! ID:', tradeId);
+                      console.log('✅ Seller matches:', tradeSeller);
+                      console.log('✅ Buyer matches or not set yet');
+                      break;
+                    } else {
+                      console.log(`⚠️ Trade ${candidateId} seller matches but buyer doesn't match`);
+                    }
+                  } else {
+                    console.log(`⚠️ Trade ${candidateId} seller doesn't match`);
+                  }
+                }
+              } catch (checkError: any) {
+                // Trade might not exist, continue to next candidate
+                console.log(`⚠️ Could not check trade ${candidateId}:`, checkError.message);
+                continue;
+              }
+            }
+            
+            // If still not found, use the most likely candidate (tradeCounterAfter)
+            if (tradeId === 0 && tradeCounterAfter > 0) {
+              console.warn('⚠️ Could not find exact match, using tradeCounterAfter as fallback');
+              tradeId = tradeCounterAfter;
+            }
+            
+            if (tradeId === 0) {
+              throw new Error(`Could not find matching trade ID. Searched ${uniqueCandidates.length} candidates.`);
+            }
+          } else {
+            console.error('❌ tradeCounter function not available in contract');
+            throw new Error('tradeCounter function not available');
+          }
+        } catch (fallbackError: any) {
+          console.error('❌ Fallback method also failed:', fallbackError);
+          console.error('❌ Fallback error details:', {
+            message: fallbackError.message,
+            code: fallbackError.code,
+            reason: fallbackError.reason
+          });
+          console.error('❌ Could not extract trade ID from transaction receipt');
+          console.error('📋 Transaction hash:', tx.hash);
+          console.error('📋 Block number:', receipt.blockNumber);
+          console.error('📋 Receipt status:', receipt.status);
+          console.error('📋 Logs count:', receipt.logs.length);
+          console.error('📋 Logs:', receipt.logs.map((log: any) => ({
+            address: log.address,
+            topics: log.topics?.length || 0,
+            dataLength: log.data?.length || 0
+          })));
+          throw new Error('Failed to extract trade ID from blockchain transaction. The TradeCreated event was not found and fallback method also failed. Please check the transaction on BSCScan: ' + tx.hash);
+        }
+      }
+
+      // Final validation
+      if (tradeId === 0 || isNaN(tradeId)) {
+        console.error('❌ Invalid trade ID after all methods:', tradeId);
+        console.error('📋 Transaction hash:', tx.hash);
+        throw new Error('Failed to extract valid trade ID. Transaction may have failed. Please check on BSCScan: ' + tx.hash);
+      }
+
+      console.log('✅ Final trade ID:', tradeId);
       return { tradeId, txHash: tx.hash };
     } catch (error: any) {
       console.error('💥 Error creating trade:', error);
+      console.error('💥 Error details:', {
+        code: error.code,
+        reason: error.reason,
+        message: error.message,
+        data: error.data,
+        transaction: error.transaction
+      });
       
-      const walletType = this.detectWalletType();
+      const detectedWalletType = this.detectWalletType();
+      const walletTypeFromStore = useWalletStore.getState()?.walletType;
+      const finalWalletType = walletTypeFromStore || detectedWalletType;
       
-      if (error.code === 'ACTION_REJECTED') {
-        throw new Error(`Transaction rejected by user in ${walletType}`);
-      } else if (error.code === 'INSUFFICIENT_FUNDS') {
-        throw new Error(`Insufficient balance in ${walletType}. Please add more funds.`);
+      // Provide more helpful error messages
+      if (error.code === 'ACTION_REJECTED' || error.code === 4001) {
+        throw new Error(`Transaction rejected by user in ${finalWalletType}. Please try again and approve the transaction in your wallet.`);
+      } else if (error.code === 'INSUFFICIENT_FUNDS' || error.code === -32000) {
+        throw new Error(`Insufficient BNB for gas fees in ${finalWalletType}. Please add more BNB to your wallet for transaction fees.`);
       } else if (error.code === 'UNSUPPORTED_OPERATION') {
-        throw new Error(`Operation not supported by ${walletType}. Please try with a different wallet.`);
+        throw new Error(`Operation not supported by ${finalWalletType}. Please try with a different wallet or ensure you have sufficient BNB for gas.`);
       } else if (error.reason) {
         throw new Error(`Smart contract error: ${error.reason}`);
-      } else if (error.message?.includes('User rejected')) {
-        throw new Error(`Transaction rejected by user in ${walletType}`);
-      } else if (error.message?.includes('insufficient funds')) {
-        throw new Error(`Insufficient balance in ${walletType}. Please add more funds.`);
+      } else if (error.message?.includes('User rejected') || error.message?.includes('user rejected') || error.message?.includes('user-denied')) {
+        throw new Error(`Transaction rejected by user in ${finalWalletType}. Please try again and approve the transaction.`);
+      } else if (error.message?.includes('insufficient funds') || error.message?.includes('insufficient balance')) {
+        throw new Error(`Insufficient BNB for gas fees in ${finalWalletType}. Please add more BNB to your wallet.`);
+      } else if (error.message?.includes('provider not available') || error.message?.includes('provider not ready')) {
+        throw new Error(`Wallet provider not available. Please reconnect your wallet via ${finalWalletType}.`);
       } else {
-        throw new Error(`Failed to create trade on blockchain using ${walletType}`);
+        const errorMsg = error.message || 'Unknown error';
+        throw new Error(`Failed to create trade on blockchain using ${finalWalletType}. ${errorMsg}`);
       }
     }
   }
@@ -381,8 +692,39 @@ export class BlockchainService {
       
       // Get fee constants from contract
       console.log('📊 Fetching fee structure for approval...');
-      const SELLER_EXTRA_BPS = await this.contract!.SELLER_EXTRA_BPS();
-      const BPS_DENOM = await this.contract!.BPS_DENOM();
+      let SELLER_EXTRA_BPS: bigint;
+      let BPS_DENOM: bigint;
+      
+      try {
+        // Try to get fees from the contract using the signer's provider
+        SELLER_EXTRA_BPS = await this.contract!.SELLER_EXTRA_BPS();
+        BPS_DENOM = await this.contract!.BPS_DENOM();
+        console.log('✅ Got fee structure from contract');
+      } catch (contractError: any) {
+        console.warn('⚠️ Failed to get fees from contract via signer provider:', contractError);
+        console.log('🔄 Trying read-only provider as fallback...');
+        
+        try {
+          // Fallback: Use read-only provider to get fees
+          const readOnlyProvider = new ethers.JsonRpcProvider(BSC_MAINNET_RPC);
+          const readOnlyContract = new ethers.Contract(
+            ZOTRUST_CONTRACT_ADDRESS,
+            ZOTRUST_CONTRACT_ABI,
+            readOnlyProvider
+          );
+          
+          SELLER_EXTRA_BPS = await readOnlyContract.SELLER_EXTRA_BPS();
+          BPS_DENOM = await readOnlyContract.BPS_DENOM();
+          console.log('✅ Got fee structure from read-only provider');
+        } catch (readOnlyError: any) {
+          console.error('❌ Failed to get fees from read-only provider:', readOnlyError);
+          console.warn('⚠️ Using default fee values (0% extra fee)');
+          // Fallback: Use default values (0% extra fee = just approve the amount)
+          // BPS_DENOM is typically 10000 (10000 = 100%)
+          BPS_DENOM = 10000n;
+          SELLER_EXTRA_BPS = 0n; // No extra fee as fallback
+        }
+      }
 
       // Calculate seller's total (amount + extra fee) with correct decimals
       const amountWei = ethers.parseUnits(amount, tokenDecimals);
@@ -406,6 +748,14 @@ export class BlockchainService {
         return 'ALREADY_APPROVED';
       }
 
+      // Verify signer is available before attempting approval
+      if (!this.signer) {
+        throw new Error('Signer not available. Please reconnect your wallet.');
+      }
+      
+      const signerAddressForApproval = await this.signer.getAddress();
+      console.log('👛 Approving with signer address:', signerAddressForApproval);
+      
       // Approve tokens (including seller's extra fee)
       // For Trust Wallet and WalletConnect, use explicit gas settings
       const walletType = this.detectWalletType();
@@ -419,6 +769,7 @@ export class BlockchainService {
         console.log('🔧 Trust Wallet/WalletConnect detected - using explicit gas settings');
         try {
           // Estimate gas first
+          console.log('⛽ Estimating gas for approval...');
           const gasEstimate = await tokenContract.approve.estimateGas(
             ZOTRUST_CONTRACT_ADDRESS,
             sellerTotal
@@ -430,6 +781,7 @@ export class BlockchainService {
           console.log('⛽ Estimated gas:', gasEstimate.toString());
           console.log('⛽ Gas limit with buffer:', gasLimit.toString());
           
+          console.log('📝 Sending approval transaction with explicit gas...');
           approveTx = await tokenContract.approve(
             ZOTRUST_CONTRACT_ADDRESS,
             sellerTotal,
@@ -437,13 +789,23 @@ export class BlockchainService {
               gasLimit: gasLimit
             }
           );
+          console.log('✅ Approval transaction sent with explicit gas');
         } catch (gasError: any) {
           console.warn('⚠️ Gas estimation failed, trying without explicit gas:', gasError);
+          console.log('📝 Attempting approval without explicit gas limit...');
           // Fallback: try without explicit gas limit
-          approveTx = await tokenContract.approve(ZOTRUST_CONTRACT_ADDRESS, sellerTotal);
+          try {
+            approveTx = await tokenContract.approve(ZOTRUST_CONTRACT_ADDRESS, sellerTotal);
+            console.log('✅ Approval transaction sent without explicit gas');
+          } catch (fallbackError: any) {
+            console.error('❌ Approval failed even without explicit gas:', fallbackError);
+            throw fallbackError;
+          }
         }
       } else {
+        console.log('📝 Sending approval transaction (standard wallet)...');
         approveTx = await tokenContract.approve(ZOTRUST_CONTRACT_ADDRESS, sellerTotal);
+        console.log('✅ Approval transaction sent');
       }
       
       console.log('📡 Approval transaction sent:', approveTx.hash);
@@ -485,6 +847,43 @@ export class BlockchainService {
         throw new Error(`Failed to approve token spending using ${walletType}. ${errorMsg}`);
       }
     }
+  }
+
+  /**
+   * Create trade and lock funds in one operation (NEW FLOW)
+   * This creates the trade first, then immediately locks funds
+   * @param orderData - Order details for trade creation
+   * @param tokenAddress - Token contract address
+   * @param amount - Amount to lock
+   * @returns Trade ID and transaction hashes
+   */
+  async createTradeAndLockFunds(orderData: {
+    token: string;
+    amount: string;
+    buyer: string;
+    isNativeBNB?: boolean;
+  }, tokenAddress: string, amount: string): Promise<{ tradeId: number; createTradeTxHash: string; lockFundsTxHash: string }> {
+    console.log('🔄 NEW FLOW: Creating trade and locking funds together...');
+    
+    // Step 1: Create trade
+    console.log('📝 Step 1: Creating trade...');
+    const tradeResult = await this.createTrade(orderData);
+    const tradeId = tradeResult.tradeId;
+    const createTradeTxHash = tradeResult.txHash;
+    
+    console.log('✅ Trade created! ID:', tradeId);
+    
+    // Step 2: Lock funds
+    console.log('🔒 Step 2: Locking funds...');
+    const lockFundsTxHash = await this.lockFunds(tradeId, tokenAddress, amount);
+    
+    console.log('✅ Funds locked!');
+    
+    return {
+      tradeId,
+      createTradeTxHash,
+      lockFundsTxHash
+    };
   }
 
   /**
@@ -566,8 +965,39 @@ export class BlockchainService {
         
         // Get fee constants from contract
         console.log('📊 Fetching fee structure from contract...');
-        const SELLER_EXTRA_BPS = await this.contract!.SELLER_EXTRA_BPS();
-        const BPS_DENOM = await this.contract!.BPS_DENOM();
+        let SELLER_EXTRA_BPS: bigint;
+        let BPS_DENOM: bigint;
+        
+        try {
+          // Try to get fees from the contract using the signer's provider
+          SELLER_EXTRA_BPS = await this.contract!.SELLER_EXTRA_BPS();
+          BPS_DENOM = await this.contract!.BPS_DENOM();
+          console.log('✅ Got fee structure from contract');
+        } catch (contractError: any) {
+          console.warn('⚠️ Failed to get fees from contract via signer provider:', contractError);
+          console.log('🔄 Trying read-only provider as fallback...');
+          
+          try {
+            // Fallback: Use read-only provider to get fees
+            const readOnlyProvider = new ethers.JsonRpcProvider(BSC_MAINNET_RPC);
+            const readOnlyContract = new ethers.Contract(
+              ZOTRUST_CONTRACT_ADDRESS,
+              ZOTRUST_CONTRACT_ABI,
+              readOnlyProvider
+            );
+            
+            SELLER_EXTRA_BPS = await readOnlyContract.SELLER_EXTRA_BPS();
+            BPS_DENOM = await readOnlyContract.BPS_DENOM();
+            console.log('✅ Got fee structure from read-only provider');
+          } catch (readOnlyError: any) {
+            console.error('❌ Failed to get fees from read-only provider:', readOnlyError);
+            console.warn('⚠️ Using default fee values (0% extra fee)');
+            // Fallback: Use default values (0% extra fee = just send the amount)
+            // BPS_DENOM is typically 10000 (10000 = 100%)
+            BPS_DENOM = 10000n;
+            SELLER_EXTRA_BPS = 0n; // No extra fee as fallback
+          }
+        }
         
         // Calculate seller's total (amount + extra fee)
         // sellerTotal = amount + (amount * SELLER_EXTRA_BPS / BPS_DENOM)
@@ -735,22 +1165,68 @@ export class BlockchainService {
     }
     
     try {
-      const tx = await this.contract!.markPaid(tradeId);
-      await tx.wait();
+      console.log('✅ Marking payment as sent on blockchain...');
+      console.log('📝 Trade ID:', tradeId);
+      
+      const walletType = useWalletStore.getState()?.walletType || this.detectWalletType();
+      console.log('👛 Wallet Type:', walletType);
+      
+      // For WalletConnect, estimate gas and add buffer
+      let tx;
+      if (walletType === 'walletconnect') {
+        console.log('🔧 WalletConnect detected - estimating gas for markPaid...');
+        try {
+          const gasEstimate = await this.contract!.markPaid.estimateGas(tradeId);
+          const gasLimit = (gasEstimate * 130n) / 100n;
+          
+          console.log('⛽ Estimated gas:', gasEstimate.toString());
+          console.log('⛽ Gas limit with buffer:', gasLimit.toString());
+          
+          tx = await this.contract!.markPaid(tradeId, { gasLimit: gasLimit });
+          console.log('✅ Transaction sent with explicit gas');
+        } catch (gasError: any) {
+          console.warn('⚠️ Gas estimation failed, trying without explicit gas:', gasError);
+          tx = await this.contract!.markPaid(tradeId);
+          console.log('✅ Transaction sent without explicit gas');
+        }
+      } else {
+        tx = await this.contract!.markPaid(tradeId);
+        console.log('✅ Transaction sent');
+      }
+      
+      console.log('📡 Transaction hash:', tx.hash);
+      console.log('⏳ Waiting for confirmation...');
+      
+      const receipt = await tx.wait();
+      console.log('✅ Payment marked as sent on blockchain!');
+      console.log('📦 Block number:', receipt.blockNumber);
+      
       return tx.hash;
     } catch (error: any) {
       console.error('💥 Error marking paid:', error);
+      console.error('💥 Error details:', {
+        code: error.code,
+        reason: error.reason,
+        message: error.message,
+        data: error.data
+      });
       
-      const walletType = this.detectWalletType();
+      const detectedWalletType = this.detectWalletType();
+      const walletTypeFromStore = useWalletStore.getState()?.walletType;
+      const finalWalletType = walletTypeFromStore || detectedWalletType;
       
-      if (error.code === 'ACTION_REJECTED') {
-        throw new Error(`Transaction rejected by user in ${walletType}`);
-      } else if (error.code === 'INSUFFICIENT_FUNDS') {
-        throw new Error(`Insufficient balance for gas fees in ${walletType}`);
+      // Provide more helpful error messages
+      if (error.code === 'ACTION_REJECTED' || error.code === 4001) {
+        throw new Error(`Payment confirmation cancelled. You can try again later. The transaction was rejected in ${finalWalletType}.`);
+      } else if (error.code === 'INSUFFICIENT_FUNDS' || error.code === -32000) {
+        throw new Error(`Insufficient BNB for gas fees in ${finalWalletType}. Please add more BNB to your wallet for transaction fees.`);
       } else if (error.reason) {
         throw new Error(`Smart contract error: ${error.reason}`);
+      } else if (error.message?.includes('User rejected') || error.message?.includes('user rejected') || error.message?.includes('user-denied')) {
+        throw new Error(`Payment confirmation cancelled. You can try again later.`);
       } else {
-        throw new Error(`Failed to mark paid using ${walletType}`);
+        const errorMsg = error.message || 'Unknown error';
+        throw new Error(`Failed to confirm payment on blockchain using ${finalWalletType}. ${errorMsg}`);
       }
     }
   }
@@ -764,22 +1240,68 @@ export class BlockchainService {
     }
     
     try {
-      const tx = await this.contract!.markReceived(tradeId);
-      await tx.wait();
+      console.log('✅ Marking payment as received on blockchain...');
+      console.log('📝 Trade ID:', tradeId);
+      
+      const walletType = useWalletStore.getState()?.walletType || this.detectWalletType();
+      console.log('👛 Wallet Type:', walletType);
+      
+      // For WalletConnect, estimate gas and add buffer
+      let tx;
+      if (walletType === 'walletconnect') {
+        console.log('🔧 WalletConnect detected - estimating gas for markReceived...');
+        try {
+          const gasEstimate = await this.contract!.markReceived.estimateGas(tradeId);
+          const gasLimit = (gasEstimate * 130n) / 100n;
+          
+          console.log('⛽ Estimated gas:', gasEstimate.toString());
+          console.log('⛽ Gas limit with buffer:', gasLimit.toString());
+          
+          tx = await this.contract!.markReceived(tradeId, { gasLimit: gasLimit });
+          console.log('✅ Transaction sent with explicit gas');
+        } catch (gasError: any) {
+          console.warn('⚠️ Gas estimation failed, trying without explicit gas:', gasError);
+          tx = await this.contract!.markReceived(tradeId);
+          console.log('✅ Transaction sent without explicit gas');
+        }
+      } else {
+        tx = await this.contract!.markReceived(tradeId);
+        console.log('✅ Transaction sent');
+      }
+      
+      console.log('📡 Transaction hash:', tx.hash);
+      console.log('⏳ Waiting for confirmation...');
+      
+      const receipt = await tx.wait();
+      console.log('✅ Payment marked as received on blockchain!');
+      console.log('📦 Block number:', receipt.blockNumber);
+      
       return tx.hash;
     } catch (error: any) {
       console.error('💥 Error marking received:', error);
+      console.error('💥 Error details:', {
+        code: error.code,
+        reason: error.reason,
+        message: error.message,
+        data: error.data
+      });
       
-      const walletType = this.detectWalletType();
+      const detectedWalletType = this.detectWalletType();
+      const walletTypeFromStore = useWalletStore.getState()?.walletType;
+      const finalWalletType = walletTypeFromStore || detectedWalletType;
       
-      if (error.code === 'ACTION_REJECTED') {
-        throw new Error(`Transaction rejected by user in ${walletType}`);
-      } else if (error.code === 'INSUFFICIENT_FUNDS') {
-        throw new Error(`Insufficient balance for gas fees in ${walletType}`);
+      // Provide more helpful error messages
+      if (error.code === 'ACTION_REJECTED' || error.code === 4001) {
+        throw new Error(`Payment confirmation cancelled. You can try again later. The transaction was rejected in ${finalWalletType}.`);
+      } else if (error.code === 'INSUFFICIENT_FUNDS' || error.code === -32000) {
+        throw new Error(`Insufficient BNB for gas fees in ${finalWalletType}. Please add more BNB to your wallet for transaction fees.`);
       } else if (error.reason) {
         throw new Error(`Smart contract error: ${error.reason}`);
+      } else if (error.message?.includes('User rejected') || error.message?.includes('user rejected') || error.message?.includes('user-denied')) {
+        throw new Error(`Payment confirmation cancelled. You can try again later.`);
       } else {
-        throw new Error(`Failed to mark received using ${walletType}`);
+        const errorMsg = error.message || 'Unknown error';
+        throw new Error(`Failed to confirm payment on blockchain using ${finalWalletType}. ${errorMsg}`);
       }
     }
   }

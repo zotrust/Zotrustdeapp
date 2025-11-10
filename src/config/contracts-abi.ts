@@ -1,5 +1,5 @@
 // P2PEscrowV2 Contract ABI - COMPLETE VERSION
-// Contract Address: 0x878A2a0d3452533F7a2cB0E3053258AB66C03d0F
+// Contract Address: 0x6722FE6DdCe1F7389daa70aD5C65e51f9F375E6e
 
 export const ZOTRUST_CONTRACT_ABI = [
     {

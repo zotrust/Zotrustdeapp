@@ -821,9 +821,9 @@ const Orders: React.FC = () => {
         return;
       }
       
-      // Step 2: Create trade on blockchain
-      console.log('⛓️ Step 2a: Creating trade on blockchain...');
-      toast.loading('Creating trade on blockchain...', { id: 'lock-flow' });
+      // Step 2: Create trade and lock funds together (NEW FLOW)
+      console.log('⛓️ Step 2: Creating trade and locking funds...');
+      toast.loading('Creating trade and locking funds on blockchain...', { id: 'lock-flow' });
       
       // Check wallet type and show instructions
       console.log('💡 Wallet instructions:', blockchainService.getWalletInstructions());
@@ -833,9 +833,6 @@ const Orders: React.FC = () => {
       const tokenConfig = ((TOKENS as any)[tokenSymbol]) || TOKENS.BNB;
       const tokenAddress = tokenConfig.address;
       const isNativeBNB = tokenConfig.isNative || false;
-      
-      // Determine ad type (0 = BUY, 1 = SELL)
-      // const adType = order?.adType === 'SELL' ? 1 : 0;
       
       // Determine counterParty
       let counterParty = '';
@@ -851,64 +848,42 @@ const Orders: React.FC = () => {
       console.log('🪙 Token:', tokenSymbol, '→ Address:', tokenAddress);
       console.log('💰 Amount:', order?.amount);
       console.log('👤 Buyer (counterParty):', counterParty);
-      console.log('ℹ️ Seller (caller) will lock funds after creating trade');
+      console.log('ℹ️ Seller (caller) will create trade and lock funds');
       
       let blockchainTradeId: number;
       let createTradeTxHash: string;
-      
-      try {
-        // P2PEscrowV2 contract: caller is SELLER, counterParty is BUYER
-        const tradeResult = await blockchainService.createTrade({
-          token: tokenAddress,
-          amount: order?.amount?.toString() || '0',
-          buyer: counterParty,
-          isNativeBNB: isNativeBNB
-        });
-        
-        blockchainTradeId = tradeResult.tradeId;
-        createTradeTxHash = tradeResult.txHash;
-        
-        console.log('✅ Step 2a Complete: Trade ID:', blockchainTradeId);
-        console.log('📡 TX Hash:', createTradeTxHash);
-        
-        toast.success(`Trade created! ID: ${blockchainTradeId}`, {
-          id: 'lock-flow',
-          duration: 3000
-        });
-        
-      } catch (createError: any) {
-        console.error('💥 Step 2a FAILED:', createError);
-        toast.error(`Failed to create trade: ${createError.message}`, {
-          id: 'lock-flow',
-          duration: 8000
-        });
-            return;
-          }
-      
-      // Step 2b: Lock funds on blockchain
-      console.log('⛓️ Step 2b: Locking funds...');
-      toast.loading('Locking funds on blockchain...', { id: 'lock-flow' });
-      
       let lockFundsTxHash: string;
       
       try {
-        lockFundsTxHash = await blockchainService.lockFunds(
-          blockchainTradeId,
+        // NEW FLOW: Create trade and lock funds together
+        const result = await blockchainService.createTradeAndLockFunds(
+          {
+            token: tokenAddress,
+            amount: order?.amount?.toString() || '0',
+            buyer: counterParty,
+            isNativeBNB: isNativeBNB
+          },
           tokenAddress,
           order?.amount?.toString() || '0'
         );
         
-        console.log('✅ Step 2b Complete: Funds locked');
-        console.log('📡 TX Hash:', lockFundsTxHash);
+        blockchainTradeId = result.tradeId;
+        createTradeTxHash = result.createTradeTxHash;
+        lockFundsTxHash = result.lockFundsTxHash;
         
-        toast.success(`Funds locked! TX: ${lockFundsTxHash.slice(0, 10)}...`, {
+        console.log('✅ Step 2 Complete: Trade created and funds locked!');
+        console.log('🆔 Trade ID:', blockchainTradeId);
+        console.log('📡 Create Trade TX Hash:', createTradeTxHash);
+        console.log('📡 Lock Funds TX Hash:', lockFundsTxHash);
+        
+        toast.success(`Trade created and funds locked! ID: ${blockchainTradeId}`, {
           id: 'lock-flow',
-          duration: 3000
+          duration: 5000
         });
         
-      } catch (lockError: any) {
-        console.error('💥 Step 2b FAILED:', lockError);
-        toast.error(`Failed to lock funds: ${lockError.message}`, {
+      } catch (error: any) {
+        console.error('💥 Step 2 FAILED:', error);
+        toast.error(`Failed to create trade and lock funds: ${error.message}`, {
           id: 'lock-flow',
           duration: 8000
         });
@@ -917,6 +892,24 @@ const Orders: React.FC = () => {
       
       // Step 3: Update database
       console.log('💾 Step 3: Updating database...');
+      console.log('📊 Step 3: Data to send:', {
+        txHash: lockFundsTxHash,
+        otpHash: prepareData.data.otpHash,
+        blockchainTradeId: blockchainTradeId,
+        blockchainTradeIdType: typeof blockchainTradeId,
+        createTradeTxHash: createTradeTxHash
+      });
+      
+      // Ensure blockchainTradeId is a number
+      const tradeIdToSend = Number(blockchainTradeId);
+      if (isNaN(tradeIdToSend) || tradeIdToSend <= 0) {
+        console.error('❌ Step 3: Invalid blockchain trade ID:', blockchainTradeId);
+        toast.error('Invalid blockchain trade ID. Please try again.', { id: 'lock-flow' });
+        return;
+      }
+      
+      console.log('✅ Step 3: Validated trade ID to send:', tradeIdToSend);
+      
       toast.loading('Finalizing...', { id: 'lock-flow' });
       
       const finalizeResponse = await fetch(`/api/orders/${orderId}/lock-funds`, {
@@ -928,7 +921,7 @@ const Orders: React.FC = () => {
         body: JSON.stringify({
           txHash: lockFundsTxHash,
           otpHash: prepareData.data.otpHash,
-          blockchainTradeId: blockchainTradeId,
+          blockchainTradeId: tradeIdToSend,
           createTradeTxHash: createTradeTxHash
         })
       });
@@ -1126,15 +1119,28 @@ const Orders: React.FC = () => {
       const order = orders.find(o => o.id === orderId);
       if (!order) { toast.error('Order not found'); return; }
       console.log(order);
+      
+      // Check if order is in a state that requires blockchain trade id
+      if (order.state !== 'LOCKED' && order.state !== 'UNDER_DISPUTE' && order.state !== 'APPEALED') {
+        toast.error(`Order must be LOCKED, UNDER_DISPUTE, or APPEALED to confirm payment. Current state: ${order.state}`);
+        return;
+      }
+      
       // We expect backend dispute status to populate blockchain_trade_id, but Orders list may not include it.
       // Try to fetch dispute status to get it if missing.
       let tradeId: number | undefined = (order as any)?.blockchain_trade_id || (order as any)?.blockchainTradeId;
       if (!tradeId) {
+        console.log('🔍 Blockchain trade ID not in order, fetching from dispute status...');
         const status = await fetchDisputeStatus(orderId);
         tradeId = Number(status?.blockchain_trade_id || status?.blockchainTradeId);
       }
       if (!tradeId || Number.isNaN(tradeId)) {
-        toast.error('Missing blockchain trade id');
+        toast.error('Missing blockchain trade id. The order may not have been locked on the blockchain yet. Please wait for the seller to lock funds.');
+        console.error('Missing blockchain_trade_id for order:', {
+          orderId,
+          orderState: order.state,
+          orderData: order
+        });
         return;
       }
 
@@ -1170,7 +1176,21 @@ const Orders: React.FC = () => {
       }
     } catch (error: any) {
       console.error('Error confirming payment:', error);
-      toast.error(error?.reason || error?.message || 'Failed to confirm payment');
+      
+      // Handle user rejection more gracefully
+      if (error?.message?.includes('cancelled') || 
+          error?.message?.includes('rejected') ||
+          error?.code === 'ACTION_REJECTED' ||
+          error?.code === 4001) {
+        // User intentionally rejected - show softer message
+        toast('Payment confirmation cancelled. You can try again when ready.', {
+          icon: 'ℹ️',
+          duration: 4000
+        });
+      } else {
+        // Other errors - show full error message
+        toast.error(error?.reason || error?.message || 'Failed to confirm payment');
+      }
     }
   };
 
@@ -1565,7 +1585,15 @@ const Orders: React.FC = () => {
   const handleRedeem = async (order: Order) => {
     try {
       const tradeId = Number((order as any)?.blockchain_trade_id || (order as any)?.blockchainTradeId);
-      if (!tradeId) { toast.error('Missing blockchain trade id'); return; }
+      if (!tradeId || Number.isNaN(tradeId)) {
+        toast.error('Missing blockchain trade id. This order may not have been locked on the blockchain yet.');
+        console.error('Missing blockchain_trade_id for redeem:', {
+          orderId: order.id,
+          orderState: order.state,
+          orderData: order
+        });
+        return;
+      }
       toast.loading('Redeeming on-chain...', { id: 'redeem' });
       const tx = await blockchainService.redeemAfterAppealWindow(tradeId);
       toast.success(`Redeemed! TX: ${tx.slice(0,10)}...`, { id: 'redeem' });
@@ -2101,7 +2129,7 @@ const Orders: React.FC = () => {
                         <div className="flex space-x-2 mt-3">
                           {order.state === 'LOCKED' && (
                             <>
-                              {isBuyer && (
+                              {isBuyer && (order as any)?.blockchain_trade_id && (
                                 <motion.button
                                   onClick={() => handleConfirmPayment(order.id, 'SENT')}
                                   className="flex-1 bg-blue-600 text-white px-3 py-2 rounded-md text-sm font-medium hover:bg-blue-700"
@@ -2111,7 +2139,7 @@ const Orders: React.FC = () => {
                                   Confirm Payment Sent
                                 </motion.button>
                               )}
-                              {isSeller && (
+                              {isSeller && (order as any)?.blockchain_trade_id && (
                                 <motion.button
                                   onClick={() => handleConfirmPayment(order.id, 'RECEIVED')}
                                   className="flex-1 bg-green-600 text-white px-3 py-2 rounded-md text-sm font-medium hover:bg-green-700"
@@ -2120,6 +2148,11 @@ const Orders: React.FC = () => {
                                   <CheckCircle size={14} className="inline mr-1" />
                                   Confirm Payment Received
                                 </motion.button>
+                              )}
+                              {(!(order as any)?.blockchain_trade_id) && (
+                                <div className="flex-1 bg-yellow-500/20 border border-yellow-500/30 rounded-md px-3 py-2 text-xs text-yellow-300">
+                                  ⏳ Waiting for blockchain trade ID...
+                                </div>
                               )}
                             </>
                           )}
@@ -2136,7 +2169,7 @@ const Orders: React.FC = () => {
                           )}
 
                           {/* Redeem Button for Seller after 48h appeal window */}
-                          {order.state === 'LOCKED' && canShowRedeem(order) && (
+                          {order.state === 'LOCKED' && canShowRedeem(order) && (order as any)?.blockchain_trade_id && (
                             <motion.button
                               onClick={() => handleRedeem(order)}
                               className="flex-1 bg-red-600 text-white px-3 py-2 rounded-md text-sm font-medium hover:bg-red-700"
