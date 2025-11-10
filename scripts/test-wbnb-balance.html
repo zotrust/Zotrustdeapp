@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test WBNB Balance</title>
+    <script src="https://cdn.ethers.io/lib/ethers-5.7.2.umd.min.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .container {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+        }
+        .button {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 18px;
+            border-radius: 50px;
+            cursor: pointer;
+            width: 100%;
+            margin: 10px 0;
+            transition: transform 0.2s;
+        }
+        .button:hover {
+            transform: scale(1.05);
+        }
+        .button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .result {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 20px;
+            border-radius: 15px;
+            margin: 20px 0;
+            font-family: 'Courier New', monospace;
+        }
+        .balance-card {
+            background: rgba(255, 255, 255, 0.15);
+            padding: 20px;
+            border-radius: 15px;
+            margin: 15px 0;
+            text-align: center;
+        }
+        .balance-amount {
+            font-size: 2em;
+            font-weight: bold;
+            color: #ffd700;
+        }
+        .success {
+            color: #4ade80;
+        }
+        .error {
+            color: #f87171;
+        }
+        .info {
+            background: rgba(59, 130, 246, 0.2);
+            padding: 15px;
+            border-radius: 10px;
+            margin: 15px 0;
+            border-left: 4px solid #3b82f6;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 WBNB Balance Tester</h1>
+        
+        <div class="info">
+            <strong>📋 Network:</strong> BSC Testnet (Chain ID: 97)<br>
+            <strong>🪙 WBNB Address:</strong> 0xae13d989daC2f0dEbFf460aC112a837C89BAa7cd
+        </div>
+
+        <button class="button" onclick="connectWallet()">🔗 Connect Wallet</button>
+        <button class="button" onclick="checkWBNBBalance()" id="checkBtn" disabled>💰 Check WBNB Balance</button>
+        <button class="button" onclick="addWBNBToMetaMask()">➕ Add WBNB to MetaMask</button>
+
+        <div id="result"></div>
+    </div>
+
+    <script>
+        let provider;
+        let signer;
+        let userAddress;
+
+        const WBNB_ADDRESS = '0xae13d989daC2f0dEbFf460aC112a837C89BAa7cd';
+        const BSC_TESTNET_CHAIN_ID = '0x61'; // 97 in hex
+
+        async function connectWallet() {
+            try {
+                if (!window.ethereum) {
+                    showResult('❌ MetaMask not found! Please install MetaMask.', 'error');
+                    return;
+                }
+
+                showResult('🔄 Connecting to wallet...', 'info');
+
+                // Request account access
+                const accounts = await window.ethereum.request({ 
+                    method: 'eth_requestAccounts' 
+                });
+
+                provider = new ethers.providers.Web3Provider(window.ethereum);
+                signer = provider.getSigner();
+                userAddress = accounts[0];
+
+                // Check network
+                const network = await provider.getNetwork();
+                const chainId = network.chainId;
+
+                let resultHTML = `
+                    <div class="balance-card">
+                        <h3>✅ Wallet Connected!</h3>
+                        <p><strong>Address:</strong><br>${userAddress}</p>
+                        <p><strong>Network:</strong> ${network.name} (${chainId})</p>
+                `;
+
+                if (chainId !== 97) {
+                    resultHTML += `
+                        <p class="error">⚠️ Wrong Network! Please switch to BSC Testnet (Chain ID: 97)</p>
+                        <button class="button" onclick="switchToBSCTestnet()">🔄 Switch to BSC Testnet</button>
+                    `;
+                } else {
+                    resultHTML += `<p class="success">✅ Correct Network!</p>`;
+                    document.getElementById('checkBtn').disabled = false;
+                }
+
+                resultHTML += `</div>`;
+                showResult(resultHTML, 'success');
+
+            } catch (error) {
+                showResult(`❌ Error connecting wallet: ${error.message}`, 'error');
+            }
+        }
+
+        async function switchToBSCTestnet() {
+            try {
+                await window.ethereum.request({
+                    method: 'wallet_switchEthereumChain',
+                    params: [{ chainId: BSC_TESTNET_CHAIN_ID }],
+                });
+                showResult('✅ Switched to BSC Testnet! Please reconnect.', 'success');
+                setTimeout(() => connectWallet(), 1000);
+            } catch (error) {
+                if (error.code === 4902) {
+                    // Chain not added, add it
+                    try {
+                        await window.ethereum.request({
+                            method: 'wallet_addEthereumChain',
+                            params: [{
+                                chainId: BSC_TESTNET_CHAIN_ID,
+                                chainName: 'BSC Testnet',
+                                nativeCurrency: {
+                                    name: 'BNB',
+                                    symbol: 'BNB',
+                                    decimals: 18
+                                },
+                                rpcUrls: ['https://data-seed-prebsc-1-s1.binance.org:8545/'],
+                                blockExplorerUrls: ['https://testnet.bscscan.com']
+                            }]
+                        });
+                        showResult('✅ BSC Testnet added! Please reconnect.', 'success');
+                        setTimeout(() => connectWallet(), 1000);
+                    } catch (addError) {
+                        showResult(`❌ Error adding network: ${addError.message}`, 'error');
+                    }
+                } else {
+                    showResult(`❌ Error switching network: ${error.message}`, 'error');
+                }
+            }
+        }
+
+        async function checkWBNBBalance() {
+            try {
+                showResult('🔄 Fetching WBNB balance...', 'info');
+
+                const wbnbAbi = [
+                    'function balanceOf(address) view returns (uint256)',
+                    'function decimals() view returns (uint8)',
+                    'function symbol() view returns (string)',
+                    'function name() view returns (string)'
+                ];
+
+                const wbnbContract = new ethers.Contract(WBNB_ADDRESS, wbnbAbi, provider);
+
+                // Get balance
+                console.log('📊 Fetching WBNB balance for:', userAddress);
+                const balance = await wbnbContract.balanceOf(userAddress);
+                console.log('🔍 WBNB Raw Balance:', balance.toString());
+
+                const decimals = await wbnbContract.decimals();
+                const symbol = await wbnbContract.symbol();
+                const name = await wbnbContract.name();
+
+                const formattedBalance = ethers.utils.formatUnits(balance, decimals);
+                console.log('✅ WBNB Formatted Balance:', formattedBalance);
+
+                // Also get native BNB balance for comparison
+                const nativeBalance = await provider.getBalance(userAddress);
+                const formattedNativeBalance = ethers.utils.formatEther(nativeBalance);
+
+                let resultHTML = `
+                    <div class="balance-card">
+                        <h3>💰 Balance Results</h3>
+                        
+                        <div style="margin: 20px 0;">
+                            <p><strong>Token Info:</strong></p>
+                            <p>Name: ${name}</p>
+                            <p>Symbol: ${symbol}</p>
+                            <p>Decimals: ${decimals}</p>
+                            <p>Contract: ${WBNB_ADDRESS}</p>
+                        </div>
+
+                        <div style="margin: 20px 0; padding: 20px; background: rgba(255, 215, 0, 0.1); border-radius: 10px;">
+                            <p><strong>🪙 WBNB Balance:</strong></p>
+                            <p class="balance-amount">${parseFloat(formattedBalance).toFixed(6)} WBNB</p>
+                            <p style="font-size: 0.9em; color: #ccc;">Raw: ${balance.toString()}</p>
+                        </div>
+
+                        <div style="margin: 20px 0; padding: 20px; background: rgba(255, 255, 0, 0.1); border-radius: 10px;">
+                            <p><strong>⚡ Native BNB Balance:</strong></p>
+                            <p class="balance-amount">${parseFloat(formattedNativeBalance).toFixed(6)} BNB</p>
+                        </div>
+                `;
+
+                if (parseFloat(formattedBalance) === 0) {
+                    resultHTML += `
+                        <div class="info">
+                            <strong>ℹ️ No WBNB Found</strong><br>
+                            You don't have any WBNB in your wallet.<br>
+                            <br>
+                            <strong>How to get WBNB:</strong><br>
+                            1. Go to PancakeSwap Testnet<br>
+                            2. Wrap some BNB to WBNB<br>
+                            3. Or use a BSC Testnet faucet
+                        </div>
+                    `;
+                } else {
+                    resultHTML += `
+                        <p class="success">✅ WBNB balance successfully fetched!</p>
+                    `;
+                }
+
+                resultHTML += `</div>`;
+                showResult(resultHTML, 'success');
+
+            } catch (error) {
+                console.error('❌ Error fetching WBNB balance:', error);
+                showResult(`
+                    <div class="balance-card">
+                        <p class="error">❌ Error fetching WBNB balance:</p>
+                        <p>${error.message}</p>
+                        <br>
+                        <p><strong>Possible reasons:</strong></p>
+                        <ul style="text-align: left;">
+                            <li>Wrong network (must be BSC Testnet)</li>
+                            <li>WBNB contract doesn't exist on this network</li>
+                            <li>RPC endpoint is down</li>
+                            <li>Network congestion</li>
+                        </ul>
+                    </div>
+                `, 'error');
+            }
+        }
+
+        async function addWBNBToMetaMask() {
+            try {
+                if (!window.ethereum) {
+                    showResult('❌ MetaMask not found!', 'error');
+                    return;
+                }
+
+                await window.ethereum.request({
+                    method: 'wallet_watchAsset',
+                    params: {
+                        type: 'ERC20',
+                        options: {
+                            address: WBNB_ADDRESS,
+                            symbol: 'WBNB',
+                            decimals: 18,
+                            image: 'https://s2.coinmarketcap.com/static/img/coins/64x64/7192.png'
+                        }
+                    }
+                });
+
+                showResult('✅ WBNB added to MetaMask! Check your assets list.', 'success');
+            } catch (error) {
+                showResult(`❌ Error adding WBNB: ${error.message}`, 'error');
+            }
+        }
+
+        function showResult(message, type = 'info') {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = `<div class="result ${type}">${message}</div>`;
+        }
+
+        // Auto-connect if already connected
+        window.addEventListener('load', async () => {
+            if (window.ethereum) {
+                try {
+                    const accounts = await window.ethereum.request({ 
+                        method: 'eth_accounts' 
+                    });
+                    if (accounts.length > 0) {
+                        await connectWallet();
+                    }
+                } catch (error) {
+                    console.error('Auto-connect failed:', error);
+                }
+            }
+        });
+    </script>
+</body>
+</html>
+

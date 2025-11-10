@@ -1,0 +1,275 @@
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { motion } from 'framer-motion';
+import { 
+  Settings, 
+  Save, 
+  RefreshCw,
+  Wallet,
+  DollarSign,
+  Clock,
+  Shield,
+  AlertCircle
+} from 'lucide-react';
+import toast from 'react-hot-toast';
+
+interface AppSetting {
+  key: string;
+  value: string;
+  description?: string;
+}
+
+const AdminSettings: React.FC = () => {
+  const [settings, setSettings] = useState<AppSetting[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [feeWallet, setFeeWallet] = useState('');
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    fetchSettings();
+  }, []);
+
+  const fetchSettings = async () => {
+    try {
+      const token = localStorage.getItem('adminToken');
+      if (!token) {
+        navigate('/admin/login');
+        return;
+      }
+
+      const response = await fetch('/api/admin/settings', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        // Ensure data.data is an array
+        const settingsArray = Array.isArray(data.data) ? data.data : (Array.isArray(data) ? data : []);
+        setSettings(settingsArray);
+        
+        // Set fee wallet from settings
+        const feeWalletSetting = settingsArray.find((s: AppSetting) => s.key === 'admin_fee_wallet');
+        if (feeWalletSetting) {
+          setFeeWallet(feeWalletSetting.value || '');
+        }
+      } else if (response.status === 401) {
+        localStorage.removeItem('adminToken');
+        navigate('/admin/login');
+      } else {
+        toast.error('Failed to load settings');
+      }
+    } catch (error) {
+      console.error('Error fetching settings:', error);
+      toast.error('Failed to load settings');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSaveFeeWallet = async () => {
+    if (!feeWallet.trim()) {
+      toast.error('Please enter a valid wallet address');
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const token = localStorage.getItem('adminToken');
+      const response = await fetch('/api/admin/set-fee-wallet', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ address: feeWallet })
+      });
+
+      if (response.ok) {
+        toast.success('Fee wallet updated successfully');
+        fetchSettings(); // Refresh settings
+      } else {
+        const errorData = await response.json();
+        toast.error(errorData.error || 'Failed to update fee wallet');
+      }
+    } catch (error) {
+      console.error('Error updating fee wallet:', error);
+      toast.error('Failed to update fee wallet');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const getSettingValue = (key: string) => {
+    const setting = settings.find(s => s.key === key);
+    return setting?.value || '';
+  };
+
+  const getSettingDescription = (key: string) => {
+    const descriptions: { [key: string]: string } = {
+      'admin_fee_wallet': 'Wallet address where admin fees are collected',
+      'buyer_fee_percent': 'Percentage fee charged to buyers (as decimal, e.g., 0.01 for 1%)',
+      'seller_fee_percent': 'Percentage fee charged to sellers (as decimal, e.g., 0.01 for 1%)',
+      'accept_timeout_minutes': 'Time in minutes for order acceptance timeout',
+      'lock_duration_hours': 'Duration in hours for fund lock period'
+    };
+    return descriptions[key] || 'Application setting';
+  };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-white/30 border-t-white rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-white text-lg">Loading settings...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      {/* Header */}
+      <div className="flex justify-between items-center mb-6">
+        <div className="flex items-center space-x-3">
+          <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-blue-500 rounded-full flex items-center justify-center">
+            <Settings className="w-6 h-6 text-white" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold text-white">App Settings</h1>
+            <p className="text-gray-400">Manage application configuration</p>
+          </div>
+        </div>
+        <button
+          onClick={fetchSettings}
+          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors flex items-center space-x-2"
+        >
+          <RefreshCw size={16} />
+          <span>Refresh</span>
+        </button>
+      </div>
+
+      {/* Fee Wallet Section */}
+      <div className="bg-white/10 backdrop-blur-lg rounded-xl p-6 border border-white/20 mb-6">
+        <div className="flex items-center space-x-3 mb-4">
+          <Wallet className="w-6 h-6 text-blue-400" />
+          <h2 className="text-xl font-semibold text-white">Fee Wallet Configuration</h2>
+        </div>
+        
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">
+              Admin Fee Wallet Address
+            </label>
+            <div className="flex space-x-3">
+              <input
+                type="text"
+                value={feeWallet}
+                onChange={(e) => setFeeWallet(e.target.value)}
+                placeholder="0x..."
+                className="flex-1 px-4 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <button
+                onClick={handleSaveFeeWallet}
+                disabled={isSaving}
+                className="bg-green-600 hover:bg-green-700 disabled:bg-gray-600 text-white px-6 py-2 rounded-lg transition-colors flex items-center space-x-2"
+              >
+                {isSaving ? (
+                  <RefreshCw size={16} className="animate-spin" />
+                ) : (
+                  <Save size={16} />
+                )}
+                <span>{isSaving ? 'Saving...' : 'Save'}</span>
+              </button>
+            </div>
+            <p className="text-xs text-gray-400 mt-2">
+              {getSettingDescription('admin_fee_wallet')}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Application Settings */}
+      <div className="bg-white/10 backdrop-blur-lg rounded-xl border border-white/20 overflow-hidden">
+        <div className="px-6 py-4 border-b border-white/10">
+          <h2 className="text-xl font-semibold text-white flex items-center space-x-2">
+            <Shield className="w-6 h-6 text-green-400" />
+            <span>Application Settings</span>
+          </h2>
+        </div>
+        
+        <div className="divide-y divide-white/10">
+          {Array.isArray(settings) && settings.map((setting, index) => (
+            <motion.div
+              key={setting.key}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: index * 0.05 }}
+              className="px-6 py-4 hover:bg-white/5 transition-colors"
+            >
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <div className="flex items-center space-x-2 mb-2">
+                    <h3 className="text-sm font-medium text-white capitalize">
+                      {setting.key.replace(/_/g, ' ')}
+                    </h3>
+                    {setting.key === 'admin_fee_wallet' && (
+                      <span className="px-2 py-1 bg-blue-500/10 text-blue-400 text-xs rounded-full">
+                        Editable
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-sm text-gray-400 mb-2">
+                    {getSettingDescription(setting.key)}
+                  </p>
+                  <div className="bg-white/5 rounded-lg p-3">
+                    <code className="text-sm text-gray-300 break-all">
+                      {setting.value || 'Not set'}
+                    </code>
+                  </div>
+                </div>
+                <div className="ml-4 flex items-center space-x-2">
+                  {setting.key === 'admin_fee_wallet' ? (
+                    <div className="flex items-center space-x-1 text-green-400">
+                      <DollarSign size={14} />
+                      <span className="text-xs">Fee Collection</span>
+                    </div>
+                  ) : setting.key.includes('fee') ? (
+                    <div className="flex items-center space-x-1 text-yellow-400">
+                      <DollarSign size={14} />
+                      <span className="text-xs">Fee Rate</span>
+                    </div>
+                  ) : setting.key.includes('timeout') || setting.key.includes('duration') ? (
+                    <div className="flex items-center space-x-1 text-blue-400">
+                      <Clock size={14} />
+                      <span className="text-xs">Timing</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center space-x-1 text-gray-400">
+                      <Settings size={14} />
+                      <span className="text-xs">Config</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          ))}
+        </div>
+        
+        {settings.length === 0 && (
+          <div className="text-center py-12">
+            <AlertCircle className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+            <p className="text-gray-400 text-lg">No settings found</p>
+            <p className="text-gray-500 text-sm mt-2">
+              Settings will appear here once they are configured
+            </p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default AdminSettings;

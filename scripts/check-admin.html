@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Check Contract Admin</title>
+  <meta charset="UTF-8">
+  <style>
+    body {
+      font-family: monospace;
+      max-width: 800px;
+      margin: 50px auto;
+      padding: 20px;
+      background: #1a1a1a;
+      color: #00ff00;
+    }
+    .container {
+      background: #000;
+      padding: 30px;
+      border: 2px solid #00ff00;
+      border-radius: 10px;
+    }
+    h1 {
+      color: #00ff00;
+      text-align: center;
+    }
+    button {
+      width: 100%;
+      padding: 15px;
+      margin: 10px 0;
+      background: #00ff00;
+      color: #000;
+      border: none;
+      font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #00cc00;
+    }
+    .info {
+      background: #111;
+      padding: 15px;
+      margin: 15px 0;
+      border-left: 4px solid #00ff00;
+    }
+    .match { color: #00ff00; }
+    .nomatch { color: #ff0000; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🔍 Check Contract Admin</h1>
+    
+    <button onclick="checkAdmin()">Check Admin</button>
+
+    <div id="result" class="info">
+      Click button to check...
+    </div>
+  </div>
+
+  <script type="module">
+    import { ethers } from 'https://cdn.jsdelivr.net/npm/ethers@6.7.0/+esm';
+    
+    const CONTRACT_ADDRESS = '0x878A2a0d3452533F7a2cB0E3053258AB66C03d0F';
+    
+    const ABI = [
+      "function admin() public view returns (address)",
+      "function owner() public view returns (address)"
+    ];
+
+    window.checkAdmin = async function() {
+      const resultDiv = document.getElementById('result');
+      
+      try {
+        resultDiv.innerHTML = '🔍 Checking...';
+        
+        if (!window.ethereum) {
+          throw new Error('MetaMask not found!');
+        }
+
+        await window.ethereum.request({ method: 'eth_requestAccounts' });
+        
+        const provider = new ethers.BrowserProvider(window.ethereum);
+        const signer = await provider.getSigner();
+        const myAddress = await signer.getAddress();
+        
+        const contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, provider);
+        
+        let adminAddress = null;
+        let ownerAddress = null;
+        
+        // Try admin() function
+        try {
+          adminAddress = await contract.admin();
+        } catch (e) {
+          console.log('admin() not found');
+        }
+        
+        // Try owner() function
+        try {
+          ownerAddress = await contract.owner();
+        } catch (e) {
+          console.log('owner() not found');
+        }
+        
+        let html = '<h3>📊 Contract Info:</h3>';
+        html += `<p>Contract: ${CONTRACT_ADDRESS}</p>`;
+        html += `<p>Your Wallet: ${myAddress}</p>`;
+        html += '<hr>';
+        
+        if (adminAddress) {
+          const isAdmin = adminAddress.toLowerCase() === myAddress.toLowerCase();
+          html += `<h3>Admin Address:</h3>`;
+          html += `<p class="${isAdmin ? 'match' : 'nomatch'}">${adminAddress}</p>`;
+          html += `<p>${isAdmin ? '✅ You are the ADMIN!' : '❌ You are NOT the admin'}</p>`;
+        }
+        
+        if (ownerAddress) {
+          const isOwner = ownerAddress.toLowerCase() === myAddress.toLowerCase();
+          html += `<h3>Owner Address:</h3>`;
+          html += `<p class="${isOwner ? 'match' : 'nomatch'}">${ownerAddress}</p>`;
+          html += `<p>${isOwner ? '✅ You are the OWNER!' : '❌ You are NOT the owner'}</p>`;
+        }
+        
+        if (!adminAddress && !ownerAddress) {
+          html += '<p class="nomatch">❌ Could not find admin or owner function</p>';
+        }
+        
+        html += '<hr>';
+        
+        if (adminAddress && adminAddress.toLowerCase() !== myAddress.toLowerCase()) {
+          html += '<h3>⚠️ What to do:</h3>';
+          html += `<p>1. Switch MetaMask to admin wallet: <strong>${adminAddress}</strong></p>`;
+          html += '<p>2. Then refresh this page and whitelist again</p>';
+        }
+        
+        if (ownerAddress && ownerAddress.toLowerCase() !== myAddress.toLowerCase()) {
+          html += '<h3>⚠️ What to do:</h3>';
+          html += `<p>1. Switch MetaMask to owner wallet: <strong>${ownerAddress}</strong></p>`;
+          html += '<p>2. Then refresh this page and whitelist again</p>';
+        }
+        
+        resultDiv.innerHTML = html;
+        
+      } catch (error) {
+        resultDiv.innerHTML = `<p class="nomatch">❌ Error: ${error.message}</p>`;
+        console.error(error);
+      }
+    };
+  </script>
+</body>
+</html>
+

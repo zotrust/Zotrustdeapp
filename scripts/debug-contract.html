@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Smart Contract Debugger</title>
+  <script src="https://cdn.jsdelivr.net/npm/ethers@6.7.0/dist/ethers.umd.min.js"></script>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      max-width: 900px;
+      margin: 50px auto;
+      padding: 20px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: #fff;
+    }
+    .container {
+      background: rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(10px);
+      border-radius: 20px;
+      padding: 30px;
+      box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+    }
+    h1 {
+      text-align: center;
+      margin-bottom: 30px;
+      font-size: 2.5em;
+    }
+    .debug-section {
+      background: rgba(255, 255, 255, 0.15);
+      border-radius: 10px;
+      padding: 20px;
+      margin: 20px 0;
+    }
+    .result {
+      background: rgba(0, 0, 0, 0.3);
+      border-radius: 5px;
+      padding: 15px;
+      margin: 10px 0;
+      font-family: 'Courier New', monospace;
+      font-size: 14px;
+      word-break: break-all;
+      white-space: pre-wrap;
+    }
+    .success {
+      background: rgba(0, 255, 0, 0.2);
+      border: 2px solid #00ff00;
+    }
+    .error {
+      background: rgba(255, 0, 0, 0.2);
+      border: 2px solid #ff0000;
+    }
+    button {
+      background: linear-gradient(45deg, #667eea, #764ba2);
+      color: white;
+      border: none;
+      padding: 12px 30px;
+      border-radius: 25px;
+      font-size: 16px;
+      cursor: pointer;
+      margin: 10px 5px;
+      transition: all 0.3s;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+    }
+    button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+    }
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    .warning {
+      background: rgba(255, 165, 0, 0.2);
+      border: 2px solid #ffa500;
+      padding: 15px;
+      border-radius: 5px;
+      margin: 15px 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🔍 Smart Contract Debugger</h1>
+    
+    <button onclick="connectWallet()">🔌 Connect Wallet</button>
+    <button onclick="runDiagnostics()">🔬 Run Full Diagnostics</button>
+    
+    <div id="walletInfo" class="debug-section" style="display:none;">
+      <h3>👛 Wallet Info</h3>
+      <div id="walletDisplay" class="result"></div>
+    </div>
+    
+    <div id="contractInfo" class="debug-section" style="display:none;">
+      <h3>📄 Contract Info</h3>
+      <div id="contractDisplay" class="result"></div>
+    </div>
+    
+    <div id="tokenStatus" class="debug-section" style="display:none;">
+      <h3>🪙 Token Whitelist Status</h3>
+      <div id="tokenDisplay" class="result"></div>
+    </div>
+    
+    <div id="permissions" class="debug-section" style="display:none;">
+      <h3>🔐 Contract Permissions</h3>
+      <div id="permissionsDisplay" class="result"></div>
+    </div>
+    
+    <div id="testTransaction" class="debug-section" style="display:none;">
+      <h3>🧪 Test Transaction (Dry Run)</h3>
+      <div id="testDisplay" class="result"></div>
+    </div>
+  </div>
+
+  <script>
+    const CONTRACT_ADDRESS = '0x878A2a0d3452533F7a2cB0E3053258AB66C03d0F';
+    const BSC_TESTNET_CHAIN_ID = 97;
+    
+    const CONTRACT_ABI = [
+      "function allowedTokens(address) view returns (bool)",
+      "function owner() view returns (address)",
+      "function admin() view returns (address)",
+      "function tradeCounter() view returns (uint256)",
+      "function createTrade(uint8,address,uint256,address) payable returns (uint256)"
+    ];
+
+    let provider, signer, contract, account;
+
+    async function connectWallet() {
+      try {
+        console.log('🔍 Checking for wallet...');
+        console.log('window.ethereum exists:', !!window.ethereum);
+        
+        // Check multiple wallet providers
+        const ethereum = window.ethereum || window.web3?.currentProvider;
+        
+        if (!ethereum) {
+          const errorMsg = `
+❌ No Web3 wallet detected!
+
+Possible solutions:
+1. Install MetaMask extension
+2. Use TrustWallet dApp browser
+3. Make sure you're on the same browser where wallet is installed
+4. Try refreshing the page
+5. Check if wallet extension is enabled
+
+Current browser: ${navigator.userAgent}
+          `;
+          alert(errorMsg);
+          document.getElementById('walletDisplay').innerHTML = errorMsg;
+          document.getElementById('walletInfo').style.display = 'block';
+          document.getElementById('walletDisplay').classList.add('error');
+          return;
+        }
+
+        console.log('✅ Wallet provider found');
+        
+        await ethereum.request({ method: 'eth_requestAccounts' });
+        provider = new ethers.BrowserProvider(ethereum);
+        signer = await provider.getSigner();
+        account = await signer.getAddress();
+        contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
+
+        const network = await provider.getNetwork();
+        
+        document.getElementById('walletInfo').style.display = 'block';
+        document.getElementById('walletDisplay').innerHTML = `
+✅ Connected!
+👛 Address: ${account}
+🌐 Network: ${network.name}
+🔢 Chain ID: ${network.chainId}
+${network.chainId !== BigInt(BSC_TESTNET_CHAIN_ID) ? '\n⚠️ WARNING: Not on BSC Testnet!' : '✅ BSC Testnet Confirmed'}
+        `;
+        
+        if (network.chainId !== BigInt(BSC_TESTNET_CHAIN_ID)) {
+          document.getElementById('walletDisplay').classList.add('error');
+        } else {
+          document.getElementById('walletDisplay').classList.add('success');
+        }
+
+        // Show contract info
+        document.getElementById('contractInfo').style.display = 'block';
+        document.getElementById('contractDisplay').innerHTML = `
+📄 Contract Address: ${CONTRACT_ADDRESS}
+🔗 BSCScan: https://testnet.bscscan.com/address/${CONTRACT_ADDRESS}
+        `;
+
+      } catch (error) {
+        alert('❌ Failed to connect: ' + error.message);
+      }
+    }
+
+    async function runDiagnostics() {
+      if (!contract) {
+        alert('⚠️ Please connect wallet first!');
+        return;
+      }
+
+      try {
+        // Check token whitelist
+        document.getElementById('tokenStatus').style.display = 'block';
+        document.getElementById('tokenDisplay').innerHTML = '🔄 Checking token whitelist...';
+        
+        const nativeBNBAllowed = await contract.allowedTokens('0x0000000000000000000000000000000000000000');
+        const wbnbAllowed = await contract.allowedTokens('0xae13d989daC2f0dEbFf460aC112a837C89BAa7cd');
+        
+        let tokenHTML = `
+📊 Token Whitelist Status:
+
+Native BNB (address(0)): ${nativeBNBAllowed ? '✅ ALLOWED' : '❌ NOT ALLOWED'}
+WBNB: ${wbnbAllowed ? '✅ ALLOWED' : '❌ NOT ALLOWED'}
+        `;
+        
+        if (!nativeBNBAllowed) {
+          tokenHTML += `\n⚠️ CRITICAL: Native BNB is NOT whitelisted!
+This is why your transactions are failing.
+
+👉 Fix: Use scripts/allow-token.html to whitelist address(0)`;
+        }
+        
+        document.getElementById('tokenDisplay').innerHTML = tokenHTML;
+        document.getElementById('tokenDisplay').classList.add(nativeBNBAllowed ? 'success' : 'error');
+
+        // Check permissions
+        document.getElementById('permissions').style.display = 'block';
+        document.getElementById('permissionsDisplay').innerHTML = '🔄 Checking permissions...';
+        
+        let owner, admin;
+        try {
+          owner = await contract.owner();
+        } catch (e) {
+          owner = 'N/A (function not found)';
+        }
+        
+        try {
+          admin = await contract.admin();
+        } catch (e) {
+          admin = 'N/A (function not found)';
+        }
+        
+        const isOwner = owner.toLowerCase() === account.toLowerCase();
+        const isAdmin = admin !== 'N/A' && admin.toLowerCase() === account.toLowerCase();
+        
+        let permHTML = `
+🔐 Contract Roles:
+
+Owner: ${owner}
+Admin: ${admin}
+
+Your address: ${account}
+You are owner: ${isOwner ? '✅ YES' : '❌ NO'}
+You are admin: ${isAdmin ? '✅ YES' : '❌ NO'}
+
+${!isOwner && !isAdmin ? '\n⚠️ You need the owner/admin wallet to whitelist tokens!' : ''}
+        `;
+        
+        document.getElementById('permissionsDisplay').innerHTML = permHTML;
+
+        // Check trade counter
+        try {
+          const tradeCounter = await contract.tradeCounter();
+          permHTML += `\n📊 Total Trades Created: ${tradeCounter.toString()}`;
+          document.getElementById('permissionsDisplay').innerHTML = permHTML;
+        } catch (e) {
+          // Trade counter might not exist
+        }
+
+        // Test transaction (simulate)
+        document.getElementById('testTransaction').style.display = 'block';
+        document.getElementById('testDisplay').innerHTML = '🧪 Testing transaction (estimate gas)...';
+        
+        try {
+          const testAmount = ethers.parseEther('0.1');
+          const gasEstimate = await contract.createTrade.estimateGas(
+            0, // BUY
+            '0x0000000000000000000000000000000000000000', // Native BNB
+            testAmount,
+            '0x1dBcBB2774307E3535DA493f34039cfa7Dbfd8f9', // Test counterparty
+            { value: testAmount }
+          );
+          
+          document.getElementById('testDisplay').innerHTML = `
+✅ Transaction simulation PASSED!
+
+⛽ Estimated Gas: ${gasEstimate.toString()}
+💰 Cost: ~${ethers.formatEther(gasEstimate * BigInt(5000000000))} BNB
+
+This means:
+✅ Token is whitelisted
+✅ Parameters are valid
+✅ Contract is working
+✅ You can proceed with real transaction
+          `;
+          document.getElementById('testDisplay').classList.add('success');
+          
+        } catch (error) {
+          let errorMsg = error.message;
+          let diagnosis = '\n\n🔍 Diagnosis:\n';
+          
+          if (errorMsg.includes('Token not allowed')) {
+            diagnosis += '❌ Native BNB (address(0)) is NOT whitelisted\n';
+            diagnosis += '👉 Solution: Use scripts/allow-token.html with owner wallet';
+          } else if (errorMsg.includes('require(false)')) {
+            diagnosis += '❌ Contract validation failed (generic)\n';
+            diagnosis += 'Possible causes:\n';
+            diagnosis += '  • Token not whitelisted\n';
+            diagnosis += '  • Contract paused\n';
+            diagnosis += '  • Amount validation failed\n';
+            diagnosis += '  • msg.value mismatch';
+          } else {
+            diagnosis += '❌ Unknown error\n';
+            diagnosis += errorMsg;
+          }
+          
+          document.getElementById('testDisplay').innerHTML = `
+💥 Transaction simulation FAILED!
+
+Error: ${errorMsg}
+${diagnosis}
+          `;
+          document.getElementById('testDisplay').classList.add('error');
+        }
+
+      } catch (error) {
+        alert('❌ Diagnostics failed: ' + error.message);
+        console.error(error);
+      }
+    }
+
+    // Check wallet on page load
+    window.addEventListener('DOMContentLoaded', () => {
+      console.log('🔄 Page loaded, checking wallet availability...');
+      
+      const ethereum = window.ethereum || (window.web3 && window.web3.currentProvider);
+      
+      if (ethereum) {
+        console.log('✅ Wallet detected on page load');
+        const walletName = ethereum.isMetaMask ? 'MetaMask' : 
+                          ethereum.isTrust ? 'TrustWallet' : 
+                          'Web3 Wallet';
+        
+        const statusDiv = document.createElement('div');
+        statusDiv.className = 'warning';
+        statusDiv.style.background = 'rgba(0, 255, 0, 0.2)';
+        statusDiv.style.border = '2px solid #00ff00';
+        statusDiv.innerHTML = `
+✅ ${walletName} detected!
+👛 Ready to connect
+📍 Click "Connect Wallet" button above
+        `;
+        const container = document.querySelector('.container');
+        const firstButton = container.querySelector('button');
+        container.insertBefore(statusDiv, firstButton.nextSibling);
+      } else {
+        console.log('❌ No wallet detected on page load');
+        const statusDiv = document.createElement('div');
+        statusDiv.className = 'warning';
+        statusDiv.innerHTML = `
+⚠️ No Web3 wallet detected!
+
+Please install one of these:
+• MetaMask (Chrome/Firefox/Brave extension)
+• TrustWallet (Mobile dApp browser)
+• Brave Browser (built-in wallet)
+
+Then refresh this page.
+
+Current browser: ${navigator.userAgent.includes('Chrome') ? 'Chrome ✅' : 
+                  navigator.userAgent.includes('Firefox') ? 'Firefox ✅' : 
+                  navigator.userAgent.includes('Safari') ? 'Safari ⚠️' : 'Unknown'}
+        `;
+        const container = document.querySelector('.container');
+        const firstButton = container.querySelector('button');
+        container.insertBefore(statusDiv, firstButton.nextSibling);
+      }
+    });
+  </script>
+</body>
+</html>
+

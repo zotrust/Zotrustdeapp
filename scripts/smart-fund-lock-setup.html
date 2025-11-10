@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Fund Lock Setup - Auto Fix</title>
+    <script src="https://cdn.jsdelivr.net/npm/ethers@6.7.0/dist/ethers.umd.min.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1000px;
+            margin: 30px auto;
+            padding: 30px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .container {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+        h1 {
+            text-align: center;
+            margin-bottom: 10px;
+            font-size: 2.8em;
+        }
+        .subtitle {
+            text-align: center;
+            margin-bottom: 30px;
+            opacity: 0.9;
+            font-size: 1.2em;
+        }
+        .button {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+            border: none;
+            padding: 18px 40px;
+            font-size: 18px;
+            font-weight: bold;
+            border-radius: 50px;
+            cursor: pointer;
+            width: 100%;
+            margin: 15px 0;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .button:hover:not(:disabled) {
+            transform: scale(1.05);
+            box-shadow: 0 5px 20px rgba(255, 255, 255, 0.3);
+        }
+        .button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: scale(1);
+        }
+        .button.success {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        }
+        .button.warning {
+            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+        }
+        .result {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 25px;
+            border-radius: 15px;
+            margin: 20px 0;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            line-height: 1.8;
+        }
+        .info {
+            background: rgba(59, 130, 246, 0.2);
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+            border-left: 4px solid #3b82f6;
+        }
+        .warning {
+            background: rgba(245, 158, 11, 0.2);
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+            border-left: 4px solid #f59e0b;
+        }
+        .success-box {
+            background: rgba(34, 197, 94, 0.2);
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+            border-left: 4px solid #22c55e;
+        }
+        .error-box {
+            background: rgba(239, 68, 68, 0.2);
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+            border-left: 4px solid #ef4444;
+        }
+        .status-card {
+            background: rgba(0, 0, 0, 0.2);
+            padding: 20px;
+            border-radius: 10px;
+            margin: 15px 0;
+        }
+        .badge {
+            display: inline-block;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            font-weight: bold;
+            margin: 5px;
+        }
+        .badge.green { background: #22c55e; color: white; }
+        .badge.red { background: #ef4444; color: white; }
+        .badge.yellow { background: #f59e0b; color: white; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎯 Smart Fund Lock Setup</h1>
+        <p class="subtitle">Auto-Detect & Fix Configuration Issues</p>
+        
+        <div class="info">
+            <strong>📋 What This Tool Does:</strong><br>
+            ✅ Checks if you're contract admin<br>
+            ✅ Checks if Native BNB is enabled<br>
+            ✅ Automatically suggests best solution<br>
+            ✅ Enables TBNB if you're admin<br>
+            ✅ Guides you to use WBNB if not admin
+        </div>
+
+        <button class="button" onclick="startDiagnosis()">🚀 Start Auto-Diagnosis</button>
+
+        <div id="result"></div>
+    </div>
+
+    <script>
+        let provider;
+        let signer;
+        let contract;
+        let userAddress;
+
+        const CONTRACT_ADDRESS = '0x878A2a0d3452533F7a2cB0E3053258AB66C03d0F';
+        const BSC_TESTNET_CHAIN_ID = 97;
+        const WBNB_ADDRESS = '0xae13d989daC2f0dEbFf460aC112a837C89BAa7cd';
+
+        const CONTRACT_ABI = [
+            "function admin() view returns (address)",
+            "function allowedNative() view returns (bool)",
+            "function setAllowedNative(bool _allowed)",
+            "function allowedTokens(address) view returns (bool)",
+            "event NativeAllowed(bool allowed)"
+        ];
+
+        async function startDiagnosis() {
+            try {
+                showResult('🔄 Starting auto-diagnosis...', 'info');
+
+                // Step 1: Connect Wallet
+                if (!window.ethereum) {
+                    showError('❌ MetaMask not found! Please install MetaMask.');
+                    return;
+                }
+
+                showResult('🔌 Connecting wallet...', 'info');
+                const accounts = await window.ethereum.request({ 
+                    method: 'eth_requestAccounts' 
+                });
+
+                provider = new ethers.BrowserProvider(window.ethereum);
+                signer = await provider.getSigner();
+                userAddress = accounts[0];
+
+                showResult('✅ Wallet connected: ' + userAddress, 'info');
+
+                // Step 2: Check Network
+                const network = await provider.getNetwork();
+                const chainId = Number(network.chainId);
+
+                if (chainId !== BSC_TESTNET_CHAIN_ID) {
+                    showResult(`
+                        <div class="warning">
+                            <strong>⚠️ Wrong Network!</strong><br>
+                            Current: ${network.name} (${chainId})<br>
+                            Required: BSC Testnet (97)<br><br>
+                            <button class="button warning" onclick="switchNetwork()">🔄 Switch to BSC Testnet</button>
+                        </div>
+                    `, 'warning');
+                    return;
+                }
+
+                showResult('✅ Network: BSC Testnet (' + chainId + ')', 'info');
+
+                // Step 3: Initialize Contract
+                contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
+
+                // Step 4: Check Admin Status
+                showResult('🔍 Checking admin status...', 'info');
+                let adminAddress;
+                let isAdmin = false;
+
+                try {
+                    adminAddress = await contract.admin();
+                    isAdmin = userAddress.toLowerCase() === adminAddress.toLowerCase();
+                    showResult('✅ Admin check complete', 'info');
+                } catch (error) {
+                    console.error('Admin check failed:', error);
+                    showResult('⚠️ Could not verify admin (contract might not exist)', 'warning');
+                }
+
+                // Step 5: Check Native BNB Status
+                showResult('🔍 Checking Native BNB status...', 'info');
+                let isNativeAllowed = false;
+
+                try {
+                    isNativeAllowed = await contract.allowedNative();
+                    showResult('✅ Native BNB check complete', 'info');
+                } catch (error) {
+                    console.error('Native check failed:', error);
+                    showResult('⚠️ Could not check native status', 'warning');
+                }
+
+                // Step 6: Check WBNB Status
+                showResult('🔍 Checking WBNB status...', 'info');
+                let isWBNBAllowed = false;
+
+                try {
+                    isWBNBAllowed = await contract.allowedTokens(WBNB_ADDRESS);
+                    showResult('✅ WBNB check complete', 'info');
+                } catch (error) {
+                    console.error('WBNB check failed:', error);
+                }
+
+                // Step 7: Display Results & Recommendations
+                displayDiagnosisResults({
+                    userAddress,
+                    adminAddress,
+                    isAdmin,
+                    isNativeAllowed,
+                    isWBNBAllowed,
+                    chainId
+                });
+
+            } catch (error) {
+                console.error('Diagnosis failed:', error);
+                showError('❌ Diagnosis failed: ' + error.message);
+            }
+        }
+
+        function displayDiagnosisResults(results) {
+            const {
+                userAddress,
+                adminAddress,
+                isAdmin,
+                isNativeAllowed,
+                isWBNBAllowed
+            } = results;
+
+            let html = `
+                <div class="result">
+                    <h2>📊 Diagnosis Results</h2>
+
+                    <div class="status-card">
+                        <h3>👤 Your Wallet</h3>
+                        <code>${userAddress}</code>
+                    </div>
+
+                    <div class="status-card">
+                        <h3>🔑 Contract Admin</h3>
+                        <code>${adminAddress || 'Unknown'}</code>
+                        ${isAdmin ? 
+                            '<span class="badge green">✅ YOU ARE ADMIN</span>' : 
+                            '<span class="badge red">❌ NOT ADMIN</span>'
+                        }
+                    </div>
+
+                    <div class="status-card">
+                        <h3>🪙 Token Status</h3>
+                        <p><strong>TBNB (Native BNB):</strong> 
+                            ${isNativeAllowed ? 
+                                '<span class="badge green">✅ ENABLED</span>' : 
+                                '<span class="badge red">❌ DISABLED</span>'
+                            }
+                        </p>
+                        <p><strong>WBNB (Wrapped BNB):</strong> 
+                            ${isWBNBAllowed ? 
+                                '<span class="badge green">✅ ENABLED</span>' : 
+                                '<span class="badge yellow">⚠️ CHECK REQUIRED</span>'
+                            }
+                        </p>
+                    </div>
+            `;
+
+            // Recommendations
+            if (isAdmin && !isNativeAllowed) {
+                // Admin but native not enabled
+                html += `
+                    <div class="warning">
+                        <h3>⚠️ Recommendation: Enable Native BNB</h3>
+                        <p>You are the admin, so you can enable TBNB!</p>
+                        <button class="button success" onclick="enableNativeBNB()">
+                            🔓 Enable TBNB Now (Recommended)
+                        </button>
+                    </div>
+                `;
+            } else if (!isAdmin && !isNativeAllowed) {
+                // Not admin and native not enabled
+                html += `
+                    <div class="error-box">
+                        <h3>❌ TBNB is Disabled</h3>
+                        <p>You are NOT the admin, so you cannot enable native BNB.</p>
+                    </div>
+
+                    <div class="success-box">
+                        <h3>✅ Solution: Use WBNB Instead!</h3>
+                        <p>WBNB works without admin permissions!</p>
+                        
+                        <h4>📝 Steps to Use WBNB:</h4>
+                        <ol style="text-align: left;">
+                            <li><strong>Get WBNB:</strong> Go to <a href="https://testnet.pancakeswap.finance" target="_blank" style="color: #60a5fa;">PancakeSwap Testnet</a></li>
+                            <li><strong>Wrap BNB:</strong> Swap TBNB → WBNB (amount: 0.5 BNB for testing)</li>
+                            <li><strong>Use WBNB:</strong> In Zotrust, select WBNB token instead of TBNB</li>
+                            <li><strong>Lock Funds:</strong> WBNB will work perfectly! ✅</li>
+                        </ol>
+
+                        <button class="button success" onclick="openPancakeSwap()">
+                            🥞 Open PancakeSwap to Get WBNB
+                        </button>
+
+                        <button class="button" onclick="openZotrust()">
+                            🚀 Go to Zotrust App
+                        </button>
+                    </div>
+                `;
+            } else if (isNativeAllowed) {
+                // Native is already enabled
+                html += `
+                    <div class="success-box">
+                        <h3>✅ All Set!</h3>
+                        <p>TBNB is already enabled. You can use it for fund locking!</p>
+                        
+                        <button class="button success" onclick="openZotrust()">
+                            🚀 Go to Zotrust App
+                        </button>
+                    </div>
+                `;
+            }
+
+            // Additional Info
+            html += `
+                    <div class="info">
+                        <h4>💡 Quick Reference:</h4>
+                        <ul style="text-align: left;">
+                            <li><strong>Contract Address:</strong> <code>${CONTRACT_ADDRESS}</code></li>
+                            <li><strong>WBNB Address:</strong> <code>${WBNB_ADDRESS}</code></li>
+                            <li><strong>Network:</strong> BSC Testnet (Chain ID: 97)</li>
+                            <li><strong>PancakeSwap:</strong> <a href="https://testnet.pancakeswap.finance" target="_blank" style="color: #60a5fa;">testnet.pancakeswap.finance</a></li>
+                            <li><strong>BSCScan:</strong> <a href="https://testnet.bscscan.com/address/${CONTRACT_ADDRESS}" target="_blank" style="color: #60a5fa;">View Contract</a></li>
+                        </ul>
+                    </div>
+                </div>
+            `;
+
+            showResult(html, 'success');
+        }
+
+        async function enableNativeBNB() {
+            try {
+                showResult('🔄 Enabling Native BNB...', 'info');
+
+                const tx = await contract.setAllowedNative(true);
+                
+                showResult(`
+                    <div class="info">
+                        <h3>⏳ Transaction Sent!</h3>
+                        <p><strong>TX Hash:</strong> <code>${tx.hash}</code></p>
+                        <p>Waiting for confirmation...</p>
+                        <a href="https://testnet.bscscan.com/tx/${tx.hash}" target="_blank" style="color: #60a5fa;">View on BSCScan →</a>
+                    </div>
+                `, 'info');
+
+                const receipt = await tx.wait();
+                
+                showResult(`
+                    <div class="success-box">
+                        <h2>✅ SUCCESS!</h2>
+                        <h3>🎉 Native BNB is Now ENABLED!</h3>
+                        
+                        <p><strong>TX Hash:</strong> <code>${tx.hash}</code></p>
+                        <p><strong>Block:</strong> ${receipt.blockNumber}</p>
+                        
+                        <div style="margin-top: 20px;">
+                            <button class="button success" onclick="openZotrust()">
+                                🚀 Go to Zotrust App
+                            </button>
+                        </div>
+
+                        <div class="info" style="margin-top: 20px;">
+                            <strong>📝 Next Steps:</strong><br>
+                            1. Reload Zotrust app (Ctrl+Shift+R)<br>
+                            2. Create/accept TBNB orders<br>
+                            3. Lock funds - it will work! 🎉
+                        </div>
+                    </div>
+                `, 'success');
+
+            } catch (error) {
+                console.error('Enable failed:', error);
+                showError('❌ Failed to enable: ' + (error.reason || error.message));
+            }
+        }
+
+        async function switchNetwork() {
+            try {
+                await window.ethereum.request({
+                    method: 'wallet_switchEthereumChain',
+                    params: [{ chainId: '0x61' }],
+                });
+                setTimeout(() => startDiagnosis(), 1000);
+            } catch (error) {
+                if (error.code === 4902) {
+                    await window.ethereum.request({
+                        method: 'wallet_addEthereumChain',
+                        params: [{
+                            chainId: '0x61',
+                            chainName: 'BSC Testnet',
+                            nativeCurrency: { name: 'BNB', symbol: 'BNB', decimals: 18 },
+                            rpcUrls: ['https://data-seed-prebsc-1-s1.binance.org:8545/'],
+                            blockExplorerUrls: ['https://testnet.bscscan.com']
+                        }]
+                    });
+                    setTimeout(() => startDiagnosis(), 1000);
+                }
+            }
+        }
+
+        function openPancakeSwap() {
+            window.open('https://testnet.pancakeswap.finance/swap?outputCurrency=0xae13d989daC2f0dEbFf460aC112a837C89BAa7cd', '_blank');
+        }
+
+        function openZotrust() {
+            window.open('http://localhost:5173', '_blank');
+        }
+
+        function showResult(message, type = 'info') {
+            document.getElementById('result').innerHTML = `<div class="result ${type}">${message}</div>`;
+        }
+
+        function showError(message) {
+            showResult(`<div class="error-box">${message}</div>`, 'error');
+        }
+    </script>
+</body>
+</html>
+

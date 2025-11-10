@@ -1,0 +1,50 @@
+#!/bin/bash
+
+# VPS Database Setup Script for Zotrust (No sudo required)
+echo "🔧 Zotrust VPS Database Setup"
+echo "=============================="
+echo ""
+
+# Check if database exists
+echo "🔍 Checking if database 'zotrust' exists..."
+DB_EXISTS=$(psql -U postgres -tAc "SELECT 1 FROM pg_database WHERE datname='zotrust'")
+
+if [ "$DB_EXISTS" = "1" ]; then
+    echo "✅ Database 'zotrust' already exists!"
+else
+    echo "📦 Creating database 'zotrust'..."
+    createdb -U postgres zotrust
+    echo "✅ Database created successfully!"
+fi
+
+echo ""
+echo "🔄 Running schema migrations..."
+
+# Run main schema
+echo "1️⃣  Running main schema..."
+psql -U postgres -d zotrust -f schema-master.sql
+
+# Run additional migrations
+echo "2️⃣  Running dispute resolution migration..."
+psql -U postgres -d zotrust -f migrations/dispute-resolution-system.sql
+
+echo "3️⃣  Running reviews table migration..."
+psql -U postgres -d zotrust -f migrations/create-reviews-table.sql
+
+echo "4️⃣  Running WBNB token migration..."
+psql -U postgres -d zotrust -f migrations/add-wbnb-token.sql
+
+echo "5️⃣  Running reviews table update..."
+psql -U postgres -d zotrust -f migrations/update-reviews-table-optional-order.sql
+
+echo ""
+echo "🔍 Verifying database setup..."
+TABLE_COUNT=$(psql -U postgres -d zotrust -tAc "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public'")
+echo "📊 Total tables created: $TABLE_COUNT"
+
+echo ""
+echo "🎉 VPS Database setup complete!"
+echo ""
+echo "You can now start the backend server with:"
+echo "  npm start"
+echo ""

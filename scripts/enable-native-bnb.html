@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enable Native BNB on Contract</title>
+    <script src="https://cdn.jsdelivr.net/npm/ethers@6.7.0/dist/ethers.umd.min.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 900px;
+            margin: 50px auto;
+            padding: 30px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .container {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+        h1 {
+            text-align: center;
+            margin-bottom: 10px;
+            font-size: 2.5em;
+        }
+        .subtitle {
+            text-align: center;
+            margin-bottom: 30px;
+            opacity: 0.9;
+            font-size: 1.1em;
+        }
+        .button {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+            border: none;
+            padding: 18px 40px;
+            font-size: 20px;
+            font-weight: bold;
+            border-radius: 50px;
+            cursor: pointer;
+            width: 100%;
+            margin: 15px 0;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 5px 20px rgba(255, 255, 255, 0.3);
+        }
+        .button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: scale(1);
+        }
+        .result {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 20px;
+            border-radius: 15px;
+            margin: 20px 0;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+        .info {
+            background: rgba(59, 130, 246, 0.2);
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+            border-left: 4px solid #3b82f6;
+        }
+        .warning {
+            background: rgba(245, 158, 11, 0.2);
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+            border-left: 4px solid #f59e0b;
+        }
+        .success {
+            color: #4ade80;
+        }
+        .error {
+            color: #f87171;
+        }
+        .admin-check {
+            background: rgba(0, 0, 0, 0.2);
+            padding: 15px;
+            border-radius: 10px;
+            margin: 15px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔓 Enable Native BNB</h1>
+        <p class="subtitle">P2PEscrowV2 Contract Configuration</p>
+        
+        <div class="info">
+            <strong>📋 Contract Address:</strong><br>
+            <code>0x878A2a0d3452533F7a2cB0E3053258AB66C03d0F</code><br><br>
+            <strong>🌐 Network:</strong> BSC Testnet (Chain ID: 97)<br>
+            <strong>⚠️ Admin Only:</strong> Only contract admin can enable native BNB
+        </div>
+
+        <div class="warning">
+            <strong>⚠️ IMPORTANT:</strong><br>
+            You must be the <strong>ADMIN</strong> of the contract to enable native BNB!<br>
+            If you're not the admin, contact the contract owner.
+        </div>
+
+        <button class="button" onclick="connectWallet()">🔗 Connect Wallet</button>
+        <button class="button" onclick="checkStatus()" id="checkBtn" disabled>🔍 Check Current Status</button>
+        <button class="button" onclick="enableNativeBNB()" id="enableBtn" disabled>🔓 Enable Native BNB</button>
+
+        <div id="result"></div>
+    </div>
+
+    <script>
+        let provider;
+        let signer;
+        let contract;
+        let userAddress;
+
+        const CONTRACT_ADDRESS = '0x878A2a0d3452533F7a2cB0E3053258AB66C03d0F';
+        const BSC_TESTNET_CHAIN_ID = '0x61'; // 97 in hex
+
+        // P2PEscrowV2 ABI (only functions we need)
+        const CONTRACT_ABI = [
+            "function admin() view returns (address)",
+            "function allowedNative() view returns (bool)",
+            "function setAllowedNative(bool _allowed)",
+            "event NativeAllowed(bool allowed)"
+        ];
+
+        async function connectWallet() {
+            try {
+                if (!window.ethereum) {
+                    showResult('❌ MetaMask not found! Please install MetaMask.', 'error');
+                    return;
+                }
+
+                showResult('🔄 Connecting to wallet...', 'info');
+
+                const accounts = await window.ethereum.request({ 
+                    method: 'eth_requestAccounts' 
+                });
+
+                provider = new ethers.BrowserProvider(window.ethereum);
+                signer = await provider.getSigner();
+                userAddress = accounts[0];
+
+                // Initialize contract
+                contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
+
+                // Check network
+                const network = await provider.getNetwork();
+                const chainId = Number(network.chainId);
+
+                let resultHTML = `
+                    <div class="admin-check">
+                        <h3>✅ Wallet Connected!</h3>
+                        <p><strong>Your Address:</strong><br><code>${userAddress}</code></p>
+                        <p><strong>Network:</strong> ${network.name} (Chain ID: ${chainId})</p>
+                `;
+
+                if (chainId !== 97) {
+                    resultHTML += `
+                        <p class="error">⚠️ Wrong Network! Please switch to BSC Testnet.</p>
+                        <button class="button" onclick="switchToBSCTestnet()">🔄 Switch to BSC Testnet</button>
+                    `;
+                } else {
+                    resultHTML += `<p class="success">✅ Correct Network (BSC Testnet)</p>`;
+                    document.getElementById('checkBtn').disabled = false;
+                    
+                    // Auto-check status
+                    setTimeout(() => checkStatus(), 1000);
+                }
+
+                resultHTML += `</div>`;
+                showResult(resultHTML, 'success');
+
+            } catch (error) {
+                showResult(`❌ Error connecting wallet: ${error.message}`, 'error');
+            }
+        }
+
+        async function switchToBSCTestnet() {
+            try {
+                await window.ethereum.request({
+                    method: 'wallet_switchEthereumChain',
+                    params: [{ chainId: BSC_TESTNET_CHAIN_ID }],
+                });
+                showResult('✅ Switched to BSC Testnet! Reconnecting...', 'success');
+                setTimeout(() => connectWallet(), 1000);
+            } catch (error) {
+                if (error.code === 4902) {
+                    try {
+                        await window.ethereum.request({
+                            method: 'wallet_addEthereumChain',
+                            params: [{
+                                chainId: BSC_TESTNET_CHAIN_ID,
+                                chainName: 'BSC Testnet',
+                                nativeCurrency: { name: 'BNB', symbol: 'BNB', decimals: 18 },
+                                rpcUrls: ['https://data-seed-prebsc-1-s1.binance.org:8545/'],
+                                blockExplorerUrls: ['https://testnet.bscscan.com']
+                            }]
+                        });
+                        setTimeout(() => connectWallet(), 1000);
+                    } catch (addError) {
+                        showResult(`❌ Error adding network: ${addError.message}`, 'error');
+                    }
+                } else {
+                    showResult(`❌ Error switching network: ${error.message}`, 'error');
+                }
+            }
+        }
+
+        async function checkStatus() {
+            try {
+                showResult('🔄 Checking contract status...', 'info');
+
+                // Get admin address
+                const adminAddress = await contract.admin();
+                console.log('🔑 Contract Admin:', adminAddress);
+
+                // Get native BNB status
+                const isNativeAllowed = await contract.allowedNative();
+                console.log('🪙 Native BNB Allowed:', isNativeAllowed);
+
+                // Check if user is admin
+                const isUserAdmin = userAddress.toLowerCase() === adminAddress.toLowerCase();
+                console.log('👤 You are admin:', isUserAdmin);
+
+                let resultHTML = `
+                    <div class="admin-check">
+                        <h3>📊 Contract Status</h3>
+                        
+                        <div style="margin: 20px 0;">
+                            <p><strong>🔑 Contract Admin:</strong></p>
+                            <code>${adminAddress}</code>
+                        </div>
+
+                        <div style="margin: 20px 0;">
+                            <p><strong>👤 Your Address:</strong></p>
+                            <code>${userAddress}</code>
+                        </div>
+
+                        <div style="margin: 20px 0; padding: 15px; background: ${isUserAdmin ? 'rgba(34, 197, 94, 0.2)' : 'rgba(239, 68, 68, 0.2)'}; border-radius: 10px;">
+                            <p><strong>Admin Check:</strong></p>
+                            ${isUserAdmin ? 
+                                '<p class="success">✅ You ARE the admin!</p>' : 
+                                '<p class="error">❌ You are NOT the admin</p>'
+                            }
+                        </div>
+
+                        <div style="margin: 20px 0; padding: 15px; background: ${isNativeAllowed ? 'rgba(34, 197, 94, 0.2)' : 'rgba(239, 68, 68, 0.2)'}; border-radius: 10px;">
+                            <p><strong>🪙 Native BNB Status:</strong></p>
+                            ${isNativeAllowed ? 
+                                '<p class="success">✅ ENABLED - You can use TBNB!</p>' : 
+                                '<p class="error">❌ DISABLED - Cannot use TBNB</p>'
+                            }
+                        </div>
+                `;
+
+                if (isUserAdmin) {
+                    if (isNativeAllowed) {
+                        resultHTML += `
+                            <div class="info">
+                                <strong>✅ All Set!</strong><br>
+                                Native BNB is already enabled. You can use TBNB in your trades!
+                            </div>
+                        `;
+                        document.getElementById('enableBtn').disabled = true;
+                        document.getElementById('enableBtn').innerText = '✅ Native BNB Already Enabled';
+                    } else {
+                        resultHTML += `
+                            <div class="warning">
+                                <strong>⚠️ Action Required!</strong><br>
+                                Native BNB is currently DISABLED.<br>
+                                Click "Enable Native BNB" button below to enable it.
+                            </div>
+                        `;
+                        document.getElementById('enableBtn').disabled = false;
+                    }
+                } else {
+                    resultHTML += `
+                        <div class="warning">
+                            <strong>⚠️ Not Authorized!</strong><br>
+                            You are not the admin of this contract.<br>
+                            Contact the admin to enable native BNB:<br>
+                            <code>${adminAddress}</code>
+                        </div>
+                    `;
+                    document.getElementById('enableBtn').disabled = true;
+                }
+
+                resultHTML += `</div>`;
+                showResult(resultHTML, 'success');
+
+            } catch (error) {
+                console.error('❌ Error checking status:', error);
+                showResult(`❌ Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function enableNativeBNB() {
+            try {
+                showResult('🔄 Enabling Native BNB...', 'info');
+
+                // Call setAllowedNative(true)
+                console.log('📝 Calling setAllowedNative(true)...');
+                const tx = await contract.setAllowedNative(true);
+                
+                showResult(`
+                    <div class="admin-check">
+                        <h3>⏳ Transaction Sent!</h3>
+                        <p><strong>TX Hash:</strong><br><code>${tx.hash}</code></p>
+                        <p>Waiting for confirmation...</p>
+                        <p><a href="https://testnet.bscscan.com/tx/${tx.hash}" target="_blank" style="color: #60a5fa;">View on BSCScan →</a></p>
+                    </div>
+                `, 'info');
+
+                console.log('📡 Transaction sent:', tx.hash);
+                console.log('⏳ Waiting for confirmation...');
+
+                const receipt = await tx.wait();
+                
+                console.log('✅ Transaction confirmed!');
+                console.log('📦 Block number:', receipt.blockNumber);
+
+                // Check if NativeAllowed event was emitted
+                const event = receipt.logs.find(log => {
+                    try {
+                        const parsed = contract.interface.parseLog(log);
+                        return parsed?.name === 'NativeAllowed';
+                    } catch {
+                        return false;
+                    }
+                });
+
+                let resultHTML = `
+                    <div class="admin-check">
+                        <h3 class="success">✅ SUCCESS!</h3>
+                        
+                        <div style="margin: 20px 0; padding: 20px; background: rgba(34, 197, 94, 0.2); border-radius: 10px;">
+                            <p style="font-size: 1.3em;"><strong>🎉 Native BNB is now ENABLED!</strong></p>
+                            <p>You can now use TBNB in your P2P trades!</p>
+                        </div>
+
+                        <div style="margin: 20px 0;">
+                            <p><strong>📡 Transaction Hash:</strong></p>
+                            <code>${tx.hash}</code><br>
+                            <a href="https://testnet.bscscan.com/tx/${tx.hash}" target="_blank" style="color: #60a5fa;">View on BSCScan →</a>
+                        </div>
+
+                        <div style="margin: 20px 0;">
+                            <p><strong>📦 Block Number:</strong> ${receipt.blockNumber}</p>
+                            <p><strong>⛽ Gas Used:</strong> ${receipt.gasUsed.toString()}</p>
+                        </div>
+
+                        <div class="info">
+                            <strong>🎯 Next Steps:</strong><br>
+                            1. Go back to your Zotrust app<br>
+                            2. Reload the page (Ctrl+Shift+R)<br>
+                            3. Try creating/locking TBNB orders<br>
+                            4. It will work now! 🚀
+                        </div>
+                    </div>
+                `;
+
+                showResult(resultHTML, 'success');
+
+                // Update buttons
+                document.getElementById('enableBtn').disabled = true;
+                document.getElementById('enableBtn').innerText = '✅ Native BNB Enabled Successfully!';
+
+            } catch (error) {
+                console.error('❌ Error enabling native BNB:', error);
+                
+                let errorMsg = error.message;
+                if (error.code === 'ACTION_REJECTED') {
+                    errorMsg = 'Transaction rejected by user';
+                } else if (error.reason) {
+                    errorMsg = error.reason;
+                }
+
+                showResult(`
+                    <div class="admin-check">
+                        <h3 class="error">❌ Error</h3>
+                        <p>${errorMsg}</p>
+                        <br>
+                        <p><strong>Possible reasons:</strong></p>
+                        <ul>
+                            <li>You rejected the transaction</li>
+                            <li>Insufficient gas</li>
+                            <li>You are not the admin</li>
+                        </ul>
+                    </div>
+                `, 'error');
+            }
+        }
+
+        function showResult(message, type = 'info') {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = `<div class="result ${type}">${message}</div>`;
+        }
+
+        // Auto-connect if already connected
+        window.addEventListener('load', async () => {
+            if (window.ethereum) {
+                try {
+                    const accounts = await window.ethereum.request({ 
+                        method: 'eth_accounts' 
+                    });
+                    if (accounts.length > 0) {
+                        await connectWallet();
+                    }
+                } catch (error) {
+                    console.error('Auto-connect failed:', error);
+                }
+            }
+        });
+    </script>
+</body>
+</html>
+

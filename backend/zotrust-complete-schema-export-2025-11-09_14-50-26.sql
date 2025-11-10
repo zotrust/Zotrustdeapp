@@ -1,0 +1,3820 @@
+--
+-- PostgreSQL database dump
+--
+
+\restrict jhylJu3eA56aiKSvc5heCTXP6MSIcjbgfmR1Kglgw5p1J20VfivK4WUtS1RMc0O
+
+-- Dumped from database version 16.10 (Ubuntu 16.10-0ubuntu0.24.04.1)
+-- Dumped by pg_dump version 16.10 (Ubuntu 16.10-0ubuntu0.24.04.1)
+
+SET statement_timeout = 0;
+SET lock_timeout = 0;
+SET idle_in_transaction_session_timeout = 0;
+SET client_encoding = 'UTF8';
+SET standard_conforming_strings = on;
+SELECT pg_catalog.set_config('search_path', '', false);
+SET check_function_bodies = false;
+SET xmloption = content;
+SET client_min_messages = warning;
+SET row_security = off;
+
+ALTER TABLE IF EXISTS ONLY public.users DROP CONSTRAINT IF EXISTS users_location_id_fkey;
+ALTER TABLE IF EXISTS ONLY public.transactions DROP CONSTRAINT IF EXISTS transactions_seller_address_fkey;
+ALTER TABLE IF EXISTS ONLY public.transactions DROP CONSTRAINT IF EXISTS transactions_order_id_fkey;
+ALTER TABLE IF EXISTS ONLY public.transactions DROP CONSTRAINT IF EXISTS transactions_buyer_address_fkey;
+ALTER TABLE IF EXISTS ONLY public.reviews DROP CONSTRAINT IF EXISTS reviews_reviewer_address_fkey;
+ALTER TABLE IF EXISTS ONLY public.reviews DROP CONSTRAINT IF EXISTS reviews_reviewee_address_fkey;
+ALTER TABLE IF EXISTS ONLY public.reviews DROP CONSTRAINT IF EXISTS reviews_order_id_fkey;
+ALTER TABLE IF EXISTS ONLY public.reviews DROP CONSTRAINT IF EXISTS reviews_approved_by_fkey;
+ALTER TABLE IF EXISTS ONLY public.payment_confirmations DROP CONSTRAINT IF EXISTS payment_confirmations_order_id_fkey;
+ALTER TABLE IF EXISTS ONLY public.otp_logs DROP CONSTRAINT IF EXISTS otp_logs_order_id_fkey;
+ALTER TABLE IF EXISTS ONLY public.orders DROP CONSTRAINT IF EXISTS orders_seller_address_fkey;
+ALTER TABLE IF EXISTS ONLY public.orders DROP CONSTRAINT IF EXISTS orders_payment_confirmation_id_fkey;
+ALTER TABLE IF EXISTS ONLY public.orders DROP CONSTRAINT IF EXISTS orders_dispute_id_fkey;
+ALTER TABLE IF EXISTS ONLY public.orders DROP CONSTRAINT IF EXISTS orders_buyer_address_fkey;
+ALTER TABLE IF EXISTS ONLY public.orders DROP CONSTRAINT IF EXISTS orders_ad_id_fkey;
+ALTER TABLE IF EXISTS ONLY public.users DROP CONSTRAINT IF EXISTS fk_users_location;
+ALTER TABLE IF EXISTS ONLY public.transactions DROP CONSTRAINT IF EXISTS fk_transactions_seller;
+ALTER TABLE IF EXISTS ONLY public.transactions DROP CONSTRAINT IF EXISTS fk_transactions_order;
+ALTER TABLE IF EXISTS ONLY public.transactions DROP CONSTRAINT IF EXISTS fk_transactions_buyer;
+ALTER TABLE IF EXISTS ONLY public.reviews DROP CONSTRAINT IF EXISTS fk_reviews_reviewer;
+ALTER TABLE IF EXISTS ONLY public.reviews DROP CONSTRAINT IF EXISTS fk_reviews_reviewee;
+ALTER TABLE IF EXISTS ONLY public.reviews DROP CONSTRAINT IF EXISTS fk_reviews_order;
+ALTER TABLE IF EXISTS ONLY public.reviews DROP CONSTRAINT IF EXISTS fk_reviews_approved_by;
+ALTER TABLE IF EXISTS ONLY public.payment_confirmations DROP CONSTRAINT IF EXISTS fk_payment_confirmations_order;
+ALTER TABLE IF EXISTS ONLY public.otp_logs DROP CONSTRAINT IF EXISTS fk_otp_logs_order;
+ALTER TABLE IF EXISTS ONLY public.orders DROP CONSTRAINT IF EXISTS fk_orders_seller;
+ALTER TABLE IF EXISTS ONLY public.orders DROP CONSTRAINT IF EXISTS fk_orders_buyer;
+ALTER TABLE IF EXISTS ONLY public.orders DROP CONSTRAINT IF EXISTS fk_orders_ad;
+ALTER TABLE IF EXISTS ONLY public.agents DROP CONSTRAINT IF EXISTS fk_agents_location;
+ALTER TABLE IF EXISTS ONLY public.ads DROP CONSTRAINT IF EXISTS fk_ads_location;
+ALTER TABLE IF EXISTS ONLY public.disputes DROP CONSTRAINT IF EXISTS disputes_order_id_fkey;
+ALTER TABLE IF EXISTS ONLY public.dispute_timeline DROP CONSTRAINT IF EXISTS dispute_timeline_order_id_fkey;
+ALTER TABLE IF EXISTS ONLY public.dispute_timeline DROP CONSTRAINT IF EXISTS dispute_timeline_dispute_id_fkey;
+ALTER TABLE IF EXISTS ONLY public.calls DROP CONSTRAINT IF EXISTS calls_receiver_address_fkey;
+ALTER TABLE IF EXISTS ONLY public.calls DROP CONSTRAINT IF EXISTS calls_caller_address_fkey;
+ALTER TABLE IF EXISTS ONLY public.appeals DROP CONSTRAINT IF EXISTS appeals_order_id_fkey;
+ALTER TABLE IF EXISTS ONLY public.appeals DROP CONSTRAINT IF EXISTS appeals_dispute_id_fkey;
+ALTER TABLE IF EXISTS ONLY public.agents DROP CONSTRAINT IF EXISTS agents_location_id_fkey;
+ALTER TABLE IF EXISTS ONLY public.ads DROP CONSTRAINT IF EXISTS ads_owner_selected_agent_id_fkey;
+ALTER TABLE IF EXISTS ONLY public.ads DROP CONSTRAINT IF EXISTS ads_owner_address_fkey;
+ALTER TABLE IF EXISTS ONLY public.ads DROP CONSTRAINT IF EXISTS ads_location_id_fkey;
+ALTER TABLE IF EXISTS ONLY public.admin_notifications DROP CONSTRAINT IF EXISTS admin_notifications_order_id_fkey;
+ALTER TABLE IF EXISTS ONLY public.admin_notifications DROP CONSTRAINT IF EXISTS admin_notifications_dispute_id_fkey;
+DROP TRIGGER IF EXISTS update_users_updated_at ON public.users;
+DROP TRIGGER IF EXISTS update_support_updated_at ON public.support;
+DROP TRIGGER IF EXISTS update_app_settings_updated_at ON public.app_settings;
+DROP INDEX IF EXISTS public.idx_users_verified;
+DROP INDEX IF EXISTS public.idx_users_location;
+DROP INDEX IF EXISTS public.idx_users_address;
+DROP INDEX IF EXISTS public.idx_tx_order;
+DROP INDEX IF EXISTS public.idx_transactions_seller;
+DROP INDEX IF EXISTS public.idx_transactions_order;
+DROP INDEX IF EXISTS public.idx_transactions_number;
+DROP INDEX IF EXISTS public.idx_transactions_buyer;
+DROP INDEX IF EXISTS public.idx_support_active;
+DROP INDEX IF EXISTS public.idx_reviews_visible;
+DROP INDEX IF EXISTS public.idx_reviews_reviewer;
+DROP INDEX IF EXISTS public.idx_reviews_reviewee;
+DROP INDEX IF EXISTS public.idx_reviews_rating;
+DROP INDEX IF EXISTS public.idx_reviews_order_id_null;
+DROP INDEX IF EXISTS public.idx_reviews_order;
+DROP INDEX IF EXISTS public.idx_reviews_created_at;
+DROP INDEX IF EXISTS public.idx_reviews_approved;
+DROP INDEX IF EXISTS public.idx_payment_confirmations_order_id;
+DROP INDEX IF EXISTS public.idx_otp_user;
+DROP INDEX IF EXISTS public.idx_otp_logs_order;
+DROP INDEX IF EXISTS public.idx_otp_expires;
+DROP INDEX IF EXISTS public.idx_orders_state;
+DROP INDEX IF EXISTS public.idx_orders_start_time;
+DROP INDEX IF EXISTS public.idx_orders_seller;
+DROP INDEX IF EXISTS public.idx_orders_created_at;
+DROP INDEX IF EXISTS public.idx_orders_buyer;
+DROP INDEX IF EXISTS public.idx_orders_blockchain_trade_id;
+DROP INDEX IF EXISTS public.idx_orders_ad;
+DROP INDEX IF EXISTS public.idx_disputes_status;
+DROP INDEX IF EXISTS public.idx_disputes_order_id;
+DROP INDEX IF EXISTS public.idx_dispute_timeline_order_id;
+DROP INDEX IF EXISTS public.idx_dispute_timeline_dispute_id;
+DROP INDEX IF EXISTS public.idx_calls_participants;
+DROP INDEX IF EXISTS public.idx_calls_caller;
+DROP INDEX IF EXISTS public.idx_audit_user;
+DROP INDEX IF EXISTS public.idx_audit_logs_user;
+DROP INDEX IF EXISTS public.idx_audit_details;
+DROP INDEX IF EXISTS public.idx_audit_created;
+DROP INDEX IF EXISTS public.idx_audit_action;
+DROP INDEX IF EXISTS public.idx_appeals_order_id;
+DROP INDEX IF EXISTS public.idx_appeals_dispute_id;
+DROP INDEX IF EXISTS public.idx_appeals_appellant;
+DROP INDEX IF EXISTS public.idx_agents_verified;
+DROP INDEX IF EXISTS public.idx_agents_location;
+DROP INDEX IF EXISTS public.idx_agents_city;
+DROP INDEX IF EXISTS public.idx_ads_type;
+DROP INDEX IF EXISTS public.idx_ads_token;
+DROP INDEX IF EXISTS public.idx_ads_owner_agent;
+DROP INDEX IF EXISTS public.idx_ads_owner;
+DROP INDEX IF EXISTS public.idx_ads_location;
+DROP INDEX IF EXISTS public.idx_ads_city;
+DROP INDEX IF EXISTS public.idx_ads_active_city;
+DROP INDEX IF EXISTS public.idx_ads_active;
+DROP INDEX IF EXISTS public.idx_admin_notifications_status;
+DROP INDEX IF EXISTS public.idx_admin_notifications_dispute_id;
+ALTER TABLE IF EXISTS ONLY public.users DROP CONSTRAINT IF EXISTS users_pkey;
+ALTER TABLE IF EXISTS ONLY public.users DROP CONSTRAINT IF EXISTS users_address_key;
+ALTER TABLE IF EXISTS ONLY public.transactions DROP CONSTRAINT IF EXISTS transactions_transaction_number_key;
+ALTER TABLE IF EXISTS ONLY public.transactions DROP CONSTRAINT IF EXISTS transactions_pkey;
+ALTER TABLE IF EXISTS ONLY public.support DROP CONSTRAINT IF EXISTS support_pkey;
+ALTER TABLE IF EXISTS ONLY public.reviews DROP CONSTRAINT IF EXISTS reviews_pkey;
+ALTER TABLE IF EXISTS ONLY public.payment_confirmations DROP CONSTRAINT IF EXISTS payment_confirmations_pkey;
+ALTER TABLE IF EXISTS ONLY public.payment_confirmations DROP CONSTRAINT IF EXISTS payment_confirmations_order_id_unique;
+ALTER TABLE IF EXISTS ONLY public.otp_logs DROP CONSTRAINT IF EXISTS otp_logs_pkey;
+ALTER TABLE IF EXISTS ONLY public.orders DROP CONSTRAINT IF EXISTS orders_pkey;
+ALTER TABLE IF EXISTS ONLY public.locations DROP CONSTRAINT IF EXISTS locations_pkey;
+ALTER TABLE IF EXISTS ONLY public.locations DROP CONSTRAINT IF EXISTS locations_name_key;
+ALTER TABLE IF EXISTS ONLY public.disputes DROP CONSTRAINT IF EXISTS disputes_pkey;
+ALTER TABLE IF EXISTS ONLY public.dispute_timeline DROP CONSTRAINT IF EXISTS dispute_timeline_pkey;
+ALTER TABLE IF EXISTS ONLY public.calls DROP CONSTRAINT IF EXISTS calls_pkey;
+ALTER TABLE IF EXISTS ONLY public.audit_logs DROP CONSTRAINT IF EXISTS audit_logs_pkey;
+ALTER TABLE IF EXISTS ONLY public.appeals DROP CONSTRAINT IF EXISTS appeals_pkey;
+ALTER TABLE IF EXISTS ONLY public.app_settings DROP CONSTRAINT IF EXISTS app_settings_pkey;
+ALTER TABLE IF EXISTS ONLY public.app_settings DROP CONSTRAINT IF EXISTS app_settings_key_key;
+ALTER TABLE IF EXISTS ONLY public.agents DROP CONSTRAINT IF EXISTS agents_pkey;
+ALTER TABLE IF EXISTS ONLY public.ads DROP CONSTRAINT IF EXISTS ads_pkey;
+ALTER TABLE IF EXISTS ONLY public.admin_users DROP CONSTRAINT IF EXISTS admin_users_username_key;
+ALTER TABLE IF EXISTS ONLY public.admin_users DROP CONSTRAINT IF EXISTS admin_users_pkey;
+ALTER TABLE IF EXISTS ONLY public.admin_notifications DROP CONSTRAINT IF EXISTS admin_notifications_pkey;
+ALTER TABLE IF EXISTS public.users ALTER COLUMN id DROP DEFAULT;
+ALTER TABLE IF EXISTS public.transactions ALTER COLUMN id DROP DEFAULT;
+ALTER TABLE IF EXISTS public.support ALTER COLUMN id DROP DEFAULT;
+ALTER TABLE IF EXISTS public.reviews ALTER COLUMN id DROP DEFAULT;
+ALTER TABLE IF EXISTS public.payment_confirmations ALTER COLUMN id DROP DEFAULT;
+ALTER TABLE IF EXISTS public.otp_logs ALTER COLUMN id DROP DEFAULT;
+ALTER TABLE IF EXISTS public.orders ALTER COLUMN id DROP DEFAULT;
+ALTER TABLE IF EXISTS public.locations ALTER COLUMN id DROP DEFAULT;
+ALTER TABLE IF EXISTS public.disputes ALTER COLUMN id DROP DEFAULT;
+ALTER TABLE IF EXISTS public.dispute_timeline ALTER COLUMN id DROP DEFAULT;
+ALTER TABLE IF EXISTS public.calls ALTER COLUMN id DROP DEFAULT;
+ALTER TABLE IF EXISTS public.audit_logs ALTER COLUMN id DROP DEFAULT;
+ALTER TABLE IF EXISTS public.appeals ALTER COLUMN id DROP DEFAULT;
+ALTER TABLE IF EXISTS public.app_settings ALTER COLUMN id DROP DEFAULT;
+ALTER TABLE IF EXISTS public.agents ALTER COLUMN id DROP DEFAULT;
+ALTER TABLE IF EXISTS public.ads ALTER COLUMN id DROP DEFAULT;
+ALTER TABLE IF EXISTS public.admin_users ALTER COLUMN id DROP DEFAULT;
+ALTER TABLE IF EXISTS public.admin_notifications ALTER COLUMN id DROP DEFAULT;
+DROP SEQUENCE IF EXISTS public.users_id_seq;
+DROP TABLE IF EXISTS public.users;
+DROP SEQUENCE IF EXISTS public.transactions_id_seq;
+DROP TABLE IF EXISTS public.transactions;
+DROP SEQUENCE IF EXISTS public.support_id_seq;
+DROP TABLE IF EXISTS public.support;
+DROP SEQUENCE IF EXISTS public.reviews_id_seq;
+DROP TABLE IF EXISTS public.reviews;
+DROP SEQUENCE IF EXISTS public.payment_confirmations_id_seq;
+DROP TABLE IF EXISTS public.payment_confirmations;
+DROP SEQUENCE IF EXISTS public.otp_logs_id_seq;
+DROP TABLE IF EXISTS public.otp_logs;
+DROP SEQUENCE IF EXISTS public.orders_id_seq;
+DROP TABLE IF EXISTS public.orders;
+DROP SEQUENCE IF EXISTS public.locations_id_seq;
+DROP TABLE IF EXISTS public.locations;
+DROP SEQUENCE IF EXISTS public.disputes_id_seq;
+DROP TABLE IF EXISTS public.disputes;
+DROP SEQUENCE IF EXISTS public.dispute_timeline_id_seq;
+DROP TABLE IF EXISTS public.dispute_timeline;
+DROP SEQUENCE IF EXISTS public.calls_id_seq;
+DROP TABLE IF EXISTS public.calls;
+DROP SEQUENCE IF EXISTS public.audit_logs_id_seq;
+DROP TABLE IF EXISTS public.audit_logs;
+DROP SEQUENCE IF EXISTS public.appeals_id_seq;
+DROP TABLE IF EXISTS public.appeals;
+DROP SEQUENCE IF EXISTS public.app_settings_id_seq;
+DROP TABLE IF EXISTS public.app_settings;
+DROP SEQUENCE IF EXISTS public.agents_id_seq;
+DROP TABLE IF EXISTS public.agents;
+DROP SEQUENCE IF EXISTS public.ads_id_seq;
+DROP TABLE IF EXISTS public.ads;
+DROP SEQUENCE IF EXISTS public.admin_users_id_seq;
+DROP TABLE IF EXISTS public.admin_users;
+DROP SEQUENCE IF EXISTS public.admin_notifications_id_seq;
+DROP TABLE IF EXISTS public.admin_notifications;
+DROP FUNCTION IF EXISTS public.update_updated_at_column();
+--
+-- Name: update_updated_at_column(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.update_updated_at_column() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    NEW.updated_at = CURRENT_TIMESTAMP;
+    RETURN NEW;
+END;
+$$;
+
+
+SET default_tablespace = '';
+
+SET default_table_access_method = heap;
+
+--
+-- Name: admin_notifications; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.admin_notifications (
+    id integer NOT NULL,
+    dispute_id integer NOT NULL,
+    order_id integer NOT NULL,
+    notification_type character varying(30) NOT NULL,
+    title character varying(255) NOT NULL,
+    message text NOT NULL,
+    priority character varying(10) DEFAULT 'MEDIUM'::character varying,
+    status character varying(20) DEFAULT 'UNREAD'::character varying,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    read_at timestamp without time zone,
+    acted_at timestamp without time zone,
+    CONSTRAINT admin_notifications_priority_check CHECK (((priority)::text = ANY ((ARRAY['LOW'::character varying, 'MEDIUM'::character varying, 'HIGH'::character varying, 'URGENT'::character varying])::text[]))),
+    CONSTRAINT admin_notifications_status_check CHECK (((status)::text = ANY ((ARRAY['UNREAD'::character varying, 'READ'::character varying, 'ACTED_UPON'::character varying])::text[])))
+);
+
+
+--
+-- Name: TABLE admin_notifications; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.admin_notifications IS 'Notifications for admin dashboard';
+
+
+--
+-- Name: COLUMN admin_notifications.priority; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.admin_notifications.priority IS 'Priority level for admin attention';
+
+
+--
+-- Name: admin_notifications_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.admin_notifications_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: admin_notifications_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.admin_notifications_id_seq OWNED BY public.admin_notifications.id;
+
+
+--
+-- Name: admin_users; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.admin_users (
+    id integer NOT NULL,
+    username character varying(50) NOT NULL,
+    password_hash character varying(255) NOT NULL,
+    role character varying(20) DEFAULT 'admin'::character varying,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP
+);
+
+
+--
+-- Name: TABLE admin_users; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.admin_users IS 'Admin panel users';
+
+
+--
+-- Name: COLUMN admin_users.password_hash; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.admin_users.password_hash IS 'Bcrypt hashed password';
+
+
+--
+-- Name: COLUMN admin_users.role; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.admin_users.role IS 'SUPER_ADMIN, ADMIN, SUPPORT, etc.';
+
+
+--
+-- Name: admin_users_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.admin_users_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: admin_users_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.admin_users_id_seq OWNED BY public.admin_users.id;
+
+
+--
+-- Name: ads; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.ads (
+    id integer NOT NULL,
+    owner_address character varying(42) NOT NULL,
+    owner_selected_agent_id bigint,
+    type character varying(10) NOT NULL,
+    token character varying(10) NOT NULL,
+    price_inr numeric(15,2) NOT NULL,
+    min_amount numeric(18,6) NOT NULL,
+    max_amount numeric(18,6) NOT NULL,
+    lock_duration_seconds integer DEFAULT 3600,
+    city character varying(100),
+    active boolean DEFAULT true,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    location_id integer,
+    sell_quantity numeric(18,6),
+    buy_quantity numeric(18,6),
+    CONSTRAINT ads_token_check CHECK (((token)::text = ANY ((ARRAY['TBNB'::character varying, 'USDT'::character varying, 'USDC'::character varying])::text[]))),
+    CONSTRAINT ads_type_check CHECK (((type)::text = ANY ((ARRAY['BUY'::character varying, 'SELL'::character varying])::text[])))
+);
+
+
+--
+-- Name: TABLE ads; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.ads IS 'P2P trading advertisements';
+
+
+--
+-- Name: COLUMN ads.type; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ads.type IS 'BUY or SELL advertisement';
+
+
+--
+-- Name: COLUMN ads.token; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ads.token IS 'Cryptocurrency token type';
+
+
+--
+-- Name: COLUMN ads.price_inr; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ads.price_inr IS 'Price per token in INR';
+
+
+--
+-- Name: COLUMN ads.lock_duration_seconds; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ads.lock_duration_seconds IS 'How long buyer has to pay';
+
+
+--
+-- Name: COLUMN ads.location_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ads.location_id IS 'Preferred location for this ad';
+
+
+--
+-- Name: COLUMN ads.sell_quantity; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ads.sell_quantity IS 'Total quantity available to sell (for SELL ads)';
+
+
+--
+-- Name: COLUMN ads.buy_quantity; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ads.buy_quantity IS 'Total quantity willing to buy (for BUY ads)';
+
+
+--
+-- Name: ads_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.ads_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: ads_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.ads_id_seq OWNED BY public.ads.id;
+
+
+--
+-- Name: agents; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.agents (
+    id integer NOT NULL,
+    branch_name character varying(255) NOT NULL,
+    city character varying(100) NOT NULL,
+    address character varying(500),
+    mobile character varying(20),
+    verified boolean DEFAULT false,
+    created_by_admin integer,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    location_id integer
+);
+
+
+--
+-- Name: TABLE agents; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.agents IS 'Agent branches for cash exchange';
+
+
+--
+-- Name: COLUMN agents.branch_name; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.agents.branch_name IS 'Branch/agency name';
+
+
+--
+-- Name: COLUMN agents.verified; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.agents.verified IS 'Admin verified agent';
+
+
+--
+-- Name: COLUMN agents.created_by_admin; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.agents.created_by_admin IS 'Admin wallet address who created this';
+
+
+--
+-- Name: COLUMN agents.location_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.agents.location_id IS 'Reference to location';
+
+
+--
+-- Name: agents_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.agents_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: agents_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.agents_id_seq OWNED BY public.agents.id;
+
+
+--
+-- Name: app_settings; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.app_settings (
+    id integer NOT NULL,
+    key character varying(100) NOT NULL,
+    value text,
+    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    updated_by integer
+);
+
+
+--
+-- Name: TABLE app_settings; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.app_settings IS 'Application configuration settings';
+
+
+--
+-- Name: COLUMN app_settings.key; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.app_settings.key IS 'Unique setting key';
+
+
+--
+-- Name: COLUMN app_settings.value; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.app_settings.value IS 'Setting value (can be JSON)';
+
+
+--
+-- Name: app_settings_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.app_settings_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: app_settings_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.app_settings_id_seq OWNED BY public.app_settings.id;
+
+
+--
+-- Name: appeals; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.appeals (
+    id integer NOT NULL,
+    dispute_id integer NOT NULL,
+    order_id integer NOT NULL,
+    appellant_address character varying(42) NOT NULL,
+    appellant_type character varying(10) NOT NULL,
+    description text NOT NULL,
+    evidence_video_url text,
+    evidence_screenshots text[],
+    evidence_documents text[],
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    status character varying(20) DEFAULT 'PENDING'::character varying,
+    CONSTRAINT appeals_appellant_type_check CHECK (((appellant_type)::text = ANY ((ARRAY['BUYER'::character varying, 'SELLER'::character varying])::text[]))),
+    CONSTRAINT appeals_status_check CHECK (((status)::text = ANY ((ARRAY['PENDING'::character varying, 'REVIEWED'::character varying, 'ACCEPTED'::character varying, 'REJECTED'::character varying])::text[])))
+);
+
+
+--
+-- Name: TABLE appeals; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.appeals IS 'Individual appeals filed by buyers or sellers';
+
+
+--
+-- Name: COLUMN appeals.appellant_type; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.appeals.appellant_type IS 'Whether the appeal was filed by buyer or seller';
+
+
+--
+-- Name: COLUMN appeals.evidence_video_url; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.appeals.evidence_video_url IS 'URL to video evidence uploaded by appellant';
+
+
+--
+-- Name: appeals_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.appeals_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: appeals_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.appeals_id_seq OWNED BY public.appeals.id;
+
+
+--
+-- Name: audit_logs; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.audit_logs (
+    id integer NOT NULL,
+    user_address character varying(42),
+    action character varying(100) NOT NULL,
+    resource_type character varying(50),
+    resource_id character varying(50),
+    details jsonb,
+    ip_address inet,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP
+);
+
+
+--
+-- Name: TABLE audit_logs; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.audit_logs IS 'Activity audit trail';
+
+
+--
+-- Name: COLUMN audit_logs.action; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.audit_logs.action IS 'Action performed (e.g., CREATE_ORDER, CANCEL_ORDER)';
+
+
+--
+-- Name: COLUMN audit_logs.details; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.audit_logs.details IS 'Additional context in JSON format';
+
+
+--
+-- Name: audit_logs_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.audit_logs_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: audit_logs_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.audit_logs_id_seq OWNED BY public.audit_logs.id;
+
+
+--
+-- Name: calls; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.calls (
+    id integer NOT NULL,
+    caller_address character varying(42) NOT NULL,
+    receiver_address character varying(42) NOT NULL,
+    status character varying(20) DEFAULT 'initiated'::character varying,
+    signaling_data jsonb,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    ended_at timestamp without time zone,
+    CONSTRAINT calls_status_check CHECK (((status)::text = ANY ((ARRAY['initiated'::character varying, 'active'::character varying, 'ended'::character varying, 'failed'::character varying])::text[])))
+);
+
+
+--
+-- Name: TABLE calls; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.calls IS 'WebRTC call records';
+
+
+--
+-- Name: COLUMN calls.status; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.calls.status IS 'INITIATED, CONNECTED, ENDED, FAILED';
+
+
+--
+-- Name: calls_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.calls_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: calls_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.calls_id_seq OWNED BY public.calls.id;
+
+
+--
+-- Name: dispute_timeline; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.dispute_timeline (
+    id integer NOT NULL,
+    dispute_id integer,
+    order_id integer NOT NULL,
+    event_type character varying(30) NOT NULL,
+    event_description text NOT NULL,
+    created_by character varying(42),
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    metadata jsonb
+);
+
+
+--
+-- Name: TABLE dispute_timeline; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.dispute_timeline IS 'Audit trail of all dispute-related events';
+
+
+--
+-- Name: COLUMN dispute_timeline.event_type; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.dispute_timeline.event_type IS 'Type of event: APPEAL_FILED, ADMIN_REVIEW, RESOLUTION, etc.';
+
+
+--
+-- Name: dispute_timeline_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.dispute_timeline_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: dispute_timeline_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.dispute_timeline_id_seq OWNED BY public.dispute_timeline.id;
+
+
+--
+-- Name: disputes; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.disputes (
+    id integer NOT NULL,
+    order_id integer NOT NULL,
+    dispute_type character varying(20) NOT NULL,
+    status character varying(20) DEFAULT 'PENDING'::character varying,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    resolved_at timestamp without time zone,
+    resolved_by character varying(42),
+    resolution character varying(20),
+    resolution_reason text,
+    created_by character varying(42) NOT NULL,
+    CONSTRAINT disputes_dispute_type_check CHECK (((dispute_type)::text = ANY ((ARRAY['PAYMENT_NOT_RECEIVED'::character varying, 'PAYMENT_NOT_SENT'::character varying, 'OTHER'::character varying])::text[]))),
+    CONSTRAINT disputes_resolution_check CHECK (((resolution)::text = ANY ((ARRAY['TRANSFER_TO_BUYER'::character varying, 'REFUND_TO_SELLER'::character varying, 'SPLIT_REFUND'::character varying])::text[]))),
+    CONSTRAINT disputes_status_check CHECK (((status)::text = ANY ((ARRAY['PENDING'::character varying, 'UNDER_REVIEW'::character varying, 'RESOLVED'::character varying, 'CLOSED'::character varying])::text[])))
+);
+
+
+--
+-- Name: TABLE disputes; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.disputes IS 'Main disputes table for tracking dispute resolution process';
+
+
+--
+-- Name: COLUMN disputes.dispute_type; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.disputes.dispute_type IS 'Type of dispute: payment not received, payment not sent, or other';
+
+
+--
+-- Name: COLUMN disputes.resolution; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.disputes.resolution IS 'Final resolution: transfer to buyer, refund to seller, or split refund';
+
+
+--
+-- Name: disputes_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.disputes_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: disputes_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.disputes_id_seq OWNED BY public.disputes.id;
+
+
+--
+-- Name: locations; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.locations (
+    id integer NOT NULL,
+    name character varying(255) NOT NULL,
+    city character varying(255),
+    state character varying(255),
+    country character varying(255) DEFAULT 'India'::character varying,
+    active boolean DEFAULT true,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP
+);
+
+
+--
+-- Name: TABLE locations; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.locations IS 'Master table for cities and locations';
+
+
+--
+-- Name: COLUMN locations.name; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.locations.name IS 'Unique location name (e.g., Mumbai)';
+
+
+--
+-- Name: COLUMN locations.city; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.locations.city IS 'City name';
+
+
+--
+-- Name: COLUMN locations.state; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.locations.state IS 'State name';
+
+
+--
+-- Name: locations_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.locations_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: locations_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.locations_id_seq OWNED BY public.locations.id;
+
+
+--
+-- Name: orders; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.orders (
+    id integer NOT NULL,
+    ad_id integer NOT NULL,
+    buyer_address character varying(42) NOT NULL,
+    seller_address character varying(42) NOT NULL,
+    amount numeric(18,6) NOT NULL,
+    token character varying(10) NOT NULL,
+    state character varying(20) DEFAULT 'CREATED'::character varying,
+    agent_branch character varying(255),
+    agent_number character varying(20),
+    agent_address character varying(500),
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    accepted_at timestamp without time zone,
+    lock_expires_at timestamp without time zone,
+    tx_hash character varying(66),
+    start_time timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    timezone character varying(100),
+    start_datetime_string character varying(100),
+    otp_hash character varying(66),
+    blockchain_trade_id integer,
+    create_trade_tx_hash character varying(66),
+    payment_confirmation_id integer,
+    dispute_id integer,
+    appeal_deadline timestamp without time zone,
+    resolution_deadline timestamp without time zone,
+    CONSTRAINT orders_state_check CHECK (((state)::text = ANY ((ARRAY['CREATED'::character varying, 'ACCEPTED'::character varying, 'LOCKED'::character varying, 'RELEASED'::character varying, 'CANCELLED'::character varying, 'EXPIRED'::character varying, 'DISPUTED'::character varying, 'UNDER_DISPUTE'::character varying, 'UNDER_REVIEW'::character varying, 'APPEALED'::character varying, 'RESOLVED'::character varying, 'CONFIRMED'::character varying, 'REFUNDED'::character varying])::text[])))
+);
+
+
+--
+-- Name: TABLE orders; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.orders IS 'Trading orders with 5-minute countdown';
+
+
+--
+-- Name: COLUMN orders.state; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.orders.state IS 'Order workflow state';
+
+
+--
+-- Name: COLUMN orders.lock_expires_at; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.orders.lock_expires_at IS 'When payment window expires';
+
+
+--
+-- Name: COLUMN orders.tx_hash; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.orders.tx_hash IS 'Blockchain transaction hash';
+
+
+--
+-- Name: COLUMN orders.start_time; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.orders.start_time IS 'UTC timestamp when order was created (for countdown)';
+
+
+--
+-- Name: COLUMN orders.timezone; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.orders.timezone IS 'User timezone (e.g., Asia/Calcutta)';
+
+
+--
+-- Name: COLUMN orders.start_datetime_string; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.orders.start_datetime_string IS 'Formatted display time with timezone';
+
+
+--
+-- Name: COLUMN orders.otp_hash; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.orders.otp_hash IS 'Hashed OTP for payment confirmation';
+
+
+--
+-- Name: orders_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.orders_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: orders_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.orders_id_seq OWNED BY public.orders.id;
+
+
+--
+-- Name: otp_logs; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.otp_logs (
+    id integer NOT NULL,
+    user_address character varying(42),
+    otp_hash character varying(255) NOT NULL,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    expires_at timestamp without time zone NOT NULL,
+    used boolean DEFAULT false,
+    order_id integer
+);
+
+
+--
+-- Name: TABLE otp_logs; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.otp_logs IS 'OTP records for order verification';
+
+
+--
+-- Name: COLUMN otp_logs.otp_hash; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.otp_logs.otp_hash IS 'SHA-256 hash of OTP (never store plain text)';
+
+
+--
+-- Name: COLUMN otp_logs.expires_at; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.otp_logs.expires_at IS 'When this OTP expires';
+
+
+--
+-- Name: COLUMN otp_logs.used; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.otp_logs.used IS 'Whether OTP has been used';
+
+
+--
+-- Name: COLUMN otp_logs.order_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.otp_logs.order_id IS 'Order this OTP is for';
+
+
+--
+-- Name: otp_logs_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.otp_logs_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: otp_logs_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.otp_logs_id_seq OWNED BY public.otp_logs.id;
+
+
+--
+-- Name: payment_confirmations; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.payment_confirmations (
+    id integer NOT NULL,
+    order_id integer NOT NULL,
+    buyer_confirmed boolean DEFAULT false,
+    seller_confirmed boolean DEFAULT false,
+    buyer_confirmed_at timestamp without time zone,
+    seller_confirmed_at timestamp without time zone,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP
+);
+
+
+--
+-- Name: TABLE payment_confirmations; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.payment_confirmations IS 'Tracks payment confirmations from both buyer and seller';
+
+
+--
+-- Name: COLUMN payment_confirmations.buyer_confirmed; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.payment_confirmations.buyer_confirmed IS 'Whether buyer confirmed payment was sent';
+
+
+--
+-- Name: COLUMN payment_confirmations.seller_confirmed; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.payment_confirmations.seller_confirmed IS 'Whether seller confirmed payment was received';
+
+
+--
+-- Name: payment_confirmations_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.payment_confirmations_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: payment_confirmations_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.payment_confirmations_id_seq OWNED BY public.payment_confirmations.id;
+
+
+--
+-- Name: reviews; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.reviews (
+    id integer NOT NULL,
+    reviewer_address character varying(42) NOT NULL,
+    reviewee_address character varying(42) NOT NULL,
+    order_id integer,
+    rating integer NOT NULL,
+    message text,
+    is_visible boolean DEFAULT true,
+    is_approved boolean DEFAULT false,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    approved_by integer,
+    approved_at timestamp without time zone,
+    CONSTRAINT reviews_rating_check CHECK (((rating >= 1) AND (rating <= 5)))
+);
+
+
+--
+-- Name: TABLE reviews; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.reviews IS 'User reviews and ratings for completed trades';
+
+
+--
+-- Name: COLUMN reviews.reviewer_address; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.reviews.reviewer_address IS 'Address of user who wrote the review';
+
+
+--
+-- Name: COLUMN reviews.reviewee_address; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.reviews.reviewee_address IS 'Address of user being reviewed';
+
+
+--
+-- Name: COLUMN reviews.order_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.reviews.order_id IS 'Order that this review is for';
+
+
+--
+-- Name: COLUMN reviews.rating; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.reviews.rating IS 'Rating from 1-5 stars';
+
+
+--
+-- Name: COLUMN reviews.message; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.reviews.message IS 'Optional review message';
+
+
+--
+-- Name: COLUMN reviews.is_visible; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.reviews.is_visible IS 'Whether review is visible to public';
+
+
+--
+-- Name: COLUMN reviews.is_approved; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.reviews.is_approved IS 'Whether review is approved by admin';
+
+
+--
+-- Name: COLUMN reviews.approved_by; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.reviews.approved_by IS 'Admin who approved the review';
+
+
+--
+-- Name: COLUMN reviews.approved_at; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.reviews.approved_at IS 'When the review was approved';
+
+
+--
+-- Name: reviews_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.reviews_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: reviews_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.reviews_id_seq OWNED BY public.reviews.id;
+
+
+--
+-- Name: support; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.support (
+    id integer NOT NULL,
+    type character varying(20) NOT NULL,
+    value character varying(255) NOT NULL,
+    label character varying(100),
+    active boolean DEFAULT true,
+    priority integer DEFAULT 0,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT support_type_check CHECK (((type)::text = ANY ((ARRAY['phone'::character varying, 'email'::character varying])::text[])))
+);
+
+
+--
+-- Name: TABLE support; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.support IS 'Customer support tickets';
+
+
+--
+-- Name: COLUMN support.priority; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.support.priority IS 'LOW, MEDIUM, HIGH, URGENT';
+
+
+--
+-- Name: support_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.support_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: support_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.support_id_seq OWNED BY public.support.id;
+
+
+--
+-- Name: transactions; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.transactions (
+    id integer NOT NULL,
+    transaction_number character varying(50) NOT NULL,
+    order_id integer NOT NULL,
+    buyer_address character varying(42) NOT NULL,
+    seller_address character varying(42) NOT NULL,
+    amount numeric(18,6) NOT NULL,
+    token character varying(10) NOT NULL,
+    transaction_type character varying(20) NOT NULL,
+    status character varying(20) DEFAULT 'PENDING'::character varying,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    completed_at timestamp without time zone,
+    CONSTRAINT transactions_status_check CHECK (((status)::text = ANY ((ARRAY['PENDING'::character varying, 'COMPLETED'::character varying, 'FAILED'::character varying, 'CANCELLED'::character varying])::text[]))),
+    CONSTRAINT transactions_transaction_type_check CHECK (((transaction_type)::text = ANY ((ARRAY['BUY'::character varying, 'SELL'::character varying])::text[])))
+);
+
+
+--
+-- Name: TABLE transactions; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.transactions IS 'Blockchain transaction records';
+
+
+--
+-- Name: COLUMN transactions.status; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.transactions.status IS 'PENDING, CONFIRMED, FAILED';
+
+
+--
+-- Name: transactions_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.transactions_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: transactions_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.transactions_id_seq OWNED BY public.transactions.id;
+
+
+--
+-- Name: users; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.users (
+    id integer NOT NULL,
+    address character varying(42) NOT NULL,
+    name character varying(255),
+    phone character varying(20),
+    city character varying(100),
+    selected_agent_id bigint,
+    verified boolean DEFAULT false,
+    verified_at timestamp without time zone,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    location_id integer,
+    selected_agent_ids text[]
+);
+
+
+--
+-- Name: TABLE users; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.users IS 'User accounts for P2P trading';
+
+
+--
+-- Name: COLUMN users.address; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.users.address IS 'Ethereum wallet address (unique identifier)';
+
+
+--
+-- Name: COLUMN users.selected_agent_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.users.selected_agent_id IS 'Single selected agent (legacy, deprecated)';
+
+
+--
+-- Name: COLUMN users.location_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.users.location_id IS 'User preferred trading location';
+
+
+--
+-- Name: COLUMN users.selected_agent_ids; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.users.selected_agent_ids IS 'Array of selected agent IDs (TEXT[] - supports multiple agents)';
+
+
+--
+-- Name: users_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.users_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: users_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.users_id_seq OWNED BY public.users.id;
+
+
+--
+-- Name: admin_notifications id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.admin_notifications ALTER COLUMN id SET DEFAULT nextval('public.admin_notifications_id_seq'::regclass);
+
+
+--
+-- Name: admin_users id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.admin_users ALTER COLUMN id SET DEFAULT nextval('public.admin_users_id_seq'::regclass);
+
+
+--
+-- Name: ads id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ads ALTER COLUMN id SET DEFAULT nextval('public.ads_id_seq'::regclass);
+
+
+--
+-- Name: agents id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.agents ALTER COLUMN id SET DEFAULT nextval('public.agents_id_seq'::regclass);
+
+
+--
+-- Name: app_settings id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.app_settings ALTER COLUMN id SET DEFAULT nextval('public.app_settings_id_seq'::regclass);
+
+
+--
+-- Name: appeals id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.appeals ALTER COLUMN id SET DEFAULT nextval('public.appeals_id_seq'::regclass);
+
+
+--
+-- Name: audit_logs id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.audit_logs ALTER COLUMN id SET DEFAULT nextval('public.audit_logs_id_seq'::regclass);
+
+
+--
+-- Name: calls id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.calls ALTER COLUMN id SET DEFAULT nextval('public.calls_id_seq'::regclass);
+
+
+--
+-- Name: dispute_timeline id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.dispute_timeline ALTER COLUMN id SET DEFAULT nextval('public.dispute_timeline_id_seq'::regclass);
+
+
+--
+-- Name: disputes id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.disputes ALTER COLUMN id SET DEFAULT nextval('public.disputes_id_seq'::regclass);
+
+
+--
+-- Name: locations id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.locations ALTER COLUMN id SET DEFAULT nextval('public.locations_id_seq'::regclass);
+
+
+--
+-- Name: orders id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.orders ALTER COLUMN id SET DEFAULT nextval('public.orders_id_seq'::regclass);
+
+
+--
+-- Name: otp_logs id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.otp_logs ALTER COLUMN id SET DEFAULT nextval('public.otp_logs_id_seq'::regclass);
+
+
+--
+-- Name: payment_confirmations id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.payment_confirmations ALTER COLUMN id SET DEFAULT nextval('public.payment_confirmations_id_seq'::regclass);
+
+
+--
+-- Name: reviews id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.reviews ALTER COLUMN id SET DEFAULT nextval('public.reviews_id_seq'::regclass);
+
+
+--
+-- Name: support id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.support ALTER COLUMN id SET DEFAULT nextval('public.support_id_seq'::regclass);
+
+
+--
+-- Name: transactions id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.transactions ALTER COLUMN id SET DEFAULT nextval('public.transactions_id_seq'::regclass);
+
+
+--
+-- Name: users id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.users ALTER COLUMN id SET DEFAULT nextval('public.users_id_seq'::regclass);
+
+
+--
+-- Data for Name: admin_notifications; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY public.admin_notifications (id, dispute_id, order_id, notification_type, title, message, priority, status, created_at, read_at, acted_at) FROM stdin;
+1	1	28	NEW_APPEAL	New Appeal Filed	Seller filed an appeal for dispute #1	URGENT	UNREAD	2025-10-15 19:34:12.467126	\N	\N
+2	2	35	NEW_APPEAL	New Appeal Filed	Buyer filed an appeal for dispute #2	URGENT	UNREAD	2025-10-24 13:48:21.962361	\N	\N
+3	1	28	NEW_APPEAL	New Appeal Filed	Buyer filed an appeal for dispute #1	URGENT	UNREAD	2025-10-29 20:18:18.739184	\N	\N
+4	4	42	NEW_APPEAL	New Appeal Filed	Seller filed an appeal for dispute #4	URGENT	UNREAD	2025-11-05 20:26:05.262	\N	\N
+5	6	48	NEW_APPEAL	New Appeal Filed	Buyer filed an appeal for dispute #6	URGENT	UNREAD	2025-11-06 19:13:56.504844	\N	\N
+6	5	46	NEW_APPEAL	New Appeal Filed	Seller filed an appeal for dispute #5	URGENT	UNREAD	2025-11-06 19:33:52.359992	\N	\N
+7	7	51	AUTO_DISPUTE	Order Auto-Disputed	Order #51 automatically moved to dispute due to timeout	HIGH	UNREAD	2025-11-07 18:57:24.842713	\N	\N
+8	7	51	NEW_APPEAL	New Appeal Filed	Seller filed an appeal for dispute #7	URGENT	UNREAD	2025-11-07 19:54:53.191637	\N	\N
+9	8	52	AUTO_DISPUTE	Order Auto-Disputed	Order #52 automatically moved to dispute due to timeout	HIGH	UNREAD	2025-11-09 12:35:21.552136	\N	\N
+10	9	53	AUTO_DISPUTE	Order Auto-Disputed	Order #53 automatically moved to dispute due to timeout	HIGH	UNREAD	2025-11-09 12:35:21.576781	\N	\N
+11	10	54	AUTO_DISPUTE	Order Auto-Disputed	Order #54 automatically moved to dispute due to timeout	HIGH	UNREAD	2025-11-09 12:35:21.614155	\N	\N
+12	11	55	AUTO_DISPUTE	Order Auto-Disputed	Order #55 automatically moved to dispute due to timeout	HIGH	UNREAD	2025-11-09 12:35:21.643152	\N	\N
+13	11	55	NEW_APPEAL	New Appeal Filed	Seller filed an appeal for dispute #11	URGENT	UNREAD	2025-11-09 12:50:36.844618	\N	\N
+14	10	54	NEW_APPEAL	New Appeal Filed	Seller filed an appeal for dispute #10	URGENT	UNREAD	2025-11-09 12:59:00.105263	\N	\N
+15	9	53	NEW_APPEAL	New Appeal Filed	Seller filed an appeal for dispute #9	URGENT	UNREAD	2025-11-09 13:51:16.203961	\N	\N
+\.
+
+
+--
+-- Data for Name: admin_users; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY public.admin_users (id, username, password_hash, role, created_at) FROM stdin;
+1	admin	$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi	admin	2025-09-29 17:47:33.300756
+\.
+
+
+--
+-- Data for Name: ads; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY public.ads (id, owner_address, owner_selected_agent_id, type, token, price_inr, min_amount, max_amount, lock_duration_seconds, city, active, created_at, updated_at, location_id, sell_quantity, buy_quantity) FROM stdin;
+3	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	9	BUY	TBNB	94.00	0.106383	0.212766	3600	3	t	2025-10-10 17:27:13.437036	2025-10-10 17:27:13.437036	\N	\N	0.300000
+4	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	14	BUY	TBNB	94.00	0.053191	0.159574	3600	5	t	2025-10-12 13:14:22.956439	2025-10-12 13:14:22.956439	\N	\N	0.200000
+5	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	14	SELL	TBNB	95.00	0.105263	0.200000	3600	5	t	2025-10-12 13:58:46.369776	2025-10-12 13:58:46.369776	\N	0.200000	\N
+6	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	14	SELL	TBNB	20.00	0.500000	2.500000	3600	5	t	2025-10-21 11:50:49.8365	2025-10-21 11:50:49.8365	\N	5.000000	\N
+7	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	14	SELL	TBNB	3000.00	0.033333	0.066667	3600	5	t	2025-10-21 11:55:28.02935	2025-10-21 11:55:28.02935	\N	0.400000	\N
+8	0x583c8c7b321f80e966e072e57e1bb5cc2698d685	14	BUY	TBNB	900.00	0.111111	0.166667	3600	5	t	2025-10-22 11:04:57.114862	2025-10-22 11:04:57.114862	\N	\N	0.200000
+11	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	9	SELL	TBNB	98.00	0.001020	0.100000	3600	3	t	2025-10-29 21:00:00.455381	2025-11-07 20:15:56.439768	\N	0.090000	\N
+12	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	9	BUY	TBNB	98.00	0.000204	0.020000	3600	3	t	2025-11-05 20:49:41.083578	2025-11-07 20:17:27.144842	\N	\N	0.010000
+10	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	9	BUY	TBNB	98.00	0.002041	0.200000	3600	3	t	2025-10-29 20:54:59.079461	2025-11-07 20:18:54.849315	\N	\N	0.190000
+9	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	14	SELL	TBNB	95.00	0.000632	0.058947	3600	5	t	2025-10-23 11:37:35.894562	2025-11-07 20:19:55.272475	\N	0.050000	\N
+\.
+
+
+--
+-- Data for Name: agents; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY public.agents (id, branch_name, city, address, mobile, verified, created_by_admin, created_at, updated_at, location_id) FROM stdin;
+2	SBI Andheri Branch	Mumbai	Andheri West, Mumbai, Maharashtra 400058	9876543210	t	1	2025-10-10 17:10:02.300123	2025-10-10 17:10:02.300123	1
+3	HDFC Bandra Branch	Mumbai	Bandra West, Mumbai, Maharashtra 400050	9876543211	t	1	2025-10-10 17:10:02.300123	2025-10-10 17:10:02.300123	1
+4	ICICI Powai Branch	Mumbai	Powai, Mumbai, Maharashtra 400076	9876543212	t	1	2025-10-10 17:10:02.300123	2025-10-10 17:10:02.300123	1
+6	PNB Karol Bagh	Delhi	Karol Bagh, New Delhi 110005	9876543214	t	1	2025-10-10 17:10:02.300123	2025-10-10 17:10:02.300123	2
+7	BOB Dwarka	Delhi	Dwarka Sector 10, New Delhi 110075	9876543215	t	1	2025-10-10 17:10:02.300123	2025-10-10 17:10:02.300123	2
+8	ICICI Koramangala	Bangalore	Koramangala 4th Block, Bangalore 560034	9876543216	t	1	2025-10-10 17:10:02.300123	2025-10-10 17:10:02.300123	3
+9	HDFC Whitefield	Bangalore	Whitefield, Bangalore 560066	9876543217	t	1	2025-10-10 17:10:02.300123	2025-10-10 17:10:02.300123	3
+10	SBI Indiranagar	Bangalore	Indiranagar, Bangalore 560038	9876543218	t	1	2025-10-10 17:10:02.300123	2025-10-10 17:10:02.300123	3
+11	HDFC Banjara Hills	Hyderabad	Banjara Hills, Hyderabad 500034	9876543219	t	1	2025-10-10 17:10:02.300123	2025-10-10 17:10:02.300123	4
+12	Axis Gachibowli	Hyderabad	Gachibowli, Hyderabad 500032	9876543220	t	1	2025-10-10 17:10:02.300123	2025-10-10 17:10:02.300123	4
+13	SBI Satellite	Ahmedabad	Satellite, Ahmedabad 380015	9876543221	t	1	2025-10-10 17:10:02.300123	2025-10-10 17:10:02.300123	5
+14	ICICI Vastrapur	Ahmedabad	Vastrapur, Ahmedabad 380015	9876543222	t	1	2025-10-10 17:10:02.300123	2025-10-10 17:10:02.300123	5
+15	HDFC T Nagar	Chennai	T Nagar, Chennai 600017	9876543223	t	1	2025-10-10 17:10:02.300123	2025-10-10 17:10:02.300123	6
+16	Axis Anna Nagar	Chennai	Anna Nagar, Chennai 600040	9876543224	t	1	2025-10-10 17:10:02.300123	2025-10-10 17:10:02.300123	6
+17	SBI Kothrud	Pune	Kothrud, Pune 411038	9876543225	t	1	2025-10-10 17:10:02.300123	2025-10-10 17:10:02.300123	8
+18	ICICI Hinjewadi	Pune	Hinjewadi Phase 1, Pune 411057	9876543226	t	1	2025-10-10 17:10:02.300123	2025-10-10 17:10:02.300123	8
+19	HDFC Park Street	Kolkata	Park Street, Kolkata 700016	9876543227	t	1	2025-10-10 17:10:02.300123	2025-10-10 17:10:02.300123	7
+20	Axis Salt Lake	Kolkata	Salt Lake, Kolkata 700091	9876543228	t	1	2025-10-10 17:10:02.300123	2025-10-10 17:10:02.300123	7
+21	HDFC MI Road	Jaipur	MI Road, Jaipur 302001	9876543229	t	1	2025-10-10 17:10:41.042377	2025-10-10 17:10:41.042377	10
+22	SBI Malviya Nagar	Jaipur	Malviya Nagar, Jaipur 302017	9876543230	t	1	2025-10-10 17:10:41.042377	2025-10-10 17:10:41.042377	10
+23	Axis Adajan	Surat	Adajan, Surat 395009	9876543231	t	1	2025-10-10 17:10:41.042377	2025-10-10 17:10:41.042377	9
+24	ICICI Vesu	Surat	Vesu, Surat 395007	9876543232	t	1	2025-10-10 17:10:41.042377	2025-10-10 17:10:41.042377	9
+25	SBI Satellite	Bangalore	bangalore	9898341367	t	1	2025-11-07 19:15:19.590086	2025-11-07 19:15:19.590086	3
+\.
+
+
+--
+-- Data for Name: app_settings; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY public.app_settings (id, key, value, updated_at, updated_by) FROM stdin;
+1	admin_fee_wallet		2025-09-29 17:47:33.308335	\N
+2	buyer_fee_percent	0.01	2025-09-29 17:47:33.308335	\N
+3	seller_fee_percent	0.01	2025-09-29 17:47:33.308335	\N
+4	accept_timeout_minutes	5	2025-09-29 17:47:33.308335	\N
+5	lock_duration_hours	1	2025-09-29 17:47:33.308335	\N
+\.
+
+
+--
+-- Data for Name: appeals; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY public.appeals (id, dispute_id, order_id, appellant_address, appellant_type, description, evidence_video_url, evidence_screenshots, evidence_documents, created_at, status) FROM stdin;
+1	1	28	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	SELLER	not done asdasdas	http://localhost:5173/orders	{}	{}	2025-10-15 19:34:12.450413	PENDING
+2	2	35	0x583c8c7b321f80e966e072e57e1bb5cc2698d685	BUYER	Hello sir I am not able 	appeal-1761293893161-919661736-video_evidence_1761293890302.webm	\N	\N	2025-10-24 13:48:21.935567	PENDING
+3	1	28	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	BUYER	Please help me 	appeal-1761749291680-565124596-video_evidence_1761749290510.webm	\N	\N	2025-10-29 20:18:18.724218	PENDING
+4	4	42	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	BUYER	Done ffffcccff	appeal-1762354563393-664530215-video_evidence_1762354564813.webm	\N	\N	2025-11-05 20:26:05.247183	PENDING
+5	6	48	0xD1c9d52F075Aed0F4cf21418e5AF0eEBB3368297	BUYER	Dijbbbbcccc	appeal-1762436636004-262292666-video_evidence_1762436635496.webm	\N	\N	2025-11-06 19:13:56.492304	PENDING
+6	5	46	0xD1c9d52F075Aed0F4cf21418e5AF0eEBB3368297	BUYER	Done dindndn	appeal-1762437830962-352132625-video_evidence_1762437830171.webm	\N	\N	2025-11-06 19:33:52.345883	PENDING
+7	7	51	0xD1c9d52F075Aed0F4cf21418e5AF0eEBB3368297	BUYER	Drrrfttttccc	appeal-1762525492110-901512487-video_evidence_1762525490880.webm	\N	\N	2025-11-07 19:54:53.179561	PENDING
+8	11	55	0xD1c9d52F075Aed0F4cf21418e5AF0eEBB3368297	BUYER	Frrrfffffff	appeal-1762672831761-222249564-video_evidence_1762672805002.webm	\N	\N	2025-11-09 12:50:36.829379	PENDING
+9	10	54	0xD1c9d52F075Aed0F4cf21418e5AF0eEBB3368297	BUYER	Fcffggggggg	appeal-1762673337583-979234646-video_evidence_1762673335845.webm	\N	\N	2025-11-09 12:59:00.09244	PENDING
+10	9	53	0xD1c9d52F075Aed0F4cf21418e5AF0eEBB3368297	BUYER	Xxxdffffffft	appeal-1762676469864-563733582-video_evidence_1762676468983.webm	\N	\N	2025-11-09 13:51:16.181379	PENDING
+\.
+
+
+--
+-- Data for Name: audit_logs; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY public.audit_logs (id, user_address, action, resource_type, resource_id, details, ip_address, created_at) FROM stdin;
+2	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-10-10 17:08:48.728327
+3	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	WALLET_LOGIN	\N	\N	\N	192.168.0.106	2025-10-10 17:09:11.377197
+4	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	WALLET_LOGIN	\N	\N	\N	192.168.0.106	2025-10-10 17:09:28.204728
+5	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	UPDATE_PROFILE	user	\N	{"name": "sdf", "phone": "9898341345", "location_id": 5, "selected_agent_ids": [14]}	127.0.0.1	2025-10-10 17:13:17.783673
+6	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	UPDATE_PROFILE	user	\N	{"name": "Heming Patel", "phone": "09726846660", "location_id": 6, "selected_agent_ids": [16, 15]}	192.168.0.106	2025-10-10 17:13:21.633574
+7	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	WALLET_LOGIN	\N	\N	\N	192.168.0.106	2025-10-10 17:13:47.187665
+8	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-10-10 17:15:00.964686
+9	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	WALLET_LOGIN	\N	\N	\N	192.168.0.106	2025-10-10 17:15:01.345625
+10	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	UPDATE_PROFILE	user	\N	{"name": "s", "phone": "9898341345", "location_id": 6, "selected_agent_ids": [16]}	127.0.0.1	2025-10-10 17:15:17.303324
+11	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	UPDATE_PROFILE	user	\N	{"name": "Heming Patel", "phone": "09726846660", "location_id": 3, "selected_agent_ids": [9, 8]}	192.168.0.106	2025-10-10 17:15:23.775568
+12	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	UPDATE_PROFILE	user	\N	{"name": "prabh", "phone": "9898341345", "location_id": 5, "selected_agent_ids": [14]}	127.0.0.1	2025-10-10 17:16:25.182723
+13	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	UPDATE_PROFILE	user	\N	{"name": "prabh", "phone": "9898341345", "location_id": 5, "selected_agent_ids": [14]}	127.0.0.1	2025-10-10 17:20:57.126889
+14	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-10-10 17:21:25.981776
+15	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	UPDATE_PROFILE	user	\N	{"name": "Heming Patel", "phone": "09726846660", "location_id": 3, "selected_agent_ids": [9, 8]}	192.168.0.106	2025-10-10 17:21:27.326782
+16	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-10-10 17:21:27.539124
+17	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	WALLET_LOGIN	\N	\N	\N	192.168.0.106	2025-10-10 17:21:46.41522
+18	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	CREATE_AD	ad	3	\N	192.168.0.106	2025-10-10 17:27:13.445166
+19	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	CREATE_ORDER	order	2	{"ad_id": 3, "amount": 0.2, "expires_at": "2025-10-10T06:32:42.434Z"}	127.0.0.1	2025-10-10 17:27:42.503328
+20	\N	AUTO_CANCEL_ORDER	order	2	{"reason": "Accept timeout"}	\N	2025-10-10 17:32:42.516466
+21	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	CREATE_ORDER	order	3	{"ad_id": 3, "amount": 0.2, "expires_at": "2025-10-10T06:41:30.371Z"}	127.0.0.1	2025-10-10 17:36:30.414815
+22	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-10-10 17:38:10.949501
+23	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	CREATE_ORDER	order	4	{"ad_id": 3, "amount": 0.2, "expires_at": "2025-10-10T06:43:20.762Z"}	127.0.0.1	2025-10-10 17:38:20.810349
+24	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	CREATE_ORDER	order	5	{"ad_id": 3, "amount": 0.2, "expires_at": "2025-10-10T12:15:39.015Z"}	127.0.0.1	2025-10-10 17:40:39.077119
+25	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-10-10 17:42:24.149117
+26	\N	AUTO_EXPIRE_ORDER	order	3	{"reason": "Accept timeout exceeded", "created_at": "2025-10-10T12:06:30.405Z", "timeout_minutes": 5}	\N	2025-10-10 17:42:28.041455
+27	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	ACCEPT_ORDER	order	5	\N	192.168.0.106	2025-10-10 17:42:42.51675
+28	\N	AUTO_EXPIRE_ORDER	order	4	{"reason": "Accept timeout exceeded", "created_at": "2025-10-10T12:08:20.798Z", "timeout_minutes": 5}	\N	2025-10-10 17:43:28.040593
+29	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	CREATE_ORDER	order	6	{"ad_id": 3, "amount": 0.2, "expires_at": "2025-10-10T12:18:28.172Z"}	127.0.0.1	2025-10-10 17:43:28.187774
+30	\N	AUTO_CANCEL_ORDER	order	6	{"reason": "Accept timeout"}	\N	2025-10-10 17:48:28.199036
+31	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	WALLET_LOGIN	\N	\N	\N	192.168.0.106	2025-10-10 17:55:25.401456
+32	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	CREATE_ORDER	order	7	{"ad_id": 3, "amount": 0.2, "expires_at": "2025-10-10T12:30:25.966Z"}	127.0.0.1	2025-10-10 17:55:26.021197
+33	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	ACCEPT_ORDER	order	7	\N	192.168.0.106	2025-10-10 17:59:26.693551
+34	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	CREATE_ORDER	order	8	{"ad_id": 3, "amount": 0.2, "expires_at": "2025-10-10T12:49:22.194Z"}	127.0.0.1	2025-10-10 18:14:22.259154
+35	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	WALLET_LOGIN	\N	\N	\N	192.168.0.106	2025-10-10 18:15:36.51207
+36	\N	AUTO_CANCEL_ORDER	order	8	{"reason": "Accept timeout"}	\N	2025-10-10 18:19:22.276475
+37	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	CREATE_ORDER	order	9	{"ad_id": 3, "amount": 0.2, "expires_at": "2025-10-10T12:58:15.840Z"}	127.0.0.1	2025-10-10 18:23:15.995221
+38	\N	AUTO_EXPIRE_ORDER	order	9	{"reason": "Accept timeout exceeded", "created_at": "2025-10-10T12:53:15.840Z", "timeout_minutes": 5}	\N	2025-10-10 18:28:56.84665
+39	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	CREATE_ORDER	order	10	{"ad_id": 3, "amount": 0.2, "expires_at": "2025-10-10T13:08:57.085Z"}	127.0.0.1	2025-10-10 18:33:57.172356
+40	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	WALLET_LOGIN	\N	\N	\N	192.168.0.106	2025-10-10 18:34:54.33441
+41	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	ACCEPT_ORDER	order	10	\N	192.168.0.106	2025-10-10 18:35:17.600823
+42	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	WALLET_LOGIN	\N	\N	\N	192.168.0.106	2025-10-10 18:37:47.311914
+43	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	CREATE_ORDER	order	11	{"ad_id": 3, "amount": 0.2, "expires_at": "2025-10-10T13:13:07.601Z"}	127.0.0.1	2025-10-10 18:38:07.61601
+44	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	ACCEPT_ORDER	order	11	\N	192.168.0.106	2025-10-10 18:38:17.994923
+45	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	WALLET_LOGIN	\N	\N	\N	192.168.0.106	2025-10-10 18:46:13.48314
+46	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	CREATE_ORDER	order	12	{"ad_id": 3, "amount": 0.2, "expires_at": "2025-10-10T13:21:18.065Z"}	127.0.0.1	2025-10-10 18:46:18.145621
+47	\N	AUTO_EXPIRE_ORDER	order	12	{"reason": "Accept timeout exceeded", "created_at": "2025-10-10T13:16:18.065Z", "timeout_minutes": 5}	\N	2025-10-10 18:52:02.260355
+48	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	CREATE_ORDER	order	13	{"ad_id": 3, "amount": 0.2, "expires_at": "2025-10-10T13:31:36.857Z"}	127.0.0.1	2025-10-10 18:56:36.932073
+49	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	WALLET_LOGIN	\N	\N	\N	192.168.0.106	2025-10-10 18:56:43.494879
+50	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	WALLET_LOGIN	\N	\N	\N	192.168.0.106	2025-10-10 18:57:39.267962
+51	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	WALLET_LOGIN	\N	\N	\N	192.168.0.106	2025-10-10 18:57:40.544873
+52	\N	AUTO_CANCEL_ORDER	order	13	{"reason": "Accept timeout"}	\N	2025-10-10 19:01:36.952723
+53	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-10-10 19:07:07.209244
+54	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	WALLET_LOGIN	\N	\N	\N	192.168.0.106	2025-10-10 19:07:08.143903
+55	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	CREATE_ORDER	order	14	{"ad_id": 3, "amount": 0.2, "expires_at": "2025-10-10T13:42:19.030Z"}	127.0.0.1	2025-10-10 19:07:19.122012
+56	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	WALLET_LOGIN	\N	\N	\N	192.168.0.106	2025-10-10 19:08:10.680365
+57	\N	AUTO_EXPIRE_ORDER	order	14	{"reason": "Accept timeout exceeded", "created_at": "2025-10-10T13:37:19.030Z", "timeout_minutes": 5}	\N	2025-10-12 12:54:21.427054
+58	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	WALLET_LOGIN	\N	\N	\N	192.168.0.105	2025-10-12 12:55:35.747636
+59	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	CREATE_ORDER	order	15	{"ad_id": 3, "amount": 0.2, "expires_at": "2025-10-12T07:30:50.303Z"}	127.0.0.1	2025-10-12 12:55:50.473213
+60	\N	AUTO_CANCEL_ORDER	order	15	{"reason": "Accept timeout"}	\N	2025-10-12 13:00:50.478056
+61	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	WALLET_LOGIN	\N	\N	\N	192.168.0.105	2025-10-12 13:01:45.457314
+62	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	CREATE_ORDER	order	16	{"ad_id": 3, "amount": 0.2, "expires_at": "2025-10-12T07:37:13.736Z"}	127.0.0.1	2025-10-12 13:02:13.814217
+63	\N	AUTO_CANCEL_ORDER	order	16	{"reason": "Accept timeout"}	\N	2025-10-12 13:07:13.825379
+64	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	CREATE_ORDER	order	17	{"ad_id": 3, "amount": 0.2, "expires_at": "2025-10-12T07:44:56.586Z"}	127.0.0.1	2025-10-12 13:09:56.642716
+65	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	WALLET_LOGIN	\N	\N	\N	192.168.0.105	2025-10-12 13:10:07.037962
+66	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	WALLET_LOGIN	\N	\N	\N	192.168.0.105	2025-10-12 13:10:44.661878
+67	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	CREATE_AD	ad	4	\N	127.0.0.1	2025-10-12 13:14:22.968434
+68	\N	AUTO_CANCEL_ORDER	order	17	{"reason": "Accept timeout"}	\N	2025-10-12 13:14:56.656234
+69	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	CREATE_ORDER	order	18	{"ad_id": 4, "amount": 0.1, "expires_at": "2025-10-12T07:51:13.304Z"}	192.168.0.105	2025-10-12 13:16:13.319249
+70	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-10-12 13:20:22.9645
+71	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	WALLET_LOGIN	\N	\N	\N	192.168.0.105	2025-10-12 13:20:45.214078
+72	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-10-12 13:21:12.372919
+73	\N	AUTO_EXPIRE_ORDER	order	18	{"reason": "Accept timeout exceeded", "created_at": "2025-10-12T07:46:13.304Z", "timeout_minutes": 5}	\N	2025-10-12 13:21:41.302475
+74	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	CREATE_ORDER	order	19	{"ad_id": 4, "amount": 0.1, "expires_at": "2025-10-12T07:56:56.336Z"}	192.168.0.105	2025-10-12 13:21:56.383566
+75	\N	AUTO_CANCEL_ORDER	order	19	{"reason": "Accept timeout"}	\N	2025-10-12 13:26:56.393462
+76	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-10-12 13:29:30.950882
+77	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-10-12 13:29:32.216597
+78	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	CREATE_ORDER	order	20	{"ad_id": 4, "amount": 0.1, "expires_at": "2025-10-12T08:04:48.113Z"}	192.168.0.105	2025-10-12 13:29:48.202766
+79	\N	AUTO_CANCEL_ORDER	order	20	{"reason": "Accept timeout"}	\N	2025-10-12 13:34:48.216227
+80	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-10-12 13:38:46.324074
+81	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-10-12 13:39:09.975106
+82	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-10-12 13:40:05.630913
+83	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-10-12 13:48:30.065934
+84	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-10-12 13:48:31.2843
+85	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-10-12 13:48:33.097517
+86	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	WALLET_LOGIN	\N	\N	\N	192.168.0.105	2025-10-12 13:48:52.381852
+87	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	CREATE_ORDER	order	21	{"ad_id": 4, "amount": 0.1, "expires_at": "2025-10-12T08:24:40.348Z"}	192.168.0.105	2025-10-12 13:49:40.367349
+88	\N	AUTO_EXPIRE_ORDER	order	21	{"reason": "Accept timeout exceeded", "created_at": "2025-10-12T08:19:40.348Z", "timeout_minutes": 5}	\N	2025-10-12 13:54:54.119783
+89	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-10-12 13:55:22.932432
+90	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-10-12 13:55:23.813145
+91	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	WALLET_LOGIN	\N	\N	\N	192.168.0.105	2025-10-12 13:55:49.496035
+92	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	CREATE_ORDER	order	22	{"ad_id": 4, "amount": 0.1, "expires_at": "2025-10-12T08:31:12.057Z"}	192.168.0.105	2025-10-12 13:56:12.103942
+93	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	CREATE_AD	ad	5	\N	127.0.0.1	2025-10-12 13:58:46.378462
+94	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	CREATE_ORDER	order	23	{"ad_id": 5, "amount": 0.2, "expires_at": "2025-10-12T08:34:07.520Z"}	192.168.0.105	2025-10-12 13:59:07.548896
+95	\N	AUTO_CANCEL_ORDER	order	22	{"reason": "Accept timeout"}	\N	2025-10-12 14:01:12.120709
+96	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	CREATE_ORDER	order	24	{"ad_id": 4, "amount": 0.1, "expires_at": "2025-10-12T08:39:03.205Z"}	192.168.0.105	2025-10-12 14:04:03.227914
+97	\N	AUTO_CANCEL_ORDER	order	23	{"reason": "Accept timeout"}	\N	2025-10-12 14:04:07.558028
+98	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-10-12 14:08:12.347792
+99	\N	AUTO_CANCEL_ORDER	order	24	{"reason": "Accept timeout"}	\N	2025-10-12 14:09:03.240646
+100	0x583c8c7b321f80e966e072e57e1bb5cc2698d685	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-10-12 14:11:44.154071
+101	0x583c8c7b321f80e966e072e57e1bb5cc2698d685	UPDATE_PROFILE	user	\N	{"name": "dev", "phone": "9898341345", "location_id": 5, "selected_agent_ids": [14]}	127.0.0.1	2025-10-12 14:12:03.904907
+102	0x583c8c7b321f80e966e072e57e1bb5cc2698d685	CREATE_ORDER	order	25	{"ad_id": 4, "amount": 0.1, "expires_at": "2025-10-12T08:47:33.314Z"}	127.0.0.1	2025-10-12 14:12:33.330752
+103	\N	AUTO_EXPIRE_ORDER	order	25	{"reason": "Accept timeout exceeded", "created_at": "2025-10-12T08:42:33.314Z", "timeout_minutes": 5}	\N	2025-10-12 14:18:04.65746
+104	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	WALLET_LOGIN	\N	\N	\N	192.168.0.105	2025-10-12 14:28:32.314656
+105	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	CREATE_ORDER	order	26	{"ad_id": 4, "amount": 0.1, "expires_at": "2025-10-12T09:04:02.187Z"}	192.168.0.105	2025-10-12 14:29:02.258646
+106	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	ACCEPT_ORDER_SIMPLE	order	26	\N	127.0.0.1	2025-10-12 14:29:12.212446
+107	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	CREATE_ORDER	order	27	{"ad_id": 3, "amount": 0.2, "expires_at": "2025-10-12T09:06:43.223Z"}	127.0.0.1	2025-10-12 14:31:43.239342
+108	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	CREATE_ORDER	order	28	{"ad_id": 3, "amount": 0.2, "expires_at": "2025-10-12T09:07:22.915Z"}	127.0.0.1	2025-10-12 14:32:22.944422
+109	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	ACCEPT_ORDER_SIMPLE	order	28	\N	192.168.0.105	2025-10-12 14:32:31.524246
+110	\N	AUTO_CANCEL_ORDER	order	27	{"reason": "Accept timeout"}	\N	2025-10-12 14:36:43.268123
+111	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-10-12 15:36:17.521122
+112	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	WALLET_LOGIN	\N	\N	\N	192.168.0.105	2025-10-12 15:47:16.439641
+113	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	WALLET_LOGIN	\N	\N	\N	192.168.0.105	2025-10-12 15:48:04.863178
+114	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	WALLET_LOGIN	\N	\N	\N	192.168.0.105	2025-10-12 15:50:32.802511
+115	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	WALLET_LOGIN	\N	\N	\N	192.168.50.105	2025-10-14 19:44:51.043718
+116	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-10-14 19:45:51.269195
+117	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-10-14 19:51:19.362137
+118	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-10-14 19:52:09.9745
+119	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	WALLET_LOGIN	\N	\N	\N	192.168.50.105	2025-10-14 19:53:09.896896
+120	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	WALLET_LOGIN	\N	\N	\N	192.168.50.105	2025-10-14 19:53:41.694951
+121	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-10-14 20:02:36.76738
+122	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-10-14 20:02:59.42484
+123	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-10-14 20:07:37.55766
+124	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	LOCK_FUNDS	order	28	{"txHash": "0x5aae91a4460234078fcbfca2ed6feff03452211b095a05639655e7c60ac917c7", "blockchainTradeId": 3}	127.0.0.1	2025-10-14 20:08:17.288772
+125	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	WALLET_LOGIN	\N	\N	\N	192.168.50.105	2025-10-14 20:12:50.067293
+126	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	CREATE_ORDER	order	29	{"ad_id": 5, "amount": 0.2, "expires_at": "2025-10-14T14:48:23.657Z"}	192.168.50.105	2025-10-14 20:13:23.696978
+127	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-10-14 20:13:30.901624
+128	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	ACCEPT_ORDER_SIMPLE	order	29	\N	127.0.0.1	2025-10-14 20:13:37.381205
+129	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	CREATE_ORDER	order	30	{"ad_id": 4, "amount": 0.1, "expires_at": "2025-10-14T14:49:09.132Z"}	192.168.50.105	2025-10-14 20:14:09.143267
+130	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	ACCEPT_ORDER_SIMPLE	order	30	\N	127.0.0.1	2025-10-14 20:14:17.335886
+131	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	LOCK_FUNDS	order	30	{"txHash": "0x18236c58fa2aa0f258422d8de33c12a16006383a9cfa86d1ea2b06560d7ee4c0", "blockchainTradeId": 5}	192.168.50.105	2025-10-14 20:14:49.09458
+132	\N	ADMIN_LOGIN	\N	\N	{"username": "admin"}	127.0.0.1	2025-10-14 20:38:03.577496
+133	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-10-14 20:47:24.095029
+134	\N	ADMIN_LOGIN	\N	\N	{"username": "admin"}	127.0.0.1	2025-10-14 20:55:07.008562
+135	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-10-14 21:36:27.358242
+136	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-10-14 21:38:27.200639
+137	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	WALLET_LOGIN	\N	\N	\N	192.168.50.105	2025-10-14 21:38:28.436593
+138	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	WALLET_LOGIN	\N	\N	\N	192.168.50.105	2025-10-14 21:42:44.673213
+139	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-10-14 21:44:39.273815
+140	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-10-15 19:27:02.084842
+141	\N	ADMIN_LOGIN	\N	\N	{"username": "admin"}	127.0.0.1	2025-10-15 19:34:32.850538
+142	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	WALLET_LOGIN	\N	\N	\N	192.168.50.105	2025-10-15 19:39:16.515423
+143	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	CREATE_ORDER	order	31	{"ad_id": 4, "amount": 0.1, "expires_at": "2025-10-15T14:15:53.448Z"}	192.168.50.105	2025-10-15 19:40:53.493361
+144	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	ACCEPT_ORDER_SIMPLE	order	31	\N	127.0.0.1	2025-10-15 19:41:01.81782
+145	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	LOCK_FUNDS	order	31	{"txHash": "0x18aac441a06f997c8b8b8c6e3af7386c03cf58b27418ec92eedce4b1f41c95a4", "blockchainTradeId": 6}	192.168.50.105	2025-10-15 19:43:26.822813
+146	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	WALLET_LOGIN	\N	\N	\N	192.168.50.105	2025-10-15 20:02:13.545794
+147	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-10-15 20:02:16.98582
+148	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	WALLET_LOGIN	\N	\N	\N	192.168.50.105	2025-10-15 20:12:40.138958
+149	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	CREATE_ORDER	order	32	{"ad_id": 4, "amount": 0.1, "expires_at": "2025-10-15T14:47:58.520Z"}	192.168.50.105	2025-10-15 20:12:58.55158
+150	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	ACCEPT_ORDER_SIMPLE	order	32	\N	127.0.0.1	2025-10-15 20:13:15.41157
+151	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	LOCK_FUNDS	order	32	{"txHash": "0x4eb00696e2b54f76c90cae0a3d5dd775974f965c6f6fcc57396773698f0693cf", "blockchainTradeId": 7}	192.168.50.105	2025-10-15 20:13:59.780638
+152	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	WALLET_LOGIN	\N	\N	\N	192.168.50.105	2025-10-15 20:18:58.549703
+153	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-10-15 20:18:58.71472
+154	0x583c8c7b321f80e966e072e57e1bb5cc2698d685	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-10-15 20:26:05.256647
+155	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	CREATE_ORDER	order	33	{"ad_id": 3, "amount": 0.15, "expires_at": "2025-10-15T15:04:50.270Z"}	127.0.0.1	2025-10-15 20:29:50.339365
+156	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	ACCEPT_ORDER_SIMPLE	order	33	\N	192.168.50.105	2025-10-15 20:30:09.006569
+157	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	LOCK_FUNDS	order	33	{"txHash": "0x83d4a481b99433e9f6366196d053bacb9755f5b4fec673a34939ee5dc56f7606", "blockchainTradeId": 8}	127.0.0.1	2025-10-15 20:31:15.623035
+158	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-10-15 21:12:06.83252
+159	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-10-15 21:16:48.854595
+160	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	WALLET_LOGIN	\N	\N	\N	192.168.50.105	2025-10-15 21:16:56.63716
+161	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	CREATE_ORDER	order	34	{"ad_id": 4, "amount": 0.1, "expires_at": "2025-10-15T15:52:17.562Z"}	192.168.50.105	2025-10-15 21:17:17.616681
+162	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	ACCEPT_ORDER_SIMPLE	order	34	\N	127.0.0.1	2025-10-15 21:17:25.374298
+163	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	LOCK_FUNDS	order	34	{"txHash": "0x51dd0ec12a327ff7519d78e4b83856eb26bd734219edcc0249aad64e5b426ff2", "blockchainTradeId": 9}	192.168.50.105	2025-10-15 21:18:47.892326
+164	\N	ADMIN_LOGIN	\N	\N	{"username": "admin"}	127.0.0.1	2025-10-15 21:25:41.891414
+165	\N	ADMIN_LOGIN	\N	\N	{"username": "admin"}	127.0.0.1	2025-10-17 18:07:48.151879
+166	\N	ADMIN_DELETE_AGENT	agent	5	\N	127.0.0.1	2025-10-17 19:13:47.886539
+167	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-10-17 20:18:45.064413
+168	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-10-17 20:24:10.816096
+169	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-10-17 20:24:12.623685
+170	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-10-17 20:34:37.262483
+171	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-10-17 20:48:22.640995
+172	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-10-17 20:55:16.744739
+173	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-10-17 21:02:20.303207
+174	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-10-17 21:08:57.931648
+175	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-10-17 21:09:06.825213
+176	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-10-17 21:10:55.246643
+177	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-10-17 22:37:39.740507
+178	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-10-17 22:37:43.258893
+179	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-10-18 18:27:07.307773
+180	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-10-18 18:29:26.836089
+181	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-10-18 18:30:16.792413
+182	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-10-18 18:40:33.580999
+183	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-10-18 18:40:35.849095
+184	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-10-18 18:49:29.0465
+185	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-10-18 18:50:35.499559
+186	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-10-18 18:51:25.978578
+187	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-10-20 12:59:57.583022
+188	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-10-21 11:30:05.605753
+189	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-10-21 11:44:56.488283
+190	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-10-21 11:45:11.160725
+191	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	CREATE_AD	ad	6	\N	127.0.0.1	2025-10-21 11:50:49.846738
+192	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	CREATE_AD	ad	7	\N	127.0.0.1	2025-10-21 11:55:28.039059
+193	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-10-21 12:10:42.613652
+194	0x583c8c7b321f80e966e072e57e1bb5cc2698d685	WALLET_LOGIN	\N	\N	\N	10.253.209.63	2025-10-21 13:17:21.447054
+195	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-10-22 11:03:12.574517
+196	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	UPDATE_PROFILE	user	\N	{"name": "prabhudev", "phone": "9898341345", "location_id": 5, "selected_agent_ids": [14]}	127.0.0.1	2025-10-22 11:03:37.053568
+197	0x583c8c7b321f80e966e072e57e1bb5cc2698d685	CREATE_AD	ad	8	\N	127.0.0.1	2025-10-22 11:04:57.124295
+198	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	CREATE_ORDER	order	35	{"ad_id": 8, "amount": 0.15, "expires_at": "2025-10-22T05:40:27.564Z"}	127.0.0.1	2025-10-22 11:05:27.595625
+199	0x583c8c7b321f80e966e072e57e1bb5cc2698d685	ACCEPT_ORDER_SIMPLE	order	35	\N	127.0.0.1	2025-10-22 11:05:38.820074
+200	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-10-22 11:06:00.47849
+201	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	LOCK_FUNDS	order	35	{"txHash": "0x4ac8e44499a293fa2ff08a3ec1614466bbe24cca5680cce9590a54ab15a84f54", "blockchainTradeId": 11}	127.0.0.1	2025-10-22 11:06:18.010174
+202	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-10-23 10:57:25.754566
+203	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	WALLET_LOGIN	\N	\N	\N	10.202.122.51	2025-10-23 11:15:43.898092
+204	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-10-23 11:17:44.152201
+205	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	UPDATE_PROFILE	user	\N	{"name": "prabhudev", "phone": "9898341345", "location_id": 5, "selected_agent_ids": [14, 13]}	127.0.0.1	2025-10-23 11:18:06.602833
+206	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	UPDATE_PROFILE	user	\N	{"name": "Hh", "phone": "6999999999", "location_id": 5, "selected_agent_ids": [14]}	10.202.122.51	2025-10-23 11:19:05.665347
+207	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	UPDATE_PROFILE	user	\N	{"name": "Hh", "phone": "6999999999", "location_id": 5, "selected_agent_ids": [14, 13]}	10.202.122.51	2025-10-23 11:19:09.842077
+208	0x249394a922d8d41a75660d4087f0e4dd6674849f	WALLET_LOGIN	\N	\N	\N	10.202.122.238	2025-10-23 11:20:27.510116
+209	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	WALLET_LOGIN	\N	\N	\N	10.202.122.51	2025-10-23 11:20:44.90279
+210	0x249394a922d8d41a75660d4087f0e4dd6674849f	UPDATE_PROFILE	user	\N	{"name": "Heming", "phone": "9726846660", "location_id": 5, "selected_agent_ids": [14, 13]}	10.202.122.238	2025-10-23 11:20:47.657793
+211	0x249394a922d8d41a75660d4087f0e4dd6674849f	CREATE_ORDER	order	36	{"ad_id": 5, "amount": 0.11, "expires_at": "2025-10-23T05:58:07.045Z"}	10.202.122.238	2025-10-23 11:23:07.070604
+212	0x583c8c7b321f80e966e072e57e1bb5cc2698d685	WALLET_LOGIN	\N	\N	\N	10.202.122.51	2025-10-23 11:23:57.244069
+213	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-10-23 11:24:12.167139
+214	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-10-23 11:26:00.297417
+215	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	ACCEPT_ORDER_SIMPLE	order	36	\N	127.0.0.1	2025-10-23 11:26:36.901102
+216	0x249394a922d8d41a75660d4087f0e4dd6674849f	CREATE_ORDER	order	37	{"ad_id": 5, "amount": 0.12, "expires_at": "2025-10-23T06:06:24.437Z"}	10.202.122.238	2025-10-23 11:31:24.463294
+217	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	ACCEPT_ORDER_SIMPLE	order	37	\N	127.0.0.1	2025-10-23 11:35:37.644475
+218	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-10-23 11:36:27.92827
+219	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	CREATE_AD	ad	9	\N	127.0.0.1	2025-10-23 11:37:35.902876
+220	0x249394a922d8d41a75660d4087f0e4dd6674849f	CREATE_ORDER	order	38	{"ad_id": 9, "amount": 0.02, "expires_at": "2025-10-23T06:13:19.635Z"}	10.202.122.238	2025-10-23 11:38:19.659404
+221	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	ACCEPT_ORDER_SIMPLE	order	38	\N	127.0.0.1	2025-10-23 11:40:19.866388
+222	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-10-23 11:42:39.773494
+223	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	LOCK_FUNDS	order	38	{"txHash": "0x9d35b035baa35fa8b26e8cffaede4ed99704119daaa2f329e7a5f5185b9b6ca8", "blockchainTradeId": 13}	127.0.0.1	2025-10-23 11:42:59.643098
+224	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-10-23 12:13:42.300797
+225	0x249394a922d8d41a75660d4087f0e4dd6674849f	UPDATE_PROFILE	user	\N	{"name": "Heming", "phone": "9726846660", "location_id": 5, "selected_agent_ids": [14, 13]}	10.202.122.238	2025-10-23 12:21:42.273548
+226	0x249394a922d8d41a75660d4087f0e4dd6674849f	WALLET_LOGIN	\N	\N	\N	10.202.122.238	2025-10-23 12:23:32.24189
+227	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-10-23 12:28:53.309884
+228	0x249394a922d8d41a75660d4087f0e4dd6674849f	WALLET_LOGIN	\N	\N	\N	10.202.122.238	2025-10-23 13:01:36.986454
+229	0x249394a922d8d41a75660d4087f0e4dd6674849f	WALLET_LOGIN	\N	\N	\N	10.202.122.238	2025-10-23 14:18:26.716499
+230	0x249394a922d8d41a75660d4087f0e4dd6674849f	WALLET_LOGIN	\N	\N	\N	10.202.122.238	2025-10-23 14:20:27.846423
+231	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-10-23 14:22:30.706488
+232	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-10-23 14:28:25.740559
+233	0x249394a922d8d41a75660d4087f0e4dd6674849f	WALLET_LOGIN	\N	\N	\N	10.202.122.238	2025-10-23 14:29:07.169872
+234	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-10-23 14:31:20.874166
+235	0x249394a922d8d41a75660d4087f0e4dd6674849f	WALLET_LOGIN	\N	\N	\N	10.202.122.238	2025-10-23 14:31:42.397991
+236	0x249394a922d8d41a75660d4087f0e4dd6674849f	WALLET_LOGIN	\N	\N	\N	10.202.122.238	2025-10-23 14:32:55.815693
+237	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-10-23 14:33:44.991777
+238	0x249394a922d8d41a75660d4087f0e4dd6674849f	WALLET_LOGIN	\N	\N	\N	10.202.122.238	2025-10-23 14:34:46.567645
+239	0x249394a922d8d41a75660d4087f0e4dd6674849f	WALLET_LOGIN	\N	\N	\N	10.202.122.238	2025-10-23 14:35:39.162465
+240	0x249394a922d8d41a75660d4087f0e4dd6674849f	WALLET_LOGIN	\N	\N	\N	10.202.122.238	2025-10-23 14:36:08.946084
+241	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-10-23 14:46:14.443374
+242	0x249394a922d8d41a75660d4087f0e4dd6674849f	WALLET_LOGIN	\N	\N	\N	10.202.122.238	2025-10-23 14:46:53.100071
+243	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	WALLET_LOGIN	\N	\N	\N	10.202.122.51	2025-10-23 14:48:55.463101
+244	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-10-24 10:33:32.458927
+245	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-10-24 10:39:51.891219
+246	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	WALLET_LOGIN	\N	\N	\N	10.202.122.51	2025-10-24 10:42:16.032919
+247	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-10-24 10:48:08.621231
+248	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-10-24 10:48:16.19416
+249	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-10-24 10:53:12.290172
+250	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	WALLET_LOGIN	\N	\N	\N	10.202.122.51	2025-10-24 12:01:40.472141
+251	0x583c8c7b321f80e966e072e57e1bb5cc2698d685	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-10-24 12:03:50.060369
+252	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-10-24 13:42:46.86923
+253	0x583c8c7b321f80e966e072e57e1bb5cc2698d685	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-10-24 13:43:12.952004
+254	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-10-24 13:48:42.386031
+255	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-10-24 14:06:46.772006
+256	0x583c8c7b321f80e966e072e57e1bb5cc2698d685	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-10-29 19:32:11.028791
+257	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-10-29 20:05:12.893402
+258	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-10-29 20:13:47.086323
+259	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-10-29 20:13:59.414037
+260	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-10-29 20:16:50.910592
+261	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-10-29 20:26:43.511144
+262	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-10-29 20:28:54.561912
+263	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-10-29 20:38:28.431227
+264	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-10-29 20:51:57.03107
+265	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	CREATE_ORDER	order	39	{"ad_id": 3, "amount": 0.14, "expires_at": "2025-10-29T15:27:32.918Z"}	127.0.0.1	2025-10-29 20:52:32.953211
+266	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	ACCEPT_ORDER_SIMPLE	order	39	\N	127.0.0.1	2025-10-29 20:52:42.403927
+267	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	CREATE_AD	ad	10	\N	127.0.0.1	2025-10-29 20:54:59.094379
+268	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	CREATE_ORDER	order	40	{"ad_id": 10, "amount": 0.2, "expires_at": "2025-10-29T15:30:24.817Z"}	127.0.0.1	2025-10-29 20:55:24.837216
+269	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	ACCEPT_ORDER_SIMPLE	order	40	\N	127.0.0.1	2025-10-29 20:55:46.867446
+270	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	CREATE_AD	ad	11	\N	127.0.0.1	2025-10-29 21:00:00.46466
+271	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-10-29 21:02:15.967231
+272	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	CREATE_ORDER	order	41	{"ad_id": 11, "amount": 0.1, "expires_at": "2025-10-29T15:38:51.017Z"}	127.0.0.1	2025-10-29 21:03:51.037033
+273	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	ACCEPT_ORDER_SIMPLE	order	41	\N	127.0.0.1	2025-10-29 21:04:00.859522
+274	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	LOCK_FUNDS	order	41	{"txHash": "0x8dd5668aaed4ad831b68393df5d67937843b1ed2b5e54803540ca1a50987570c", "blockchainTradeId": 17}	127.0.0.1	2025-10-29 21:04:34.32958
+275	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-10-31 19:35:31.702417
+276	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-10-31 20:36:15.090357
+277	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-11-02 10:05:20.693359
+278	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-11-02 10:07:35.281785
+279	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-11-02 10:31:37.468572
+280	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-11-02 10:32:28.883358
+281	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-11-02 10:34:13.428176
+282	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	INITIATE_CALL	call	2	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 10:36:27.726155
+283	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	INITIATE_CALL	call	3	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 10:36:27.753927
+284	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-11-02 10:45:33.548034
+285	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	INITIATE_CALL	call	4	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 10:45:50.276586
+286	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	INITIATE_CALL	call	5	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 10:45:50.310799
+287	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-11-02 11:04:26.509869
+288	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-11-02 11:04:33.279917
+289	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	INITIATE_CALL	call	6	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 11:04:38.735398
+290	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	INITIATE_CALL	call	7	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 11:04:38.950692
+291	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-11-02 11:06:27.319635
+292	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	INITIATE_CALL	call	8	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 11:07:40.520082
+293	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	INITIATE_CALL	call	9	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 11:07:40.64388
+294	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	INITIATE_CALL	call	10	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 11:07:58.386547
+295	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	INITIATE_CALL	call	11	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 11:07:58.71855
+296	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	INITIATE_CALL	call	12	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 11:08:17.504805
+297	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	INITIATE_CALL	call	13	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 11:08:17.61075
+298	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	INITIATE_CALL	call	14	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 11:08:47.592433
+299	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	INITIATE_CALL	call	15	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 11:08:47.667112
+300	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-11-02 11:09:36.857315
+301	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	INITIATE_CALL	call	16	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 11:09:50.699233
+302	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	INITIATE_CALL	call	17	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 11:09:51.174017
+303	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	INITIATE_CALL	call	18	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 11:10:06.931696
+304	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	INITIATE_CALL	call	19	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 11:10:07.163777
+305	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	INITIATE_CALL	call	20	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 11:10:12.608945
+306	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	INITIATE_CALL	call	21	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 11:10:13.068415
+307	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	INITIATE_CALL	call	22	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 11:10:17.408625
+308	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	INITIATE_CALL	call	23	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 11:10:17.488165
+309	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	INITIATE_CALL	call	24	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 11:17:16.494804
+310	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	INITIATE_CALL	call	25	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 11:17:16.856629
+311	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	INITIATE_CALL	call	26	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 11:17:32.541596
+312	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	INITIATE_CALL	call	27	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 11:17:32.728254
+313	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	INITIATE_CALL	call	28	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 11:18:02.775916
+314	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	INITIATE_CALL	call	29	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 11:18:03.223494
+315	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	INITIATE_CALL	call	30	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 11:18:31.732756
+316	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	INITIATE_CALL	call	31	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 11:18:31.896784
+317	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	INITIATE_CALL	call	32	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 11:19:46.74566
+318	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	INITIATE_CALL	call	33	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 11:19:47.287534
+319	0x249394a922d8d41a75660d4087f0e4dd6674849f	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-11-02 11:21:54.159715
+320	0x249394a922d8d41a75660d4087f0e4dd6674849f	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-11-02 11:22:32.523333
+321	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	INITIATE_CALL	call	34	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 11:29:43.276314
+322	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	INITIATE_CALL	call	35	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 11:29:43.353956
+323	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-11-02 11:31:08.176923
+324	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	INITIATE_CALL	call	36	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 11:31:16.403812
+325	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	INITIATE_CALL	call	37	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 11:31:16.524851
+326	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	INITIATE_CALL	call	38	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 11:31:21.945274
+327	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	INITIATE_CALL	call	39	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 11:31:22.054394
+328	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	INITIATE_CALL	call	40	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 11:31:54.541854
+329	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	INITIATE_CALL	call	41	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 11:31:54.736094
+330	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	INITIATE_CALL	call	42	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 11:32:05.490222
+331	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	INITIATE_CALL	call	43	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 11:32:05.640966
+332	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	INITIATE_CALL	call	44	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 11:32:49.812161
+333	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	INITIATE_CALL	call	45	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 11:32:49.942626
+334	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	INITIATE_CALL	call	46	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 11:32:59.863278
+335	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	INITIATE_CALL	call	47	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 11:32:59.992152
+336	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-11-02 11:35:52.469521
+337	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	INITIATE_CALL	call	48	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 11:36:03.840159
+338	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	INITIATE_CALL	call	49	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 11:36:04.025316
+339	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	INITIATE_CALL	call	50	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 11:36:21.880633
+340	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	INITIATE_CALL	call	51	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 11:36:22.234416
+341	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	INITIATE_CALL	call	52	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 11:36:38.048017
+342	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	INITIATE_CALL	call	53	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 11:36:38.765522
+343	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	INITIATE_CALL	call	54	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 11:36:51.339469
+344	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	INITIATE_CALL	call	55	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 11:36:51.472303
+345	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	INITIATE_CALL	call	56	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 11:38:17.370837
+346	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	INITIATE_CALL	call	57	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 11:38:17.819469
+347	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	INITIATE_CALL	call	58	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 11:38:36.445325
+348	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	INITIATE_CALL	call	59	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 11:38:36.738029
+349	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-11-02 11:51:16.93336
+350	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	INITIATE_CALL	call	60	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 11:51:21.971454
+351	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	INITIATE_CALL	call	61	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 11:51:22.166011
+352	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	INITIATE_CALL	call	62	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 11:53:44.940056
+353	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	INITIATE_CALL	call	63	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 11:53:45.1733
+354	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-11-02 11:56:36.857512
+355	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	INITIATE_CALL	call	64	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 11:56:59.15919
+356	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	INITIATE_CALL	call	65	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 11:56:59.191404
+357	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-11-02 12:15:02.980794
+358	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	INITIATE_CALL	call	66	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 12:15:15.356953
+359	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	INITIATE_CALL	call	67	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 12:15:15.645792
+360	0x583c8c7b321f80e966e072e57e1bb5cc2698d685	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-11-02 12:16:51.327927
+361	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-11-02 12:21:29.647234
+362	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-11-02 12:43:05.113768
+363	0x583c8c7b321f80e966e072e57e1bb5cc2698d685	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-11-02 12:43:40.470737
+364	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-11-02 12:44:45.339013
+365	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	INITIATE_CALL	call	68	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 12:44:55.045416
+366	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	INITIATE_CALL	call	69	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 12:44:55.143409
+367	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	INITIATE_CALL	call	70	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 12:45:14.865634
+368	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	INITIATE_CALL	call	71	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 12:45:15.028983
+369	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	INITIATE_CALL	call	72	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 12:45:22.329441
+370	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	INITIATE_CALL	call	73	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 12:45:22.489687
+371	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	INITIATE_CALL	call	74	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 12:45:28.387356
+372	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	INITIATE_CALL	call	75	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 12:45:28.517709
+373	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	INITIATE_CALL	call	76	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 12:45:34.653636
+374	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	INITIATE_CALL	call	77	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 12:45:34.760399
+375	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	INITIATE_CALL	call	78	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 12:45:41.009035
+376	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	INITIATE_CALL	call	79	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 12:45:41.18347
+377	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	INITIATE_CALL	call	80	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 12:45:46.853319
+378	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	INITIATE_CALL	call	81	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 12:45:47.041273
+379	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	INITIATE_CALL	call	82	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 12:45:54.128389
+380	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	INITIATE_CALL	call	83	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 12:45:54.231636
+381	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	INITIATE_CALL	call	84	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 12:45:56.432775
+382	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	INITIATE_CALL	call	85	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 12:45:56.61611
+383	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	INITIATE_CALL	call	86	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 12:46:06.570749
+384	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	INITIATE_CALL	call	87	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 12:46:06.705349
+385	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	INITIATE_CALL	call	88	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 12:46:12.311452
+386	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	INITIATE_CALL	call	89	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 12:46:12.82729
+387	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	INITIATE_CALL	call	90	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 12:46:14.383422
+388	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	INITIATE_CALL	call	91	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 12:46:14.676896
+389	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-11-02 13:11:31.35328
+390	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	INITIATE_CALL	call	92	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 13:11:40.787351
+391	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	INITIATE_CALL	call	93	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 13:11:40.869737
+392	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	INITIATE_CALL	call	94	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 13:12:13.505039
+393	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	INITIATE_CALL	call	95	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 13:12:13.974599
+394	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-11-02 13:17:25.537249
+395	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	INITIATE_CALL	call	96	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 13:17:30.711387
+396	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	INITIATE_CALL	call	97	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 13:17:30.896355
+397	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	INITIATE_CALL	call	98	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 13:17:51.095593
+398	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	INITIATE_CALL	call	99	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 13:17:51.25788
+399	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	END_CALL	call	99	\N	127.0.0.1	2025-11-02 13:18:17.344141
+400	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	INITIATE_CALL	call	100	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 13:18:29.153138
+401	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	INITIATE_CALL	call	101	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 13:18:29.283528
+402	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	END_CALL	call	101	\N	127.0.0.1	2025-11-02 13:19:00.337838
+403	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-11-02 13:21:30.744421
+404	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	INITIATE_CALL	call	102	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 13:21:46.8908
+405	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	INITIATE_CALL	call	103	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 13:21:46.928925
+406	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	END_CALL	call	103	\N	127.0.0.1	2025-11-02 13:22:19.375934
+407	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-11-02 13:30:48.930594
+408	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	INITIATE_CALL	call	104	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 13:30:52.091933
+409	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	INITIATE_CALL	call	105	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 13:30:52.174182
+410	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-11-02 13:30:57.03616
+411	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	INITIATE_CALL	call	106	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 13:30:57.332857
+412	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	INITIATE_CALL	call	107	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 13:30:57.37892
+413	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	END_CALL	call	107	\N	127.0.0.1	2025-11-02 13:31:47.168772
+414	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-11-02 13:36:45.605197
+415	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-11-02 13:36:58.412706
+416	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	INITIATE_CALL	call	108	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 13:37:01.737581
+417	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	INITIATE_CALL	call	109	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 13:37:01.933108
+418	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	END_CALL	call	108	\N	127.0.0.1	2025-11-02 13:37:05.93069
+419	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-11-02 13:46:07.539742
+420	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	INITIATE_CALL	call	110	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 13:46:11.78365
+421	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	INITIATE_CALL	call	111	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 13:46:12.102215
+422	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	END_CALL	call	110	\N	127.0.0.1	2025-11-02 13:46:25.829877
+423	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	INITIATE_CALL	call	112	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 13:46:33.719159
+424	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	INITIATE_CALL	call	113	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 13:46:35.018072
+425	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	END_CALL	call	112	\N	127.0.0.1	2025-11-02 13:46:47.267493
+426	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-11-02 13:47:17.915145
+427	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	INITIATE_CALL	call	114	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 13:47:37.664381
+428	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	INITIATE_CALL	call	115	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 13:47:38.067433
+429	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	END_CALL	call	114	\N	127.0.0.1	2025-11-02 13:47:50.823803
+430	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	INITIATE_CALL	call	116	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 13:48:08.001344
+431	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	INITIATE_CALL	call	117	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 13:48:08.364292
+432	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-11-02 13:51:16.991147
+433	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	INITIATE_CALL	call	118	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 13:51:20.955818
+434	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	INITIATE_CALL	call	119	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 13:51:20.996635
+435	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	END_CALL	call	119	\N	127.0.0.1	2025-11-02 13:51:51.615811
+436	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	END_CALL	call	116	\N	127.0.0.1	2025-11-02 13:51:55.305277
+437	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	END_CALL	call	118	\N	127.0.0.1	2025-11-02 13:52:01.806563
+438	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	INITIATE_CALL	call	120	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 13:52:06.491556
+439	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	INITIATE_CALL	call	121	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 13:52:06.603428
+440	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	END_CALL	call	121	\N	127.0.0.1	2025-11-02 13:52:37.512358
+441	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	END_CALL	call	120	\N	127.0.0.1	2025-11-02 13:52:58.987291
+442	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	INITIATE_CALL	call	122	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 13:53:14.706046
+443	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	INITIATE_CALL	call	123	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 13:53:15.288356
+444	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	END_CALL	call	122	\N	127.0.0.1	2025-11-02 13:53:21.619243
+445	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	INITIATE_CALL	call	124	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 13:53:22.217467
+446	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	INITIATE_CALL	call	125	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 13:53:23.554819
+447	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	END_CALL	call	124	\N	127.0.0.1	2025-11-02 13:53:36.932037
+448	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	INITIATE_CALL	call	126	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 13:53:52.582601
+449	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	INITIATE_CALL	call	127	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 13:53:55.929262
+450	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	END_CALL	call	126	\N	127.0.0.1	2025-11-02 13:53:58.563044
+451	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	INITIATE_CALL	call	128	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 13:53:59.297195
+452	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	INITIATE_CALL	call	129	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 13:53:59.649003
+453	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	END_CALL	call	128	\N	127.0.0.1	2025-11-02 13:54:04.198355
+454	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	INITIATE_CALL	call	130	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 13:54:27.450413
+455	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	INITIATE_CALL	call	131	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 13:54:27.933158
+456	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	END_CALL	call	130	\N	127.0.0.1	2025-11-02 13:56:43.426131
+457	0x583c8c7b321f80e966e072e57e1bb5cc2698d685	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-11-02 14:07:49.674025
+458	0x583c8c7b321f80e966e072e57e1bb5cc2698d685	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-11-02 14:08:08.84419
+459	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-11-02 14:10:15.915861
+460	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	INITIATE_CALL	call	132	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 14:10:21.97355
+461	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	INITIATE_CALL	call	133	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 14:10:22.081308
+462	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	END_CALL	call	133	\N	127.0.0.1	2025-11-02 14:10:52.93844
+463	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	END_CALL	call	132	\N	127.0.0.1	2025-11-02 14:12:12.130935
+464	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-11-02 14:14:09.812505
+465	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-11-02 14:15:31.593923
+466	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	INITIATE_CALL	call	134	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 14:15:35.554711
+467	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	INITIATE_CALL	call	135	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 14:15:35.666038
+468	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	END_CALL	call	135	\N	127.0.0.1	2025-11-02 14:16:06.356301
+469	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	END_CALL	call	134	\N	127.0.0.1	2025-11-02 14:22:36.144221
+470	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-11-02 14:22:44.697859
+471	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-11-02 14:23:05.459189
+472	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-11-02 14:23:22.205037
+473	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	INITIATE_CALL	call	136	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 14:23:25.082974
+474	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	INITIATE_CALL	call	137	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 14:23:25.137604
+475	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	END_CALL	call	136	\N	127.0.0.1	2025-11-02 14:23:44.258723
+476	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	INITIATE_CALL	call	138	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 14:23:46.016364
+477	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	INITIATE_CALL	call	139	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 14:23:46.064823
+478	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	END_CALL	call	139	\N	127.0.0.1	2025-11-02 14:24:18.292448
+479	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	END_CALL	call	138	\N	127.0.0.1	2025-11-02 14:28:45.109577
+480	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-11-02 14:29:09.942105
+481	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-11-02 14:29:43.234367
+482	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	INITIATE_CALL	call	140	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 14:29:45.330005
+483	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	INITIATE_CALL	call	141	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 14:29:45.421307
+484	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	INITIATE_CALL	call	142	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 14:38:04.320902
+485	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	INITIATE_CALL	call	143	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 14:38:04.448608
+486	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-11-02 14:38:22.744052
+487	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	INITIATE_CALL	call	144	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 14:38:25.444228
+488	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	INITIATE_CALL	call	145	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 14:38:25.494542
+489	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	INITIATE_CALL	call	146	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 14:38:43.027874
+490	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	INITIATE_CALL	call	147	{"receiver_address": "ADMIN_SUPPORT"}	127.0.0.1	2025-11-02 14:38:43.092036
+491	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-11-02 14:44:27.784611
+492	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-11-02 14:46:27.112438
+493	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-11-02 14:49:49.076049
+494	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-11-02 15:08:03.96878
+495	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-11-02 15:16:27.182006
+496	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-11-02 15:18:50.737892
+497	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-11-02 15:25:31.826602
+498	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-11-02 15:30:18.526034
+499	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-11-02 15:45:10.49064
+500	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-11-02 15:47:33.11214
+501	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-11-02 15:48:31.597649
+502	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-11-02 15:56:33.253942
+503	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-11-02 15:59:45.359558
+504	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-11-02 16:02:08.856005
+505	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-11-02 16:48:24.268025
+506	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	CREATE_ORDER	order	42	{"ad_id": 11, "amount": 0.01, "expires_at": "2025-11-02T11:26:37.416Z"}	127.0.0.1	2025-11-02 16:51:37.454437
+507	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-11-02 16:53:36.473848
+508	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	ACCEPT_ORDER_SIMPLE	order	42	\N	127.0.0.1	2025-11-02 16:53:46.6737
+509	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-11-02 16:56:37.512872
+510	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-11-05 16:16:37.083622
+511	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-11-05 16:31:07.115943
+512	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-11-05 16:34:26.975543
+513	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-11-05 16:35:34.385807
+514	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-11-05 16:36:18.072782
+515	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-11-05 16:39:53.810987
+516	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-11-05 16:40:21.165645
+517	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-11-05 16:40:54.465261
+518	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-11-05 17:46:27.001954
+519	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-11-05 17:47:36.357633
+520	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-11-05 17:52:18.983524
+521	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-11-05 17:52:37.838756
+522	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-11-05 17:54:14.357906
+523	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	END_SUPPORT_CALL	call	support-call-1762346130042	\N	127.0.0.1	2025-11-05 18:06:01.280026
+524	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	WALLET_LOGIN	\N	\N	\N	10.12.20.238	2025-11-05 18:18:47.586796
+525	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	LOCK_FUNDS	order	42	{"txHash": "0x61633e5ca4378eb402c7d33db9e8bd8e821d40e3bf241e40aed7a842cf430fc3", "blockchainTradeId": 20}	10.12.20.238	2025-11-05 18:19:38.442656
+526	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	WALLET_LOGIN	\N	\N	\N	10.12.20.167	2025-11-05 18:21:45.144281
+527	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-11-05 18:23:16.100455
+528	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-11-05 18:24:37.571305
+529	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	WALLET_LOGIN	\N	\N	\N	10.12.20.238	2025-11-05 18:25:26.786342
+530	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	WALLET_LOGIN	\N	\N	\N	10.12.20.238	2025-11-05 18:34:17.636073
+531	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-11-05 18:35:39.089182
+532	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	WALLET_LOGIN	\N	\N	\N	10.12.20.238	2025-11-05 18:36:04.478748
+533	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-11-05 18:38:46.968746
+534	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	WALLET_LOGIN	\N	\N	\N	10.12.20.238	2025-11-05 18:48:31.875358
+535	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	WALLET_LOGIN	\N	\N	\N	10.12.20.238	2025-11-05 18:48:40.71105
+536	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	WALLET_LOGIN	\N	\N	\N	10.12.20.238	2025-11-05 18:52:46.409017
+537	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-11-05 19:00:34.51586
+538	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	WALLET_LOGIN	\N	\N	\N	10.12.20.238	2025-11-05 19:21:43.714686
+539	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	WALLET_LOGIN	\N	\N	\N	10.12.20.238	2025-11-05 19:25:13.202819
+540	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-11-05 19:27:11.773734
+541	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-11-05 19:27:16.535086
+542	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	WALLET_LOGIN	\N	\N	\N	10.12.20.238	2025-11-05 19:43:24.890205
+543	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	WALLET_LOGIN	\N	\N	\N	10.12.20.238	2025-11-05 19:46:49.769249
+544	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	WALLET_LOGIN	\N	\N	\N	10.12.20.238	2025-11-05 19:47:14.866061
+545	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-11-05 19:50:03.304903
+546	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	WALLET_LOGIN	\N	\N	\N	10.12.20.238	2025-11-05 19:53:45.829531
+547	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	WALLET_LOGIN	\N	\N	\N	10.12.20.238	2025-11-05 19:56:10.445436
+548	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-11-05 20:02:40.987953
+549	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	WALLET_LOGIN	\N	\N	\N	10.12.20.167	2025-11-05 20:04:51.90447
+550	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	WALLET_LOGIN	\N	\N	\N	10.12.20.167	2025-11-05 20:04:57.881299
+551	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	CREATE_ORDER	order	43	{"ad_id": 11, "amount": 0.1, "expires_at": "2025-11-05T14:40:16.746Z"}	10.12.20.167	2025-11-05 20:05:16.762596
+552	\N	AUTO_CANCEL_ORDER	order	43	{"reason": "Accept timeout", "utcOffset": "+05:30 (IST)", "createdIST": "06/11/2025, 01:35:16", "cancelledIST": "06/11/2025, 01:40:16"}	\N	2025-11-05 20:10:16.782139
+553	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-11-05 20:11:51.254142
+554	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	WALLET_LOGIN	\N	\N	\N	10.12.20.238	2025-11-05 20:13:34.138981
+555	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	WALLET_LOGIN	\N	\N	\N	10.12.20.167	2025-11-05 20:16:40.570685
+556	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	WALLET_LOGIN	\N	\N	\N	10.12.20.238	2025-11-05 20:16:49.302224
+557	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-11-05 20:21:07.799448
+558	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-11-05 20:29:07.106613
+559	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-11-05 20:29:27.340517
+560	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-11-05 20:29:33.539458
+561	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-11-05 20:30:35.161453
+562	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-11-05 20:30:35.990534
+563	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	WALLET_LOGIN	\N	\N	\N	10.12.20.238	2025-11-05 20:30:42.380384
+564	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-11-05 20:31:30.799809
+565	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	CREATE_ORDER	order	44	{"ad_id": 11, "amount": 0.1, "expires_at": "2025-11-05T15:17:15.967Z"}	127.0.0.1	2025-11-05 20:42:15.995391
+566	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	CREATE_ORDER	order	45	{"ad_id": 7, "amount": 0.04, "expires_at": "2025-11-05T15:17:26.300Z"}	127.0.0.1	2025-11-05 20:42:26.322472
+567	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	WALLET_LOGIN	\N	\N	\N	10.12.20.238	2025-11-05 20:43:51.848576
+568	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	ACCEPT_ORDER_SIMPLE	order	44	\N	10.12.20.238	2025-11-05 20:44:11.104926
+569	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	WALLET_LOGIN	\N	\N	\N	10.12.20.238	2025-11-05 20:44:28.256049
+570	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	WALLET_LOGIN	\N	\N	\N	10.12.20.238	2025-11-05 20:46:42.572353
+571	\N	AUTO_CANCEL_ORDER	order	45	{"reason": "Accept timeout", "utcOffset": "+05:30 (IST)", "createdIST": "06/11/2025, 02:12:26", "cancelledIST": "06/11/2025, 02:17:26"}	\N	2025-11-05 20:47:26.333314
+572	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	CREATE_ORDER	order	46	{"ad_id": 9, "amount": 0.02, "expires_at": "2025-11-05T15:22:33.957Z"}	10.12.20.238	2025-11-05 20:47:33.970537
+573	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	ACCEPT_ORDER_SIMPLE	order	46	\N	127.0.0.1	2025-11-05 20:47:50.81789
+574	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-11-05 20:47:57.893461
+575	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	LOCK_FUNDS	order	46	{"txHash": "0xf12df1ce494168d690e4ff548899206166651bab2eefee3ccf9c617a1e9a0106", "blockchainTradeId": 22}	127.0.0.1	2025-11-05 20:48:17.737861
+576	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	CREATE_AD	ad	12	\N	10.12.20.238	2025-11-05 20:49:41.099173
+577	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	CREATE_ORDER	order	47	{"ad_id": 5, "amount": 0.11, "expires_at": "2025-11-05T15:25:38.938Z"}	10.12.20.167	2025-11-05 20:50:38.952855
+578	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	CREATE_ORDER	order	48	{"ad_id": 11, "amount": 0.1, "expires_at": "2025-11-05T15:26:32.763Z"}	127.0.0.1	2025-11-05 20:51:32.781327
+579	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	ACCEPT_ORDER_SIMPLE	order	48	\N	10.12.20.238	2025-11-05 20:51:42.689413
+580	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	LOCK_FUNDS	order	48	{"txHash": "0x08fc54986d1b67596c997061f04d91e2c9c1f05b9241a7623e6a321125ea6c91", "blockchainTradeId": 24}	10.12.20.238	2025-11-05 20:52:21.108841
+581	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	CREATE_ORDER	order	49	{"ad_id": 9, "amount": 0.05, "expires_at": "2025-11-05T15:28:01.841Z"}	10.12.20.167	2025-11-05 20:53:01.857625
+582	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	ACCEPT_ORDER_SIMPLE	order	49	\N	127.0.0.1	2025-11-05 20:53:09.974359
+583	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-11-05 20:53:54.358526
+584	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-11-05 20:54:04.164331
+585	\N	AUTO_EXPIRE_ORDER	order	47	{"reason": "Accept timeout exceeded", "utcOffset": "+05:30 (IST)", "createdIST": "06/11/2025, 02:20:38", "created_at": "2025-11-05T15:20:38.938Z", "expiredIST": "07/11/2025, 00:30:18", "timeout_minutes": 5}	\N	2025-11-06 19:00:18.082449
+586	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-11-06 19:04:31.967179
+587	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-11-06 19:05:15.462275
+588	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	CREATE_ORDER	order	50	{"ad_id": 12, "amount": 0.01, "expires_at": "2025-11-06T13:40:44.206Z"}	127.0.0.1	2025-11-06 19:05:44.237413
+589	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	WALLET_LOGIN	\N	\N	\N	10.12.20.238	2025-11-06 19:06:05.380179
+590	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	CREATE_ORDER	order	51	{"ad_id": 9, "amount": 0.01, "expires_at": "2025-11-06T13:41:47.840Z"}	10.12.20.167	2025-11-06 19:06:47.854395
+591	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	ACCEPT_ORDER_SIMPLE	order	51	\N	127.0.0.1	2025-11-06 19:06:57.311514
+592	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	WALLET_LOGIN	\N	\N	\N	10.12.20.238	2025-11-06 19:07:01.870465
+593	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	LOCK_FUNDS	order	51	{"txHash": "0x4f58303c5b6e19900755af9bd1c7320996967ca0cca0bb41557c69db75abd028", "blockchainTradeId": 28}	127.0.0.1	2025-11-06 19:07:15.06149
+594	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	WALLET_LOGIN	\N	\N	\N	10.12.20.238	2025-11-06 19:07:24.44309
+595	\N	AUTO_CANCEL_ORDER	order	50	{"reason": "Accept timeout", "utcOffset": "+05:30 (IST)", "createdIST": "07/11/2025, 00:35:44", "cancelledIST": "07/11/2025, 00:40:44"}	\N	2025-11-06 19:10:44.246713
+596	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-11-06 19:14:28.917177
+597	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	WALLET_LOGIN	\N	\N	\N	10.12.20.238	2025-11-06 19:14:30.37095
+598	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	WALLET_LOGIN	\N	\N	\N	10.12.20.238	2025-11-06 19:14:50.654056
+599	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	WALLET_LOGIN	\N	\N	\N	10.12.20.238	2025-11-06 19:17:52.678821
+600	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	WALLET_LOGIN	\N	\N	\N	10.12.20.238	2025-11-06 19:20:27.658447
+601	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	WALLET_LOGIN	\N	\N	\N	10.12.20.238	2025-11-06 19:20:33.819103
+602	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	WALLET_LOGIN	\N	\N	\N	10.12.20.238	2025-11-06 19:24:50.843945
+603	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-11-06 19:27:08.711873
+604	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	WALLET_LOGIN	\N	\N	\N	10.12.20.238	2025-11-06 19:31:18.892413
+605	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-11-06 19:31:50.250351
+606	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	WALLET_LOGIN	\N	\N	\N	10.12.20.238	2025-11-06 19:34:11.186302
+607	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-11-06 19:36:06.567572
+608	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	WALLET_LOGIN	\N	\N	\N	10.12.20.238	2025-11-06 19:39:49.884682
+609	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	WALLET_LOGIN	\N	\N	\N	10.12.20.238	2025-11-06 19:44:42.042951
+610	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	WALLET_LOGIN	\N	\N	\N	10.12.20.238	2025-11-06 19:53:13.255588
+611	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	WALLET_LOGIN	\N	\N	\N	10.12.20.238	2025-11-06 19:54:29.373976
+612	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	WALLET_LOGIN	\N	\N	\N	10.12.20.238	2025-11-06 19:55:53.268537
+613	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	WALLET_LOGIN	\N	\N	\N	10.12.20.238	2025-11-06 19:56:34.445592
+614	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-11-06 19:58:02.997402
+615	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	WALLET_LOGIN	\N	\N	\N	10.12.20.238	2025-11-06 20:02:22.424165
+616	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	WALLET_LOGIN	\N	\N	\N	10.12.20.238	2025-11-06 20:10:37.904625
+617	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	WALLET_LOGIN	\N	\N	\N	10.12.20.238	2025-11-06 20:10:39.389898
+618	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	WALLET_LOGIN	\N	\N	\N	10.12.20.238	2025-11-07 18:58:24.887528
+619	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-11-07 19:00:07.69809
+620	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	WALLET_LOGIN	\N	\N	\N	10.12.20.238	2025-11-07 19:12:08.855465
+621	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-11-07 19:12:45.011981
+622	\N	ADMIN_CREATE_AGENT	agent	25	{"mobile": "9898341367", "address": "bangalore", "verified": true, "branch_name": "SBI Satellite", "location_id": 3}	127.0.0.1	2025-11-07 19:15:19.600328
+623	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	UPDATE_PROFILE	user	\N	{"name": "Heming Patel", "phone": "09726846660", "location_id": 3, "selected_agent_ids": [9, 8, 25]}	10.12.20.238	2025-11-07 19:15:41.79164
+624	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	WALLET_LOGIN	\N	\N	\N	10.12.20.238	2025-11-07 19:24:37.910052
+625	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	UPDATE_PROFILE	user	\N	{"name": "Heming Patel", "phone": "09726846660", "location_id": 3, "selected_agent_ids": [9, 8]}	10.12.20.238	2025-11-07 19:25:11.848877
+626	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	UPDATE_PROFILE	user	\N	{"name": "Heming Patel", "phone": "09726846660", "location_id": 3, "selected_agent_ids": [9, 8, 10]}	10.12.20.238	2025-11-07 19:25:33.306415
+627	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	WALLET_LOGIN	\N	\N	\N	10.12.20.238	2025-11-07 19:25:51.762375
+628	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	UPDATE_PROFILE	user	\N	{"name": "Heming Patel", "phone": "09726846660", "location_id": 3, "selected_agent_ids": [9, 8, 10]}	10.12.20.238	2025-11-07 19:29:28.769715
+629	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	UPDATE_PROFILE	user	\N	{"name": "Heming Patel", "phone": "09726846660", "location_id": 3, "selected_agent_ids": [9]}	10.12.20.238	2025-11-07 19:33:03.04868
+630	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	UPDATE_PROFILE	user	\N	{"name": "prabhudev", "phone": "9898341345", "location_id": 5, "selected_agent_ids": [14]}	127.0.0.1	2025-11-07 19:35:41.302331
+631	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-11-07 19:36:14.242131
+632	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-11-07 19:36:15.005897
+633	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-11-07 19:40:02.6214
+634	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	UPDATE_PROFILE	user	\N	{"name": "prabhudev", "phone": "9898341345", "location_id": 5, "selected_agent_ids": [14]}	127.0.0.1	2025-11-07 19:40:41.121203
+635	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	WALLET_LOGIN	\N	\N	\N	10.12.20.238	2025-11-07 19:42:49.968091
+636	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	UPDATE_PROFILE	user	\N	{"name": "Heming Patel", "phone": "09726846660", "location_id": 3, "selected_agent_ids": [8]}	10.12.20.238	2025-11-07 19:43:05.496506
+637	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-11-07 19:46:36.797111
+638	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	UPDATE_PROFILE	user	\N	{"name": "Heming Patel", "phone": "09726846660", "location_id": 3, "selected_agent_ids": [9]}	10.12.20.238	2025-11-07 19:49:03.160469
+639	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	UPDATE_PROFILE	user	\N	{"name": "Heming Patel", "phone": "09726846660", "location_id": 5, "selected_agent_ids": [14]}	10.12.20.238	2025-11-07 19:49:37.111737
+640	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	UPDATE_PROFILE	user	\N	{"name": "Heming Patel", "phone": "09726846660", "location_id": 5, "selected_agent_ids": [13]}	10.12.20.238	2025-11-07 19:49:53.264343
+641	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	WALLET_LOGIN	\N	\N	\N	10.12.20.238	2025-11-07 19:55:34.319864
+642	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-11-07 19:59:50.400581
+643	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-11-07 20:00:27.382892
+644	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-11-07 20:14:00.997311
+645	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	UPDATE_PROFILE	user	\N	{"name": "prabhudev", "phone": "9898341345", "location_id": 5, "selected_agent_ids": [14, 13]}	127.0.0.1	2025-11-07 20:15:00.130412
+646	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	WALLET_LOGIN	\N	\N	\N	10.12.20.238	2025-11-07 20:15:02.999352
+647	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	CREATE_ORDER	order	52	{"ad_id": 11, "amount": 0.01, "expires_at": "2025-11-07T14:50:10.500Z"}	127.0.0.1	2025-11-07 20:15:10.522923
+648	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	UPDATE_PROFILE	user	\N	{"name": "Heming Patel", "phone": "09726846660", "location_id": 5, "selected_agent_ids": [13, 14]}	10.12.20.238	2025-11-07 20:15:22.982791
+649	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	ACCEPT_ORDER_SIMPLE	order	52	\N	10.12.20.238	2025-11-07 20:15:29.830265
+650	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	LOCK_FUNDS	order	52	{"txHash": "0x66cf69ab5009a3913249601a7821ea67072b21c98dd2ee703e317eedd84d78a5", "blockchainTradeId": 29}	10.12.20.238	2025-11-07 20:15:56.444388
+651	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	CREATE_ORDER	order	53	{"ad_id": 12, "amount": 0.01, "expires_at": "2025-11-07T14:51:25.429Z"}	127.0.0.1	2025-11-07 20:16:25.447022
+652	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	ACCEPT_ORDER_SIMPLE	order	53	\N	10.12.20.238	2025-11-07 20:16:32.975772
+653	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-11-07 20:16:51.635352
+654	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	LOCK_FUNDS	order	53	{"txHash": "0x4c8be41f9a2076c250b433281c2680cab08d90121c38f6f84d90451bc62eda7e", "blockchainTradeId": 30}	127.0.0.1	2025-11-07 20:17:27.151695
+655	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	CREATE_ORDER	order	54	{"ad_id": 10, "amount": 0.01, "expires_at": "2025-11-07T14:53:01.375Z"}	127.0.0.1	2025-11-07 20:18:01.401342
+656	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	ACCEPT_ORDER_SIMPLE	order	54	\N	10.12.20.238	2025-11-07 20:18:15.979962
+657	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	LOCK_FUNDS	order	54	{"txHash": "0x9fc2a306a10456105f4c38f2b413cd66aeb0eb873616598be406fa2a90b3cb86", "blockchainTradeId": 31}	127.0.0.1	2025-11-07 20:18:54.854358
+658	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	CREATE_ORDER	order	55	{"ad_id": 9, "amount": 0.01, "expires_at": "2025-11-07T14:54:25.036Z"}	10.12.20.238	2025-11-07 20:19:25.047878
+659	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	ACCEPT_ORDER_SIMPLE	order	55	\N	127.0.0.1	2025-11-07 20:19:30.689619
+660	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	LOCK_FUNDS	order	55	{"txHash": "0xb54cc2d2202d2409c4ed45c42e5a123599b912b06e8bf9eaaad260261ed9def6", "blockchainTradeId": 32}	127.0.0.1	2025-11-07 20:19:55.279062
+661	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-11-09 12:37:17.017754
+662	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-11-09 12:41:35.4174
+663	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-11-09 12:48:25.261096
+664	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-11-09 12:48:57.504582
+665	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	WALLET_LOGIN	\N	\N	\N	10.78.142.118	2025-11-09 12:58:39.714126
+666	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	WALLET_LOGIN	\N	\N	\N	10.78.142.118	2025-11-09 13:10:45.710475
+667	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	WALLET_LOGIN	\N	\N	\N	10.78.142.118	2025-11-09 13:29:23.665664
+668	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	WALLET_LOGIN	\N	\N	\N	10.78.142.118	2025-11-09 13:30:00.251154
+669	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	WALLET_LOGIN	\N	\N	\N	10.78.142.118	2025-11-09 13:35:51.956785
+670	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	WALLET_LOGIN	\N	\N	\N	10.78.142.118	2025-11-09 13:43:21.459954
+671	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	WALLET_LOGIN	\N	\N	\N	10.78.142.118	2025-11-09 13:44:08.694792
+672	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-11-09 13:46:45.740302
+673	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	WALLET_LOGIN	\N	\N	\N	127.0.0.1	2025-11-09 13:50:49.195195
+\.
+
+
+--
+-- Data for Name: calls; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY public.calls (id, caller_address, receiver_address, status, signaling_data, created_at, ended_at) FROM stdin;
+2	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0xadmin00000000000000000000000000000000000	initiated	{"context": "support-call", "supportCall": true, "callerAddress": "0xD1c9d52F075Aed0F4cf21418e5AF0eEBB3368297", "isAdminSupportCall": true}	2025-11-02 10:36:27.72108	\N
+3	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0xadmin00000000000000000000000000000000000	initiated	{"supportCall": true, "isAdminSupportCall": true}	2025-11-02 10:36:27.748974	\N
+4	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0xadmin00000000000000000000000000000000000	initiated	{"context": "support-call", "supportCall": true, "callerAddress": "0xD1c9d52F075Aed0F4cf21418e5AF0eEBB3368297", "isAdminSupportCall": true}	2025-11-02 10:45:50.269072	\N
+5	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0xadmin00000000000000000000000000000000000	initiated	{"supportCall": true, "isAdminSupportCall": true}	2025-11-02 10:45:50.305391	\N
+6	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	0xadmin00000000000000000000000000000000000	initiated	{"context": "support-call", "supportCall": true, "callerAddress": "0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d", "isAdminSupportCall": true}	2025-11-02 11:04:38.729594	\N
+7	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	0xadmin00000000000000000000000000000000000	initiated	{"supportCall": true, "isAdminSupportCall": true}	2025-11-02 11:04:38.94345	\N
+8	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0xadmin00000000000000000000000000000000000	initiated	{"context": "support-call", "supportCall": true, "callerAddress": "0xD1c9d52F075Aed0F4cf21418e5AF0eEBB3368297", "isAdminSupportCall": true}	2025-11-02 11:07:40.513229	\N
+9	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0xadmin00000000000000000000000000000000000	initiated	{"supportCall": true, "isAdminSupportCall": true}	2025-11-02 11:07:40.637079	\N
+10	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0xadmin00000000000000000000000000000000000	initiated	{"context": "support-call", "supportCall": true, "callerAddress": "0xD1c9d52F075Aed0F4cf21418e5AF0eEBB3368297", "isAdminSupportCall": true}	2025-11-02 11:07:58.379567	\N
+11	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0xadmin00000000000000000000000000000000000	initiated	{"supportCall": true, "isAdminSupportCall": true}	2025-11-02 11:07:58.710898	\N
+12	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0xadmin00000000000000000000000000000000000	initiated	{"context": "support-call", "supportCall": true, "callerAddress": "0xD1c9d52F075Aed0F4cf21418e5AF0eEBB3368297", "isAdminSupportCall": true}	2025-11-02 11:08:17.49882	\N
+13	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0xadmin00000000000000000000000000000000000	initiated	{"supportCall": true, "isAdminSupportCall": true}	2025-11-02 11:08:17.604156	\N
+14	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0xadmin00000000000000000000000000000000000	initiated	{"context": "support-call", "supportCall": true, "callerAddress": "0xD1c9d52F075Aed0F4cf21418e5AF0eEBB3368297", "isAdminSupportCall": true}	2025-11-02 11:08:47.584517	\N
+15	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0xadmin00000000000000000000000000000000000	initiated	{"supportCall": true, "isAdminSupportCall": true}	2025-11-02 11:08:47.659534	\N
+16	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	0xadmin00000000000000000000000000000000000	initiated	{"context": "support-call", "supportCall": true, "callerAddress": "0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d", "isAdminSupportCall": true}	2025-11-02 11:09:50.693339	\N
+17	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	0xadmin00000000000000000000000000000000000	initiated	{"supportCall": true, "isAdminSupportCall": true}	2025-11-02 11:09:51.16877	\N
+18	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	0xadmin00000000000000000000000000000000000	initiated	{"context": "support-call", "supportCall": true, "callerAddress": "0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d", "isAdminSupportCall": true}	2025-11-02 11:10:06.926359	\N
+19	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	0xadmin00000000000000000000000000000000000	initiated	{"supportCall": true, "isAdminSupportCall": true}	2025-11-02 11:10:07.158357	\N
+20	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0xadmin00000000000000000000000000000000000	initiated	{"context": "support-call", "supportCall": true, "callerAddress": "0xD1c9d52F075Aed0F4cf21418e5AF0eEBB3368297", "isAdminSupportCall": true}	2025-11-02 11:10:12.599684	\N
+21	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0xadmin00000000000000000000000000000000000	initiated	{"supportCall": true, "isAdminSupportCall": true}	2025-11-02 11:10:13.065613	\N
+22	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0xadmin00000000000000000000000000000000000	initiated	{"context": "support-call", "supportCall": true, "callerAddress": "0xD1c9d52F075Aed0F4cf21418e5AF0eEBB3368297", "isAdminSupportCall": true}	2025-11-02 11:10:17.40079	\N
+23	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0xadmin00000000000000000000000000000000000	initiated	{"supportCall": true, "isAdminSupportCall": true}	2025-11-02 11:10:17.48108	\N
+24	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0xadmin00000000000000000000000000000000000	initiated	{"context": "support-call", "supportCall": true, "callerAddress": "0xD1c9d52F075Aed0F4cf21418e5AF0eEBB3368297", "isAdminSupportCall": true}	2025-11-02 11:17:16.488083	\N
+25	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0xadmin00000000000000000000000000000000000	initiated	{"supportCall": true, "isAdminSupportCall": true}	2025-11-02 11:17:16.851098	\N
+26	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0xadmin00000000000000000000000000000000000	initiated	{"context": "support-call", "supportCall": true, "callerAddress": "0xD1c9d52F075Aed0F4cf21418e5AF0eEBB3368297", "isAdminSupportCall": true}	2025-11-02 11:17:32.535106	\N
+27	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0xadmin00000000000000000000000000000000000	initiated	{"supportCall": true, "isAdminSupportCall": true}	2025-11-02 11:17:32.722413	\N
+28	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0xadmin00000000000000000000000000000000000	initiated	{"context": "support-call", "supportCall": true, "callerAddress": "0xD1c9d52F075Aed0F4cf21418e5AF0eEBB3368297", "isAdminSupportCall": true}	2025-11-02 11:18:02.769414	\N
+29	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0xadmin00000000000000000000000000000000000	initiated	{"supportCall": true, "isAdminSupportCall": true}	2025-11-02 11:18:03.217705	\N
+30	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0xadmin00000000000000000000000000000000000	initiated	{"context": "support-call", "supportCall": true, "callerAddress": "0xD1c9d52F075Aed0F4cf21418e5AF0eEBB3368297", "isAdminSupportCall": true}	2025-11-02 11:18:31.727193	\N
+31	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0xadmin00000000000000000000000000000000000	initiated	{"supportCall": true, "isAdminSupportCall": true}	2025-11-02 11:18:31.890935	\N
+32	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0xadmin00000000000000000000000000000000000	initiated	{"context": "support-call", "supportCall": true, "callerAddress": "0xD1c9d52F075Aed0F4cf21418e5AF0eEBB3368297", "isAdminSupportCall": true}	2025-11-02 11:19:46.737849	\N
+33	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0xadmin00000000000000000000000000000000000	initiated	{"supportCall": true, "isAdminSupportCall": true}	2025-11-02 11:19:47.282286	\N
+34	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0xadmin00000000000000000000000000000000000	initiated	{"context": "support-call", "supportCall": true, "callerAddress": "0xD1c9d52F075Aed0F4cf21418e5AF0eEBB3368297", "isAdminSupportCall": true}	2025-11-02 11:29:43.262104	\N
+35	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0xadmin00000000000000000000000000000000000	initiated	{"supportCall": true, "isAdminSupportCall": true}	2025-11-02 11:29:43.347917	\N
+36	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0xadmin00000000000000000000000000000000000	initiated	{"context": "support-call", "supportCall": true, "callerAddress": "0xD1c9d52F075Aed0F4cf21418e5AF0eEBB3368297", "isAdminSupportCall": true}	2025-11-02 11:31:16.394148	\N
+37	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0xadmin00000000000000000000000000000000000	initiated	{"supportCall": true, "isAdminSupportCall": true}	2025-11-02 11:31:16.519253	\N
+38	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0xadmin00000000000000000000000000000000000	initiated	{"context": "support-call", "supportCall": true, "callerAddress": "0xD1c9d52F075Aed0F4cf21418e5AF0eEBB3368297", "isAdminSupportCall": true}	2025-11-02 11:31:21.938457	\N
+39	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0xadmin00000000000000000000000000000000000	initiated	{"supportCall": true, "isAdminSupportCall": true}	2025-11-02 11:31:22.048767	\N
+40	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0xadmin00000000000000000000000000000000000	initiated	{"context": "support-call", "supportCall": true, "callerAddress": "0xD1c9d52F075Aed0F4cf21418e5AF0eEBB3368297", "isAdminSupportCall": true}	2025-11-02 11:31:54.53418	\N
+41	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0xadmin00000000000000000000000000000000000	initiated	{"supportCall": true, "isAdminSupportCall": true}	2025-11-02 11:31:54.726142	\N
+42	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0xadmin00000000000000000000000000000000000	initiated	{"context": "support-call", "supportCall": true, "callerAddress": "0xD1c9d52F075Aed0F4cf21418e5AF0eEBB3368297", "isAdminSupportCall": true}	2025-11-02 11:32:05.484356	\N
+43	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0xadmin00000000000000000000000000000000000	initiated	{"supportCall": true, "isAdminSupportCall": true}	2025-11-02 11:32:05.63557	\N
+44	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0xadmin00000000000000000000000000000000000	initiated	{"context": "support-call", "supportCall": true, "callerAddress": "0xD1c9d52F075Aed0F4cf21418e5AF0eEBB3368297", "isAdminSupportCall": true}	2025-11-02 11:32:49.806307	\N
+45	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0xadmin00000000000000000000000000000000000	initiated	{"supportCall": true, "isAdminSupportCall": true}	2025-11-02 11:32:49.936186	\N
+46	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0xadmin00000000000000000000000000000000000	initiated	{"context": "support-call", "supportCall": true, "callerAddress": "0xD1c9d52F075Aed0F4cf21418e5AF0eEBB3368297", "isAdminSupportCall": true}	2025-11-02 11:32:59.857797	\N
+47	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0xadmin00000000000000000000000000000000000	initiated	{"supportCall": true, "isAdminSupportCall": true}	2025-11-02 11:32:59.986498	\N
+48	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	0xadmin00000000000000000000000000000000000	initiated	{"context": "support-call", "supportCall": true, "callerAddress": "0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d", "isAdminSupportCall": true}	2025-11-02 11:36:03.831048	\N
+49	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	0xadmin00000000000000000000000000000000000	initiated	{"supportCall": true, "isAdminSupportCall": true}	2025-11-02 11:36:04.017616	\N
+50	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	0xadmin00000000000000000000000000000000000	initiated	{"context": "support-call", "supportCall": true, "callerAddress": "0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d", "isAdminSupportCall": true}	2025-11-02 11:36:21.868821	\N
+51	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	0xadmin00000000000000000000000000000000000	initiated	{"supportCall": true, "isAdminSupportCall": true}	2025-11-02 11:36:22.227414	\N
+52	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	0xadmin00000000000000000000000000000000000	initiated	{"context": "support-call", "supportCall": true, "callerAddress": "0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d", "isAdminSupportCall": true}	2025-11-02 11:36:38.042176	\N
+53	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	0xadmin00000000000000000000000000000000000	initiated	{"supportCall": true, "isAdminSupportCall": true}	2025-11-02 11:36:38.760002	\N
+54	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	0xadmin00000000000000000000000000000000000	initiated	{"context": "support-call", "supportCall": true, "callerAddress": "0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d", "isAdminSupportCall": true}	2025-11-02 11:36:51.334282	\N
+55	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	0xadmin00000000000000000000000000000000000	initiated	{"supportCall": true, "isAdminSupportCall": true}	2025-11-02 11:36:51.466427	\N
+56	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	0xadmin00000000000000000000000000000000000	initiated	{"context": "support-call", "supportCall": true, "callerAddress": "0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d", "isAdminSupportCall": true}	2025-11-02 11:38:17.362699	\N
+57	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	0xadmin00000000000000000000000000000000000	initiated	{"supportCall": true, "isAdminSupportCall": true}	2025-11-02 11:38:17.813808	\N
+58	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	0xadmin00000000000000000000000000000000000	initiated	{"context": "support-call", "supportCall": true, "callerAddress": "0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d", "isAdminSupportCall": true}	2025-11-02 11:38:36.439637	\N
+59	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	0xadmin00000000000000000000000000000000000	initiated	{"supportCall": true, "isAdminSupportCall": true}	2025-11-02 11:38:36.732525	\N
+60	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	0xadmin00000000000000000000000000000000000	initiated	{"context": "support-call", "supportCall": true, "callerAddress": "0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d", "isAdminSupportCall": true}	2025-11-02 11:51:21.965537	\N
+61	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	0xadmin00000000000000000000000000000000000	initiated	{"supportCall": true, "isAdminSupportCall": true}	2025-11-02 11:51:22.160355	\N
+62	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	0xadmin00000000000000000000000000000000000	initiated	{"context": "support-call", "supportCall": true, "callerAddress": "0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d", "isAdminSupportCall": true}	2025-11-02 11:53:44.933726	\N
+63	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	0xadmin00000000000000000000000000000000000	initiated	{"supportCall": true, "isAdminSupportCall": true}	2025-11-02 11:53:45.165199	\N
+64	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0xadmin00000000000000000000000000000000000	initiated	{"context": "support-call", "supportCall": true, "callerAddress": "0xD1c9d52F075Aed0F4cf21418e5AF0eEBB3368297", "isAdminSupportCall": true}	2025-11-02 11:56:59.150351	\N
+65	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0xadmin00000000000000000000000000000000000	initiated	{"supportCall": true, "isAdminSupportCall": true}	2025-11-02 11:56:59.186813	\N
+66	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	0xadmin00000000000000000000000000000000000	initiated	{"context": "support-call", "supportCall": true, "callerAddress": "0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d", "isAdminSupportCall": true}	2025-11-02 12:15:15.348181	\N
+67	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	0xadmin00000000000000000000000000000000000	initiated	{"supportCall": true, "isAdminSupportCall": true}	2025-11-02 12:15:15.640426	\N
+68	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0xadmin00000000000000000000000000000000000	initiated	{"context": "support-call", "supportCall": true, "callerAddress": "0xD1c9d52F075Aed0F4cf21418e5AF0eEBB3368297", "isAdminSupportCall": true}	2025-11-02 12:44:55.03141	\N
+69	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0xadmin00000000000000000000000000000000000	initiated	{"supportCall": true, "isAdminSupportCall": true}	2025-11-02 12:44:55.137192	\N
+70	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0xadmin00000000000000000000000000000000000	initiated	{"context": "support-call", "supportCall": true, "callerAddress": "0xD1c9d52F075Aed0F4cf21418e5AF0eEBB3368297", "isAdminSupportCall": true}	2025-11-02 12:45:14.860022	\N
+71	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0xadmin00000000000000000000000000000000000	initiated	{"supportCall": true, "isAdminSupportCall": true}	2025-11-02 12:45:15.024173	\N
+72	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0xadmin00000000000000000000000000000000000	initiated	{"context": "support-call", "supportCall": true, "callerAddress": "0xD1c9d52F075Aed0F4cf21418e5AF0eEBB3368297", "isAdminSupportCall": true}	2025-11-02 12:45:22.320139	\N
+73	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0xadmin00000000000000000000000000000000000	initiated	{"supportCall": true, "isAdminSupportCall": true}	2025-11-02 12:45:22.480862	\N
+74	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0xadmin00000000000000000000000000000000000	initiated	{"context": "support-call", "supportCall": true, "callerAddress": "0xD1c9d52F075Aed0F4cf21418e5AF0eEBB3368297", "isAdminSupportCall": true}	2025-11-02 12:45:28.381577	\N
+75	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0xadmin00000000000000000000000000000000000	initiated	{"supportCall": true, "isAdminSupportCall": true}	2025-11-02 12:45:28.512198	\N
+76	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0xadmin00000000000000000000000000000000000	initiated	{"context": "support-call", "supportCall": true, "callerAddress": "0xD1c9d52F075Aed0F4cf21418e5AF0eEBB3368297", "isAdminSupportCall": true}	2025-11-02 12:45:34.645932	\N
+77	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0xadmin00000000000000000000000000000000000	initiated	{"supportCall": true, "isAdminSupportCall": true}	2025-11-02 12:45:34.754552	\N
+78	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0xadmin00000000000000000000000000000000000	initiated	{"context": "support-call", "supportCall": true, "callerAddress": "0xD1c9d52F075Aed0F4cf21418e5AF0eEBB3368297", "isAdminSupportCall": true}	2025-11-02 12:45:41.005392	\N
+79	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0xadmin00000000000000000000000000000000000	initiated	{"supportCall": true, "isAdminSupportCall": true}	2025-11-02 12:45:41.177153	\N
+80	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0xadmin00000000000000000000000000000000000	initiated	{"context": "support-call", "supportCall": true, "callerAddress": "0xD1c9d52F075Aed0F4cf21418e5AF0eEBB3368297", "isAdminSupportCall": true}	2025-11-02 12:45:46.847559	\N
+81	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0xadmin00000000000000000000000000000000000	initiated	{"supportCall": true, "isAdminSupportCall": true}	2025-11-02 12:45:47.035586	\N
+82	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0xadmin00000000000000000000000000000000000	initiated	{"context": "support-call", "supportCall": true, "callerAddress": "0xD1c9d52F075Aed0F4cf21418e5AF0eEBB3368297", "isAdminSupportCall": true}	2025-11-02 12:45:54.122538	\N
+83	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0xadmin00000000000000000000000000000000000	initiated	{"supportCall": true, "isAdminSupportCall": true}	2025-11-02 12:45:54.228953	\N
+84	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0xadmin00000000000000000000000000000000000	initiated	{"context": "support-call", "supportCall": true, "callerAddress": "0xD1c9d52F075Aed0F4cf21418e5AF0eEBB3368297", "isAdminSupportCall": true}	2025-11-02 12:45:56.426933	\N
+85	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0xadmin00000000000000000000000000000000000	initiated	{"supportCall": true, "isAdminSupportCall": true}	2025-11-02 12:45:56.609103	\N
+86	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0xadmin00000000000000000000000000000000000	initiated	{"context": "support-call", "supportCall": true, "callerAddress": "0xD1c9d52F075Aed0F4cf21418e5AF0eEBB3368297", "isAdminSupportCall": true}	2025-11-02 12:46:06.563699	\N
+87	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0xadmin00000000000000000000000000000000000	initiated	{"supportCall": true, "isAdminSupportCall": true}	2025-11-02 12:46:06.698765	\N
+88	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0xadmin00000000000000000000000000000000000	initiated	{"context": "support-call", "supportCall": true, "callerAddress": "0xD1c9d52F075Aed0F4cf21418e5AF0eEBB3368297", "isAdminSupportCall": true}	2025-11-02 12:46:12.305493	\N
+89	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0xadmin00000000000000000000000000000000000	initiated	{"supportCall": true, "isAdminSupportCall": true}	2025-11-02 12:46:12.82222	\N
+90	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0xadmin00000000000000000000000000000000000	initiated	{"context": "support-call", "supportCall": true, "callerAddress": "0xD1c9d52F075Aed0F4cf21418e5AF0eEBB3368297", "isAdminSupportCall": true}	2025-11-02 12:46:14.374126	\N
+91	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0xadmin00000000000000000000000000000000000	initiated	{"supportCall": true, "isAdminSupportCall": true}	2025-11-02 12:46:14.670741	\N
+92	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0xadmin00000000000000000000000000000000000	initiated	{"context": "support-call", "supportCall": true, "callerAddress": "0xD1c9d52F075Aed0F4cf21418e5AF0eEBB3368297", "isAdminSupportCall": true}	2025-11-02 13:11:40.780725	\N
+93	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0xadmin00000000000000000000000000000000000	initiated	{"supportCall": true, "callerAddress": "0xD1c9d52F075Aed0F4cf21418e5AF0eEBB3368297", "isAdminSupportCall": true}	2025-11-02 13:11:40.864242	\N
+94	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0xadmin00000000000000000000000000000000000	initiated	{"context": "support-call", "supportCall": true, "callerAddress": "0xD1c9d52F075Aed0F4cf21418e5AF0eEBB3368297", "isAdminSupportCall": true}	2025-11-02 13:12:13.498869	\N
+95	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0xadmin00000000000000000000000000000000000	initiated	{"supportCall": true, "callerAddress": "0xD1c9d52F075Aed0F4cf21418e5AF0eEBB3368297", "isAdminSupportCall": true}	2025-11-02 13:12:13.968533	\N
+96	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0xadmin00000000000000000000000000000000000	initiated	{"context": "support-call", "supportCall": true, "callerAddress": "0xD1c9d52F075Aed0F4cf21418e5AF0eEBB3368297", "isAdminSupportCall": true}	2025-11-02 13:17:30.703098	\N
+97	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0xadmin00000000000000000000000000000000000	initiated	{"supportCall": true, "callerAddress": "0xD1c9d52F075Aed0F4cf21418e5AF0eEBB3368297", "isAdminSupportCall": true}	2025-11-02 13:17:30.890169	\N
+98	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0xadmin00000000000000000000000000000000000	initiated	{"context": "support-call", "supportCall": true, "callerAddress": "0xD1c9d52F075Aed0F4cf21418e5AF0eEBB3368297", "isAdminSupportCall": true}	2025-11-02 13:17:51.086052	\N
+99	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0xadmin00000000000000000000000000000000000	ended	{"supportCall": true, "callerAddress": "0xD1c9d52F075Aed0F4cf21418e5AF0eEBB3368297", "isAdminSupportCall": true}	2025-11-02 13:17:51.251655	2025-11-02 13:18:17.337336
+100	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0xadmin00000000000000000000000000000000000	initiated	{"context": "support-call", "supportCall": true, "callerAddress": "0xD1c9d52F075Aed0F4cf21418e5AF0eEBB3368297", "isAdminSupportCall": true}	2025-11-02 13:18:29.147536	\N
+101	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0xadmin00000000000000000000000000000000000	ended	{"supportCall": true, "callerAddress": "0xD1c9d52F075Aed0F4cf21418e5AF0eEBB3368297", "isAdminSupportCall": true}	2025-11-02 13:18:29.277238	2025-11-02 13:19:00.333237
+102	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0xadmin00000000000000000000000000000000000	initiated	{"context": "support-call", "supportCall": true, "callerAddress": "0xD1c9d52F075Aed0F4cf21418e5AF0eEBB3368297", "isAdminSupportCall": true}	2025-11-02 13:21:46.88318	\N
+103	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0xadmin00000000000000000000000000000000000	ended	{"supportCall": true, "callerAddress": "0xD1c9d52F075Aed0F4cf21418e5AF0eEBB3368297", "isAdminSupportCall": true}	2025-11-02 13:21:46.924069	2025-11-02 13:22:19.365853
+104	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0xadmin00000000000000000000000000000000000	initiated	{"context": "support-call", "supportCall": true, "callerAddress": "0xD1c9d52F075Aed0F4cf21418e5AF0eEBB3368297", "isAdminSupportCall": true}	2025-11-02 13:30:52.082538	\N
+105	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0xadmin00000000000000000000000000000000000	initiated	{"supportCall": true, "callerAddress": "0xD1c9d52F075Aed0F4cf21418e5AF0eEBB3368297", "isAdminSupportCall": true}	2025-11-02 13:30:52.168224	\N
+106	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0xadmin00000000000000000000000000000000000	initiated	{"context": "support-call", "supportCall": true, "callerAddress": "0xD1c9d52F075Aed0F4cf21418e5AF0eEBB3368297", "isAdminSupportCall": true}	2025-11-02 13:30:57.327657	\N
+107	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0xadmin00000000000000000000000000000000000	ended	{"supportCall": true, "callerAddress": "0xD1c9d52F075Aed0F4cf21418e5AF0eEBB3368297", "isAdminSupportCall": true}	2025-11-02 13:30:57.372024	2025-11-02 13:31:47.16351
+109	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0xadmin00000000000000000000000000000000000	initiated	{"supportCall": true, "callerAddress": "0xD1c9d52F075Aed0F4cf21418e5AF0eEBB3368297", "isAdminSupportCall": true}	2025-11-02 13:37:01.922506	\N
+108	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0xadmin00000000000000000000000000000000000	ended	{"context": "support-call", "supportCall": true, "callerAddress": "0xD1c9d52F075Aed0F4cf21418e5AF0eEBB3368297", "isAdminSupportCall": true}	2025-11-02 13:37:01.729612	2025-11-02 13:37:05.919537
+111	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	0xadmin00000000000000000000000000000000000	initiated	{"supportCall": true, "callerAddress": "0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d", "isAdminSupportCall": true}	2025-11-02 13:46:12.098863	\N
+110	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	0xadmin00000000000000000000000000000000000	ended	{"context": "support-call", "supportCall": true, "callerAddress": "0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d", "isAdminSupportCall": true}	2025-11-02 13:46:11.777762	2025-11-02 13:46:25.824051
+113	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	0xadmin00000000000000000000000000000000000	initiated	{"supportCall": true, "callerAddress": "0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d", "isAdminSupportCall": true}	2025-11-02 13:46:35.013146	\N
+112	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	0xadmin00000000000000000000000000000000000	ended	{"context": "support-call", "supportCall": true, "callerAddress": "0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d", "isAdminSupportCall": true}	2025-11-02 13:46:33.713945	2025-11-02 13:46:47.262353
+115	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	0xadmin00000000000000000000000000000000000	initiated	{"supportCall": true, "callerAddress": "0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d", "isAdminSupportCall": true}	2025-11-02 13:47:38.061582	\N
+114	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	0xadmin00000000000000000000000000000000000	ended	{"context": "support-call", "supportCall": true, "callerAddress": "0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d", "isAdminSupportCall": true}	2025-11-02 13:47:37.658577	2025-11-02 13:47:50.818488
+117	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	0xadmin00000000000000000000000000000000000	initiated	{"supportCall": true, "callerAddress": "0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d", "isAdminSupportCall": true}	2025-11-02 13:48:08.357411	\N
+119	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0xadmin00000000000000000000000000000000000	ended	{"supportCall": true, "callerAddress": "0xD1c9d52F075Aed0F4cf21418e5AF0eEBB3368297", "isAdminSupportCall": true}	2025-11-02 13:51:20.990434	2025-11-02 13:51:51.608464
+116	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	0xadmin00000000000000000000000000000000000	ended	{"context": "support-call", "supportCall": true, "callerAddress": "0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d", "isAdminSupportCall": true}	2025-11-02 13:48:07.995208	2025-11-02 13:51:55.299348
+118	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0xadmin00000000000000000000000000000000000	ended	{"context": "support-call", "supportCall": true, "callerAddress": "0xD1c9d52F075Aed0F4cf21418e5AF0eEBB3368297", "isAdminSupportCall": true}	2025-11-02 13:51:20.943542	2025-11-02 13:52:01.798551
+121	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0xadmin00000000000000000000000000000000000	ended	{"supportCall": true, "callerAddress": "0xD1c9d52F075Aed0F4cf21418e5AF0eEBB3368297", "isAdminSupportCall": true}	2025-11-02 13:52:06.596976	2025-11-02 13:52:37.507611
+120	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0xadmin00000000000000000000000000000000000	ended	{"context": "support-call", "supportCall": true, "callerAddress": "0xD1c9d52F075Aed0F4cf21418e5AF0eEBB3368297", "isAdminSupportCall": true}	2025-11-02 13:52:06.479459	2025-11-02 13:52:58.98035
+123	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	0xadmin00000000000000000000000000000000000	initiated	{"supportCall": true, "callerAddress": "0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d", "isAdminSupportCall": true}	2025-11-02 13:53:15.281742	\N
+122	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	0xadmin00000000000000000000000000000000000	ended	{"context": "support-call", "supportCall": true, "callerAddress": "0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d", "isAdminSupportCall": true}	2025-11-02 13:53:14.699738	2025-11-02 13:53:21.604113
+125	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	0xadmin00000000000000000000000000000000000	initiated	{"supportCall": true, "callerAddress": "0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d", "isAdminSupportCall": true}	2025-11-02 13:53:23.54955	\N
+124	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	0xadmin00000000000000000000000000000000000	ended	{"context": "support-call", "supportCall": true, "callerAddress": "0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d", "isAdminSupportCall": true}	2025-11-02 13:53:22.211742	2025-11-02 13:53:36.925963
+127	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	0xadmin00000000000000000000000000000000000	initiated	{"supportCall": true, "callerAddress": "0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d", "isAdminSupportCall": true}	2025-11-02 13:53:55.918996	\N
+126	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	0xadmin00000000000000000000000000000000000	ended	{"context": "support-call", "supportCall": true, "callerAddress": "0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d", "isAdminSupportCall": true}	2025-11-02 13:53:52.575761	2025-11-02 13:53:58.55372
+129	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	0xadmin00000000000000000000000000000000000	initiated	{"supportCall": true, "callerAddress": "0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d", "isAdminSupportCall": true}	2025-11-02 13:53:59.640097	\N
+128	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	0xadmin00000000000000000000000000000000000	ended	{"context": "support-call", "supportCall": true, "callerAddress": "0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d", "isAdminSupportCall": true}	2025-11-02 13:53:59.289239	2025-11-02 13:54:04.192651
+131	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	0xadmin00000000000000000000000000000000000	initiated	{"supportCall": true, "callerAddress": "0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d", "isAdminSupportCall": true}	2025-11-02 13:54:27.922065	\N
+130	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	0xadmin00000000000000000000000000000000000	ended	{"context": "support-call", "supportCall": true, "callerAddress": "0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d", "isAdminSupportCall": true}	2025-11-02 13:54:27.44168	2025-11-02 13:56:43.417931
+133	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0xadmin00000000000000000000000000000000000	ended	{"supportCall": true, "callerAddress": "0xD1c9d52F075Aed0F4cf21418e5AF0eEBB3368297", "isAdminSupportCall": true}	2025-11-02 14:10:22.074632	2025-11-02 14:10:52.932222
+132	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0xadmin00000000000000000000000000000000000	ended	{"context": "support-call", "supportCall": true, "callerAddress": "0xD1c9d52F075Aed0F4cf21418e5AF0eEBB3368297", "isAdminSupportCall": true}	2025-11-02 14:10:21.96145	2025-11-02 14:12:12.124432
+135	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0xadmin00000000000000000000000000000000000	ended	{"supportCall": true, "callerAddress": "0xD1c9d52F075Aed0F4cf21418e5AF0eEBB3368297", "isAdminSupportCall": true}	2025-11-02 14:15:35.65877	2025-11-02 14:16:06.350282
+134	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0xadmin00000000000000000000000000000000000	ended	{"context": "support-call", "supportCall": true, "callerAddress": "0xD1c9d52F075Aed0F4cf21418e5AF0eEBB3368297", "isAdminSupportCall": true}	2025-11-02 14:15:35.547906	2025-11-02 14:22:36.136082
+137	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0xadmin00000000000000000000000000000000000	initiated	{"supportCall": true, "callerAddress": "0xD1c9d52F075Aed0F4cf21418e5AF0eEBB3368297", "isAdminSupportCall": true}	2025-11-02 14:23:25.131095	\N
+136	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0xadmin00000000000000000000000000000000000	ended	{"context": "support-call", "supportCall": true, "callerAddress": "0xD1c9d52F075Aed0F4cf21418e5AF0eEBB3368297", "isAdminSupportCall": true}	2025-11-02 14:23:25.075018	2025-11-02 14:23:44.246661
+139	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0xadmin00000000000000000000000000000000000	ended	{"supportCall": true, "callerAddress": "0xD1c9d52F075Aed0F4cf21418e5AF0eEBB3368297", "isAdminSupportCall": true}	2025-11-02 14:23:46.058422	2025-11-02 14:24:18.285852
+138	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0xadmin00000000000000000000000000000000000	ended	{"context": "support-call", "supportCall": true, "callerAddress": "0xD1c9d52F075Aed0F4cf21418e5AF0eEBB3368297", "isAdminSupportCall": true}	2025-11-02 14:23:46.00871	2025-11-02 14:28:45.10161
+140	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0xadmin00000000000000000000000000000000000	initiated	{"context": "support-call", "supportCall": true, "callerAddress": "0xD1c9d52F075Aed0F4cf21418e5AF0eEBB3368297", "isAdminSupportCall": true}	2025-11-02 14:29:45.322651	\N
+141	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0xadmin00000000000000000000000000000000000	initiated	{"supportCall": true, "callerAddress": "0xD1c9d52F075Aed0F4cf21418e5AF0eEBB3368297", "isAdminSupportCall": true}	2025-11-02 14:29:45.414576	\N
+142	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0xadmin00000000000000000000000000000000000	initiated	{"context": "support-call", "supportCall": true, "callerAddress": "0xD1c9d52F075Aed0F4cf21418e5AF0eEBB3368297", "isAdminSupportCall": true}	2025-11-02 14:38:04.311161	\N
+143	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0xadmin00000000000000000000000000000000000	initiated	{"supportCall": true, "callerAddress": "0xD1c9d52F075Aed0F4cf21418e5AF0eEBB3368297", "isAdminSupportCall": true}	2025-11-02 14:38:04.428781	\N
+144	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0xadmin00000000000000000000000000000000000	initiated	{"context": "support-call", "supportCall": true, "callerAddress": "0xD1c9d52F075Aed0F4cf21418e5AF0eEBB3368297", "isAdminSupportCall": true}	2025-11-02 14:38:25.438054	\N
+145	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0xadmin00000000000000000000000000000000000	initiated	{"supportCall": true, "callerAddress": "0xD1c9d52F075Aed0F4cf21418e5AF0eEBB3368297", "isAdminSupportCall": true}	2025-11-02 14:38:25.487096	\N
+146	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0xadmin00000000000000000000000000000000000	initiated	{"context": "support-call", "supportCall": true, "callerAddress": "0xD1c9d52F075Aed0F4cf21418e5AF0eEBB3368297", "isAdminSupportCall": true}	2025-11-02 14:38:43.021482	\N
+147	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0xadmin00000000000000000000000000000000000	initiated	{"supportCall": true, "callerAddress": "0xD1c9d52F075Aed0F4cf21418e5AF0eEBB3368297", "isAdminSupportCall": true}	2025-11-02 14:38:43.085904	\N
+\.
+
+
+--
+-- Data for Name: dispute_timeline; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY public.dispute_timeline (id, dispute_id, order_id, event_type, event_description, created_by, created_at, metadata) FROM stdin;
+3	\N	30	BUYER_CONFIRMED	Buyer confirmed payment sent	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	2025-10-14 21:42:03.94782	\N
+4	1	28	AUTO_DISPUTE	Order automatically moved to dispute due to timeout	SYSTEM	2025-10-15 19:24:00.798669	{"reason": "2-hour confirmation window expired", "buyer_confirmed": false, "seller_confirmed": false}
+5	\N	30	BOTH_CONFIRMED_NO_BLOCKCHAIN	Both parties confirmed but blockchain release failed	SYSTEM	2025-10-15 19:28:10.884972	{"error": "Contract or relayer wallet not configured. Please check .env file."}
+6	1	28	APPEAL_FILED	Seller filed an appeal	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	2025-10-15 19:34:12.459829	{"appeal_id": 1, "dispute_type": "PAYMENT_NOT_RECEIVED"}
+7	\N	31	BUYER_CONFIRMED	Buyer confirmed payment sent	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	2025-10-15 20:02:22.743951	\N
+8	\N	31	BOTH_CONFIRMED_NO_BLOCKCHAIN	Both parties confirmed but blockchain release failed	SYSTEM	2025-10-15 20:02:27.535374	{"error": "this.contract.releaseFunds is not a function"}
+9	\N	32	BUYER_CONFIRMED	Buyer confirmed payment sent	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	2025-10-15 20:21:39.061885	\N
+10	\N	32	BOTH_CONFIRMED	Both buyer and seller confirmed payment	SYSTEM	2025-10-15 20:21:51.75119	\N
+11	\N	33	SELLER_CONFIRMED	Seller confirmed payment received	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	2025-10-15 20:32:25.240811	\N
+12	\N	33	BOTH_CONFIRMED	Both buyer and seller confirmed payment	SYSTEM	2025-10-15 20:32:47.828732	\N
+13	\N	34	BUYER_CONFIRMED	Buyer confirmed payment sent	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	2025-10-15 21:19:57.260199	\N
+14	\N	34	BOTH_CONFIRMED	Both buyer and seller confirmed payment	SYSTEM	2025-10-15 21:20:33.82267	\N
+15	2	35	AUTO_DISPUTE	Order automatically moved to dispute due to timeout	SYSTEM	2025-10-23 10:56:38.837713	{"reason": "2-hour confirmation window expired", "buyer_confirmed": false, "seller_confirmed": false}
+16	\N	38	BUYER_CONFIRMED	Buyer confirmed payment sent	0x249394a922d8d41a75660d4087f0e4dd6674849f	2025-10-23 12:00:50.147344	\N
+17	\N	38	BOTH_CONFIRMED	Both buyer and seller confirmed payment	SYSTEM	2025-10-23 12:01:26.073117	\N
+18	2	35	APPEAL_FILED	Buyer filed an appeal	0x583c8c7b321f80e966e072e57e1bb5cc2698d685	2025-10-24 13:48:21.950262	{"appeal_id": 2, "dispute_type": "OTHER"}
+19	1	28	APPEAL_FILED	Buyer filed an appeal	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	2025-10-29 20:18:18.731207	{"appeal_id": 3, "dispute_type": "OTHER"}
+20	3	41	AUTO_DISPUTE	Order automatically moved to dispute due to timeout	SYSTEM	2025-10-31 19:20:41.331533	{"reason": "2-hour confirmation window expired", "buyer_confirmed": false, "seller_confirmed": false}
+21	3	41	AUTO_REFUND_FAILED	Automatic refund failed	SYSTEM	2025-11-05 17:55:53.79332	{"error": "this.contract.cancelTrade is not a function", "reason": "Contract execution failed"}
+22	3	41	AUTO_REFUND_FAILED	Automatic refund failed	SYSTEM	2025-11-05 17:57:54.623643	{"error": "this.contract.cancelTrade is not a function", "reason": "Contract execution failed"}
+23	2	35	APPEAL_RESOLVED	Appeal resolved: TRANSFER_TO_BUYER	ADMIN	2025-11-05 19:57:04.07052	{"reason": "hjhghhhhhh", "resolution": "TRANSFER_TO_BUYER"}
+24	1	28	APPEAL_RESOLVED	Appeal resolved: TRANSFER_TO_BUYER	ADMIN	2025-11-05 19:57:24.463498	{"reason": "hghhghfgushs", "resolution": "TRANSFER_TO_BUYER"}
+25	4	42	AUTO_DISPUTE	Order automatically moved to dispute due to timeout	SYSTEM	2025-11-05 20:21:43.555848	{"reason": "2-hour confirmation window expired", "buyer_confirmed": false, "seller_confirmed": false}
+26	4	42	APPEAL_FILED	Seller filed an appeal	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	2025-11-05 20:26:05.256212	{"appeal_id": 4, "dispute_type": "PAYMENT_NOT_SENT"}
+27	5	46	AUTO_DISPUTE	Order automatically moved to dispute due to timeout	SYSTEM	2025-11-06 19:00:18.100021	{"reason": "2-hour confirmation window expired", "buyer_confirmed": false, "seller_confirmed": false}
+28	6	48	AUTO_DISPUTE	Order automatically moved to dispute due to timeout	SYSTEM	2025-11-06 19:00:18.129078	{"reason": "2-hour confirmation window expired", "buyer_confirmed": false, "seller_confirmed": false}
+29	6	48	APPEAL_FILED	Buyer filed an appeal	0xD1c9d52F075Aed0F4cf21418e5AF0eEBB3368297	2025-11-06 19:13:56.499258	{"appeal_id": 5, "dispute_type": "OTHER"}
+30	6	48	APPEAL_RESOLVED	Appeal resolved: REFUND_TO_SELLER	ADMIN	2025-11-06 19:31:54.997289	{"reason": "done hekwkk", "resolution": "REFUND_TO_SELLER"}
+31	5	46	APPEAL_FILED	Seller filed an appeal	0xD1c9d52F075Aed0F4cf21418e5AF0eEBB3368297	2025-11-06 19:33:52.352432	{"appeal_id": 6, "dispute_type": "PAYMENT_NOT_RECEIVED"}
+32	5	46	APPEAL_RESOLVED	Appeal resolved: REFUND_TO_SELLER	ADMIN	2025-11-06 19:35:22.569706	{"reason": "dgjikkgffhjuuijjkjkkdd", "resolution": "REFUND_TO_SELLER"}
+33	5	46	APPEAL_RESOLVED	Appeal resolved: REFUND_TO_SELLER	ADMIN	2025-11-06 19:57:10.429287	{"reason": "gsjjwjwkwiowi", "resolution": "REFUND_TO_SELLER"}
+34	6	48	APPEAL_RESOLVED	Appeal resolved: REFUND_TO_SELLER	ADMIN	2025-11-06 19:59:17.788285	{"reason": "ueuwjjejejejej", "resolution": "REFUND_TO_SELLER"}
+35	5	46	APPEAL_RESOLVED	Appeal resolved: REFUND_TO_SELLER	ADMIN	2025-11-06 20:02:44.126528	{"reason": "gsjsjsjjshsjejsj", "resolution": "REFUND_TO_SELLER"}
+36	6	48	APPEAL_RESOLVED	Appeal resolved: TRANSFER_TO_BUYER	ADMIN	2025-11-06 20:11:18.621727	{"reason": "dffghknjhjff", "resolution": "TRANSFER_TO_BUYER"}
+37	4	42	APPEAL_RESOLVED	Appeal resolved: TRANSFER_TO_BUYER	ADMIN	2025-11-06 20:12:47.935855	{"reason": "bbuuuuuinihnih", "resolution": "TRANSFER_TO_BUYER"}
+38	7	51	AUTO_DISPUTE	Order automatically moved to dispute due to timeout	SYSTEM	2025-11-07 18:57:24.833429	{"reason": "2-hour confirmation window expired", "buyer_confirmed": false, "seller_confirmed": false}
+39	7	51	APPEAL_FILED	Seller filed an appeal	0xD1c9d52F075Aed0F4cf21418e5AF0eEBB3368297	2025-11-07 19:54:53.185892	{"appeal_id": 7, "dispute_type": "OTHER"}
+40	8	52	AUTO_DISPUTE	Order automatically moved to dispute due to timeout	SYSTEM	2025-11-09 12:35:21.545621	{"reason": "2-hour confirmation window expired", "buyer_confirmed": false, "seller_confirmed": false}
+41	9	53	AUTO_DISPUTE	Order automatically moved to dispute due to timeout	SYSTEM	2025-11-09 12:35:21.572193	{"reason": "2-hour confirmation window expired", "buyer_confirmed": false, "seller_confirmed": false}
+42	10	54	AUTO_DISPUTE	Order automatically moved to dispute due to timeout	SYSTEM	2025-11-09 12:35:21.60907	{"reason": "2-hour confirmation window expired", "buyer_confirmed": false, "seller_confirmed": false}
+43	11	55	AUTO_DISPUTE	Order automatically moved to dispute due to timeout	SYSTEM	2025-11-09 12:35:21.637839	{"reason": "2-hour confirmation window expired", "buyer_confirmed": false, "seller_confirmed": false}
+44	11	55	APPEAL_FILED	Seller filed an appeal	0xD1c9d52F075Aed0F4cf21418e5AF0eEBB3368297	2025-11-09 12:50:36.838742	{"appeal_id": 8, "dispute_type": "OTHER"}
+45	10	54	APPEAL_FILED	Seller filed an appeal	0xD1c9d52F075Aed0F4cf21418e5AF0eEBB3368297	2025-11-09 12:59:00.099252	{"appeal_id": 9, "dispute_type": "OTHER"}
+46	11	55	APPEAL_RESOLVED	Appeal resolved: TRANSFER_TO_BUYER	ADMIN	2025-11-09 13:28:30.488393	{"reason": "gggyyyyy6666", "resolution": "TRANSFER_TO_BUYER"}
+47	10	54	APPEAL_RESOLVED	Appeal resolved: REFUND_TO_SELLER	ADMIN	2025-11-09 13:44:30.21955	{"reason": "Trade was already completed on-chain. Status synced automatically.", "resolution": "REFUND_TO_SELLER"}
+48	10	54	APPEAL_RESOLVED	Appeal resolved: REFUND_TO_SELLER	ADMIN	2025-11-09 13:44:30.244468	{"reason": "Trade was already completed on-chain. Status synced automatically.", "resolution": "REFUND_TO_SELLER"}
+49	1	28	APPEAL_RESOLVED	Appeal resolved: TRANSFER_TO_BUYER	ADMIN	2025-11-09 13:45:15.475562	{"reason": "rtfttttttttt55", "resolution": "TRANSFER_TO_BUYER"}
+50	9	53	APPEAL_FILED	Seller filed an appeal	0xD1c9d52F075Aed0F4cf21418e5AF0eEBB3368297	2025-11-09 13:51:16.190068	{"appeal_id": 10, "dispute_type": "OTHER"}
+51	9	53	APPEAL_RESOLVED	Appeal resolved: TRANSFER_TO_BUYER	ADMIN	2025-11-09 13:53:04.371676	{"reason": "gshwjwjjej3jj3", "resolution": "TRANSFER_TO_BUYER"}
+\.
+
+
+--
+-- Data for Name: disputes; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY public.disputes (id, order_id, dispute_type, status, created_at, resolved_at, resolved_by, resolution, resolution_reason, created_by) FROM stdin;
+3	41	PAYMENT_NOT_RECEIVED	PENDING	2025-10-31 19:20:41.316447	\N	\N	\N	\N	SYSTEM
+2	35	PAYMENT_NOT_RECEIVED	PENDING	2025-10-23 10:56:38.822367	\N	\N	\N	\N	SYSTEM
+5	46	PAYMENT_NOT_RECEIVED	RESOLVED	2025-11-06 19:00:18.08314	2025-11-06 20:02:44.119	ADMIN	REFUND_TO_SELLER	gsjsjsjjshsjejsj	SYSTEM
+6	48	PAYMENT_NOT_RECEIVED	RESOLVED	2025-11-06 19:00:18.11848	2025-11-06 20:11:18.614	ADMIN	TRANSFER_TO_BUYER	dffghknjhjff	SYSTEM
+4	42	PAYMENT_NOT_RECEIVED	RESOLVED	2025-11-05 20:21:43.544259	2025-11-06 20:12:47.927	ADMIN	TRANSFER_TO_BUYER	bbuuuuuinihnih	SYSTEM
+7	51	PAYMENT_NOT_RECEIVED	PENDING	2025-11-07 18:57:24.814638	\N	\N	\N	\N	SYSTEM
+8	52	PAYMENT_NOT_RECEIVED	PENDING	2025-11-09 12:35:21.523169	\N	\N	\N	\N	SYSTEM
+11	55	PAYMENT_NOT_RECEIVED	RESOLVED	2025-11-09 12:35:21.622459	2025-11-09 13:28:30.481	ADMIN	TRANSFER_TO_BUYER	gggyyyyy6666	SYSTEM
+10	54	PAYMENT_NOT_RECEIVED	RESOLVED	2025-11-09 12:35:21.586739	2025-11-09 13:44:30.238	ADMIN	REFUND_TO_SELLER	Trade was already completed on-chain. Status synced automatically.	SYSTEM
+1	28	PAYMENT_NOT_RECEIVED	RESOLVED	2025-10-15 19:24:00.785141	2025-11-09 13:45:15.464	ADMIN	TRANSFER_TO_BUYER	rtfttttttttt55	SYSTEM
+9	53	PAYMENT_NOT_RECEIVED	RESOLVED	2025-11-09 12:35:21.562257	2025-11-09 13:53:04.363	ADMIN	TRANSFER_TO_BUYER	gshwjwjjej3jj3	SYSTEM
+\.
+
+
+--
+-- Data for Name: locations; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY public.locations (id, name, city, state, country, active, created_at) FROM stdin;
+1	Mumbai	Mumbai	Maharashtra	India	t	2025-10-10 17:05:47.004546
+2	Delhi	Delhi	Delhi	India	t	2025-10-10 17:05:47.004546
+3	Bangalore	Bangalore	Karnataka	India	t	2025-10-10 17:05:47.004546
+4	Hyderabad	Hyderabad	Telangana	India	t	2025-10-10 17:05:47.004546
+5	Ahmedabad	Ahmedabad	Gujarat	India	t	2025-10-10 17:05:47.004546
+6	Chennai	Chennai	Tamil Nadu	India	t	2025-10-10 17:05:47.004546
+7	Kolkata	Kolkata	West Bengal	India	t	2025-10-10 17:05:47.004546
+8	Pune	Pune	Maharashtra	India	t	2025-10-10 17:05:47.004546
+9	Surat	Surat	Gujarat	India	t	2025-10-10 17:05:47.004546
+10	Jaipur	Jaipur	Rajasthan	India	t	2025-10-10 17:05:47.004546
+\.
+
+
+--
+-- Data for Name: orders; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY public.orders (id, ad_id, buyer_address, seller_address, amount, token, state, agent_branch, agent_number, agent_address, created_at, accepted_at, lock_expires_at, tx_hash, start_time, timezone, start_datetime_string, otp_hash, blockchain_trade_id, create_trade_tx_hash, payment_confirmation_id, dispute_id, appeal_deadline, resolution_deadline) FROM stdin;
+2	3	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	0.200000	TBNB	CANCELLED	ICICI Koramangala	9876543216	Koramangala 4th Block, Bangalore 560034	2025-10-10 17:27:42.481067	\N	\N	\N	2025-10-10 11:57:42.434	Asia/Calcutta	10/10/2025, 17:27:42 Calcutta	\N	\N	\N	\N	\N	\N	\N
+3	3	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	0.200000	TBNB	EXPIRED	ICICI Koramangala	9876543216	Koramangala 4th Block, Bangalore 560034	2025-10-10 17:36:30.405166	\N	\N	\N	2025-10-10 12:06:30.371	Asia/Calcutta	10/10/2025, 17:36:30 Calcutta	\N	\N	\N	\N	\N	\N	\N
+5	3	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	0.200000	TBNB	ACCEPTED	ICICI Koramangala	9876543216	Koramangala 4th Block, Bangalore 560034	2025-10-10 17:40:39.015749	2025-10-10 17:42:42.506	2025-10-10 18:42:42.505	\N	2025-10-10 17:40:39.015749	Asia/Calcutta	10/10/2025, 17:40:39 Calcutta	\N	\N	\N	\N	\N	\N	\N
+4	3	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	0.200000	TBNB	EXPIRED	ICICI Koramangala	9876543216	Koramangala 4th Block, Bangalore 560034	2025-10-10 17:38:20.798457	\N	\N	\N	2025-10-10 12:08:20.762	Asia/Calcutta	10/10/2025, 17:38:20 Calcutta	\N	\N	\N	\N	\N	\N	\N
+6	3	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	0.200000	TBNB	CANCELLED	ICICI Koramangala	9876543216	Koramangala 4th Block, Bangalore 560034	2025-10-10 17:43:28.172222	\N	\N	\N	2025-10-10 17:43:28.172222	Asia/Calcutta	10/10/2025, 17:43:28 Calcutta	\N	\N	\N	\N	\N	\N	\N
+11	3	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	0.200000	TBNB	ACCEPTED	ICICI Koramangala	9876543216	Koramangala 4th Block, Bangalore 560034	2025-10-10 18:38:07.601408	2025-10-10 18:38:17.973	2025-10-10 20:38:17.971	\N	2025-10-10 18:38:07.601408	Asia/Calcutta	10/10/2025, 18:38:07 Calcutta	0x619eada0eac1686810b4a15266f2b12972c3fb827f693f62c366489e406e78d2	\N	\N	\N	\N	\N	\N
+7	3	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	0.200000	TBNB	ACCEPTED	ICICI Koramangala	9876543216	Koramangala 4th Block, Bangalore 560034	2025-10-10 17:55:25.966718	2025-10-10 17:59:26.67	2025-10-10 18:59:26.668	\N	2025-10-10 17:55:25.966718	Asia/Calcutta	10/10/2025, 17:55:25 Calcutta	0x298ee90b0caf87b6b23b2634b239605ae3c7f448a75a52196495fc808792a57c	\N	\N	\N	\N	\N	\N
+8	3	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	0.200000	TBNB	CANCELLED	ICICI Koramangala	9876543216	Koramangala 4th Block, Bangalore 560034	2025-10-10 18:14:22.19434	\N	\N	\N	2025-10-10 18:14:22.19434	Asia/Calcutta	10/10/2025, 18:14:22 Calcutta	\N	\N	\N	\N	\N	\N	\N
+16	3	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	0.200000	TBNB	CANCELLED	ICICI Koramangala	9876543216	Koramangala 4th Block, Bangalore 560034	2025-10-12 13:02:13.736079	\N	\N	\N	2025-10-12 13:02:13.736079	Asia/Calcutta	12/10/2025, 13:02:13 Calcutta	\N	\N	\N	\N	\N	\N	\N
+9	3	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	0.200000	TBNB	EXPIRED	ICICI Koramangala	9876543216	Koramangala 4th Block, Bangalore 560034	2025-10-10 18:23:15.840586	\N	\N	\N	2025-10-10 18:23:15.840586	Asia/Calcutta	10/10/2025, 18:23:15 Calcutta	\N	\N	\N	\N	\N	\N	\N
+10	3	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	0.200000	TBNB	ACCEPTED	ICICI Koramangala	9876543216	Koramangala 4th Block, Bangalore 560034	2025-10-10 18:33:57.085481	2025-10-10 18:35:17.573	2025-10-10 20:35:17.571	\N	2025-10-10 18:33:57.085481	Asia/Calcutta	10/10/2025, 18:33:57 Calcutta	0xb9f721f3028533fb13056eaf6a33ca4fb3329d60fe85c3434cd0d9ace375fdb8	\N	\N	\N	\N	\N	\N
+12	3	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	0.200000	TBNB	EXPIRED	ICICI Koramangala	9876543216	Koramangala 4th Block, Bangalore 560034	2025-10-10 18:46:18.065684	\N	\N	\N	2025-10-10 18:46:18.065684	Asia/Calcutta	10/10/2025, 18:46:18 Calcutta	\N	\N	\N	\N	\N	\N	\N
+13	3	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	0.200000	TBNB	CANCELLED	ICICI Koramangala	9876543216	Koramangala 4th Block, Bangalore 560034	2025-10-10 18:56:36.857103	\N	\N	\N	2025-10-10 18:56:36.857103	Asia/Calcutta	10/10/2025, 18:56:36 Calcutta	\N	\N	\N	\N	\N	\N	\N
+17	3	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	0.200000	TBNB	CANCELLED	ICICI Koramangala	9876543216	Koramangala 4th Block, Bangalore 560034	2025-10-12 13:09:56.586426	\N	\N	\N	2025-10-12 13:09:56.586426	Asia/Calcutta	12/10/2025, 13:09:56 Calcutta	\N	\N	\N	\N	\N	\N	\N
+14	3	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	0.200000	TBNB	EXPIRED	ICICI Koramangala	9876543216	Koramangala 4th Block, Bangalore 560034	2025-10-10 19:07:19.030381	\N	\N	\N	2025-10-10 19:07:19.030381	Asia/Calcutta	10/10/2025, 19:07:19 Calcutta	\N	\N	\N	\N	\N	\N	\N
+15	3	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	0.200000	TBNB	CANCELLED	ICICI Koramangala	9876543216	Koramangala 4th Block, Bangalore 560034	2025-10-12 12:55:50.303964	\N	\N	\N	2025-10-12 12:55:50.303964	Asia/Calcutta	12/10/2025, 12:55:50 Calcutta	\N	\N	\N	\N	\N	\N	\N
+20	4	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	0.100000	TBNB	CANCELLED	ICICI Vastrapur	9876543222	Vastrapur, Ahmedabad 380015	2025-10-12 13:29:48.113681	\N	\N	\N	2025-10-12 13:29:48.113681	America/Los_Angeles	12/10/2025, 00:59:48 Los_Angeles	\N	\N	\N	\N	\N	\N	\N
+18	4	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	0.100000	TBNB	EXPIRED	ICICI Vastrapur	9876543222	Vastrapur, Ahmedabad 380015	2025-10-12 13:16:13.304517	\N	\N	\N	2025-10-12 13:16:13.304517	America/Los_Angeles	12/10/2025, 00:46:13 Los_Angeles	\N	\N	\N	\N	\N	\N	\N
+19	4	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	0.100000	TBNB	CANCELLED	ICICI Vastrapur	9876543222	Vastrapur, Ahmedabad 380015	2025-10-12 13:21:56.336516	\N	\N	\N	2025-10-12 13:21:56.336516	America/Los_Angeles	12/10/2025, 00:51:56 Los_Angeles	\N	\N	\N	\N	\N	\N	\N
+21	4	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	0.100000	TBNB	EXPIRED	ICICI Vastrapur	9876543222	Vastrapur, Ahmedabad 380015	2025-10-12 13:49:40.348631	\N	\N	\N	2025-10-12 13:49:40.348631	America/Los_Angeles	12/10/2025, 01:19:40 Los_Angeles	\N	\N	\N	\N	\N	\N	\N
+23	5	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	0.200000	TBNB	CANCELLED	ICICI Vastrapur	9876543222	Vastrapur, Ahmedabad 380015	2025-10-12 13:59:07.520219	\N	\N	\N	2025-10-12 13:59:07.520219	America/Los_Angeles	12/10/2025, 01:29:07 Los_Angeles	\N	\N	\N	\N	\N	\N	\N
+22	4	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	0.100000	TBNB	CANCELLED	ICICI Vastrapur	9876543222	Vastrapur, Ahmedabad 380015	2025-10-12 13:56:12.05718	\N	\N	\N	2025-10-12 13:56:12.05718	America/Los_Angeles	12/10/2025, 01:26:12 Los_Angeles	\N	\N	\N	\N	\N	\N	\N
+24	4	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	0.100000	TBNB	CANCELLED	ICICI Vastrapur	9876543222	Vastrapur, Ahmedabad 380015	2025-10-12 14:04:03.20537	\N	\N	\N	2025-10-12 14:04:03.20537	America/Los_Angeles	12/10/2025, 01:34:03 Los_Angeles	\N	\N	\N	\N	\N	\N	\N
+25	4	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	0x583c8c7b321f80e966e072e57e1bb5cc2698d685	0.100000	TBNB	EXPIRED	ICICI Vastrapur	9876543222	Vastrapur, Ahmedabad 380015	2025-10-12 14:12:33.314849	\N	\N	\N	2025-10-12 14:12:33.314849	Asia/Kolkata	12/10/2025, 14:12:33 Kolkata	\N	\N	\N	\N	\N	\N	\N
+26	4	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	0.100000	TBNB	ACCEPTED	ICICI Vastrapur	9876543222	Vastrapur, Ahmedabad 380015	2025-10-12 14:29:02.187736	2025-10-12 14:29:12.204	\N	\N	2025-10-12 14:29:02.187736	America/Los_Angeles	12/10/2025, 01:59:02 Los_Angeles	\N	\N	\N	\N	\N	\N	\N
+27	3	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	0.200000	TBNB	CANCELLED	ICICI Koramangala	9876543216	Koramangala 4th Block, Bangalore 560034	2025-10-12 14:31:43.223741	\N	\N	\N	2025-10-12 14:31:43.223741	Asia/Calcutta	12/10/2025, 14:31:43 Calcutta	\N	\N	\N	\N	\N	\N	\N
+29	5	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	0.200000	TBNB	ACCEPTED	ICICI Vastrapur	9876543222	Vastrapur, Ahmedabad 380015	2025-10-14 20:13:23.657865	2025-10-14 20:13:37.373	\N	\N	2025-10-14 20:13:23.657865	America/Los_Angeles	14/10/2025, 07:43:23 Los_Angeles	\N	\N	\N	\N	\N	\N	\N
+30	4	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	0.100000	TBNB	CONFIRMED	ICICI Vastrapur	9876543222	Vastrapur, Ahmedabad 380015	2025-10-14 20:14:09.132003	2025-10-14 20:14:17.325	2025-10-14 22:14:49.08	0x18236c58fa2aa0f258422d8de33c12a16006383a9cfa86d1ea2b06560d7ee4c0	2025-10-14 20:14:09.132003	America/Los_Angeles	14/10/2025, 07:44:09 Los_Angeles	0xaed9c57193759e2b0a59b9e7c55ea841ac1a5ee1de4da2d3fecdeaf7ffefa237	5	0x93b307493970b6b0ea938efad9a89e72681fad86850535063a46309a01019c00	\N	\N	\N	\N
+31	4	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	0.100000	TBNB	CONFIRMED	ICICI Vastrapur	9876543222	Vastrapur, Ahmedabad 380015	2025-10-15 19:40:53.448798	2025-10-15 19:41:01.812	2025-10-15 21:43:26.806	0x18aac441a06f997c8b8b8c6e3af7386c03cf58b27418ec92eedce4b1f41c95a4	2025-10-15 19:40:53.448798	America/Los_Angeles	15/10/2025, 07:10:53 Los_Angeles	0xe0a02fb7664058abf73c719292cfc9004ea9a2608fdd1468cb1fafd6acc6e782	6	0x628376335312fe68be0ef26b47f01f5ffad034f8c21609642da6596debf76ede	\N	\N	\N	\N
+32	4	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	0.100000	TBNB	RELEASED	ICICI Vastrapur	9876543222	Vastrapur, Ahmedabad 380015	2025-10-15 20:12:58.520132	2025-10-15 20:13:15.403	2025-10-15 22:13:59.761	0x4eb00696e2b54f76c90cae0a3d5dd775974f965c6f6fcc57396773698f0693cf	2025-10-15 20:12:58.520132	America/Los_Angeles	15/10/2025, 07:42:58 Los_Angeles	0x09cd274c4be0f874bdc74222320135042b643f8ac34432ffa7c3b5b4eb66befc	7	0x23b1d6936ea1f02a5ff7e6e740587bed33cb4e7047e7c9590ed3be90be835cc7	\N	\N	\N	\N
+33	3	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	0.150000	TBNB	RELEASED	ICICI Koramangala	9876543216	Koramangala 4th Block, Bangalore 560034	2025-10-15 20:29:50.27028	2025-10-15 20:30:09	2025-10-15 22:31:15.606	0x83d4a481b99433e9f6366196d053bacb9755f5b4fec673a34939ee5dc56f7606	2025-10-15 20:29:50.27028	Asia/Calcutta	15/10/2025, 20:29:50 Calcutta	0x2cd6f157fa9b5d36ac675879e60b828b8c036ae6c7e57f563f1798ac3d412a42	8	0x12fe7b5adbbfe4f462dbff33b1245c0d7149e8cb55b794a0227e4ca1fee8555c	\N	\N	\N	\N
+34	4	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	0.100000	TBNB	RELEASED	ICICI Vastrapur	9876543222	Vastrapur, Ahmedabad 380015	2025-10-15 21:17:17.562318	2025-10-15 21:17:25.367	2025-10-15 23:18:47.868	0x51dd0ec12a327ff7519d78e4b83856eb26bd734219edcc0249aad64e5b426ff2	2025-10-15 21:17:17.562318	America/Los_Angeles	15/10/2025, 08:47:17 Los_Angeles	0x52edf15976e0ab0bd344c75fdcb5d97d4ab40cbde7f73d2fcc80d36f9ef2b81c	9	0x254c0193a956e648f1567c3c18cec0c74fe821c1f39ae2b807ce7bbd171346bf	\N	\N	\N	\N
+36	5	0x249394a922d8d41a75660d4087f0e4dd6674849f	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	0.110000	TBNB	ACCEPTED	ICICI Vastrapur	9876543222	Vastrapur, Ahmedabad 380015	2025-10-23 11:23:07.045949	2025-10-23 11:26:36.89	\N	\N	2025-10-23 11:23:07.045949	Asia/Calcutta	23/10/2025, 11:23:07 Calcutta	\N	\N	\N	\N	\N	\N	\N
+35	8	0x583c8c7b321f80e966e072e57e1bb5cc2698d685	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0.150000	TBNB	DISPUTED	ICICI Vastrapur	9876543222	Vastrapur, Ahmedabad 380015	2025-10-22 11:05:27.564608	2025-10-22 11:05:38.813	2025-10-22 13:06:17.988	0x4ac8e44499a293fa2ff08a3ec1614466bbe24cca5680cce9590a54ab15a84f54	2025-10-22 11:05:27.564608	Asia/Calcutta	22/10/2025, 11:05:27 Calcutta	0x61d410562af5be4a55a2ecf9810c2f3f6810cf27aa3261d4359313d508fb6ecd	11	0xb1049503ef855ab0c0b67dbdcdcbd10131954b5a26e0aa07cab693928e144e57	\N	2	2025-10-25 10:56:38.829	\N
+39	3	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0.140000	TBNB	ACCEPTED	ICICI Koramangala	9876543216	Koramangala 4th Block, Bangalore 560034	2025-10-29 20:52:32.918832	2025-10-29 20:52:42.4	\N	\N	2025-10-29 20:52:32.918832	Asia/Calcutta	29/10/2025, 20:52:32 Calcutta	\N	\N	\N	\N	\N	\N	\N
+37	5	0x249394a922d8d41a75660d4087f0e4dd6674849f	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	0.120000	TBNB	ACCEPTED	ICICI Vastrapur	9876543222	Vastrapur, Ahmedabad 380015	2025-10-23 11:31:24.437223	2025-10-23 11:35:37.637	\N	\N	2025-10-23 11:31:24.437223	Asia/Calcutta	23/10/2025, 11:31:24 Calcutta	\N	\N	\N	\N	\N	\N	\N
+38	9	0x249394a922d8d41a75660d4087f0e4dd6674849f	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0.020000	TBNB	RELEASED	ICICI Vastrapur	9876543222	Vastrapur, Ahmedabad 380015	2025-10-23 11:38:19.635877	2025-10-23 11:40:19.859	2025-10-23 13:42:59.627	0x9d35b035baa35fa8b26e8cffaede4ed99704119daaa2f329e7a5f5185b9b6ca8	2025-10-23 11:38:19.635877	Asia/Calcutta	23/10/2025, 11:38:19 Calcutta	0xcbff32e1707e241a45050c0591a63ac752edf9449a819058418ca970c3e8c8b4	13	0xa68835fc13f89bffc34bea1a0deca89b3664e8dae96756082b4b1edf49e1da0c	\N	\N	\N	\N
+41	11	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	0.100000	TBNB	DISPUTED	ICICI Koramangala	9876543216	Koramangala 4th Block, Bangalore 560034	2025-10-29 21:03:51.017418	2025-10-29 21:04:00.853	2025-10-29 23:04:34.313	0x8dd5668aaed4ad831b68393df5d67937843b1ed2b5e54803540ca1a50987570c	2025-10-29 21:03:51.017418	Asia/Calcutta	29/10/2025, 21:03:51 Calcutta	0xac5fb1978a2019c9aa44926781ff350f715d84b1f8c5743aa3995c29a440740c	17	0x8952cde708b92155f24bfcc2670953afc4566673999602d373984525595ac57a	\N	3	2025-11-02 19:20:41.323	\N
+40	10	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0.200000	TBNB	ACCEPTED	ICICI Koramangala	9876543216	Koramangala 4th Block, Bangalore 560034	2025-10-29 20:55:24.817954	2025-10-29 20:55:46.858	\N	\N	2025-10-29 20:55:24.817954	Asia/Calcutta	29/10/2025, 20:55:24 Calcutta	\N	\N	\N	\N	\N	\N	\N
+28	3	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	0.200000	TBNB	UNDER_DISPUTE	ICICI Koramangala	9876543216	Koramangala 4th Block, Bangalore 560034	2025-10-12 14:32:22.915061	2025-10-12 14:32:31.518	2025-10-14 22:08:17.267	0x5aae91a4460234078fcbfca2ed6feff03452211b095a05639655e7c60ac917c7	2025-10-12 14:32:22.915061	Asia/Calcutta	12/10/2025, 14:32:22 Calcutta	0xbd0c3155e9792cc0917a3ea5efb04aa1bd80ddac7b96103c5fa3e17de4d4c68e	3	0xaf0761b9ea746fc852057fb07ebc3c63a711262cba1540ba67591bb9a64bb360	\N	1	2025-10-17 19:24:00.791	\N
+42	11	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	0.010000	TBNB	UNDER_DISPUTE	ICICI Koramangala	9876543216	Koramangala 4th Block, Bangalore 560034	2025-11-02 16:51:37.416419	2025-11-02 16:53:46.667	2025-11-05 20:19:38.422	0x61633e5ca4378eb402c7d33db9e8bd8e821d40e3bf241e40aed7a842cf430fc3	2025-11-02 16:51:37.416419	Asia/Calcutta	02/11/2025, 16:51:37 Calcutta	0x2380e2fc25784e406cd27e1d5a01514777da33106ffefcc4640927d5be799071	20	0x1a7cf3b8c5fab096e20bdf015e6f8cb51121bd05ad58b59ae89fd34bc4a2ce54	\N	4	2025-11-07 20:21:43.55	\N
+43	11	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	0.100000	TBNB	CANCELLED	ICICI Koramangala	9876543216	Koramangala 4th Block, Bangalore 560034	2025-11-05 20:05:16.74639	\N	\N	\N	2025-11-05 20:05:16.74639	Asia/Calcutta	05/11/2025, 20:05:16 Calcutta	\N	\N	\N	\N	\N	\N	\N
+45	7	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	0.040000	TBNB	CANCELLED	ICICI Vastrapur	9876543222	Vastrapur, Ahmedabad 380015	2025-11-05 20:42:26.300449	\N	\N	\N	2025-11-05 20:42:26.300449	Asia/Calcutta	05/11/2025, 20:42:26 Calcutta	\N	\N	\N	\N	\N	\N	\N
+44	11	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	0.100000	TBNB	ACCEPTED	ICICI Koramangala	9876543216	Koramangala 4th Block, Bangalore 560034	2025-11-05 20:42:15.967595	2025-11-05 20:44:11.099	\N	\N	2025-11-05 20:42:15.967595	Asia/Calcutta	05/11/2025, 20:42:15 Calcutta	\N	\N	\N	\N	\N	\N	\N
+49	9	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0.050000	TBNB	ACCEPTED	SBI Satellite	9876543221	Satellite, Ahmedabad 380015	2025-11-05 20:53:01.841587	2025-11-05 20:53:09.965	\N	\N	2025-11-05 20:53:01.841587	Asia/Calcutta	05/11/2025, 20:53:01 Calcutta	\N	\N	\N	\N	\N	\N	\N
+47	5	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	0.110000	TBNB	EXPIRED	ICICI Vastrapur	9876543222	Vastrapur, Ahmedabad 380015	2025-11-05 20:50:38.938138	\N	\N	\N	2025-11-05 20:50:38.938138	Asia/Calcutta	05/11/2025, 20:50:38 Calcutta	\N	\N	\N	\N	\N	\N	\N
+46	9	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0.020000	TBNB	UNDER_DISPUTE	SBI Satellite	9876543221	Satellite, Ahmedabad 380015	2025-11-05 20:47:33.957855	2025-11-05 20:47:50.81	2025-11-05 22:48:17.717	0xf12df1ce494168d690e4ff548899206166651bab2eefee3ccf9c617a1e9a0106	2025-11-05 20:47:33.957855	Asia/Calcutta	05/11/2025, 20:47:33 Calcutta	0x877aa48f396a2d63b082ed6223adccdbfb2c917a08b6add6a3953f7f1445c784	22	0xc4b016d7b87d1dba772581a391d5e78b71fce98cb458a980cae9d4f6386e8ef7	\N	5	2025-11-08 19:00:18.089	\N
+48	11	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	0.100000	TBNB	UNDER_DISPUTE	ICICI Koramangala	9876543216	Koramangala 4th Block, Bangalore 560034	2025-11-05 20:51:32.763523	2025-11-05 20:51:42.684	2025-11-05 22:52:21.092	0x08fc54986d1b67596c997061f04d91e2c9c1f05b9241a7623e6a321125ea6c91	2025-11-05 20:51:32.763523	Asia/Calcutta	05/11/2025, 20:51:32 Calcutta	0x1da423d379bb5fa3de501135d4b9b465142af50145c7d5a7264caa44fe7a65d6	24	0xec898cbe834ecfe3d0ed39d1e2b9429a410b3f63979815f638104bea26eda400	\N	6	2025-11-08 19:00:18.123	\N
+53	12	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0.010000	TBNB	UNDER_DISPUTE	SBI Satellite	9876543221	Satellite, Ahmedabad 380015	2025-11-07 20:16:25.429847	2025-11-07 20:16:32.965	2025-11-07 22:17:27.132	0x4c8be41f9a2076c250b433281c2680cab08d90121c38f6f84d90451bc62eda7e	2025-11-07 20:16:25.429847	Asia/Calcutta	07/11/2025, 20:16:25 Calcutta	0x98b1d8bf4b7f0531576d14b1de7c5345bacec8ea62cd13039a5fad0df3aaf00e	30	0x6a95c3220215ce1b3cd291df8bf68e57ddd652b21785fb77e63a235663a02251	\N	9	2025-11-11 12:35:21.566	\N
+50	12	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0.010000	TBNB	CANCELLED	ICICI Koramangala	9876543216	Koramangala 4th Block, Bangalore 560034	2025-11-06 19:05:44.206564	\N	\N	\N	2025-11-06 19:05:44.206564	Asia/Calcutta	06/11/2025, 19:05:44 Calcutta	\N	\N	\N	\N	\N	\N	\N
+51	9	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0.010000	TBNB	UNDER_DISPUTE	SBI Satellite	9876543221	Satellite, Ahmedabad 380015	2025-11-06 19:06:47.840885	2025-11-06 19:06:57.305	2025-11-06 21:07:15.041	0x4f58303c5b6e19900755af9bd1c7320996967ca0cca0bb41557c69db75abd028	2025-11-06 19:06:47.840885	Asia/Calcutta	06/11/2025, 19:06:47 Calcutta	0xe493b34ed89fda6e608afb0b32e2e195600f16bf22ee73071ac84c052d356e0e	28	0x5ee22b2a20289696f0e0f391ccdbf51b1f06f3e7d6788fbae03c938497a41f11	\N	7	2025-11-09 18:57:24.822	\N
+54	10	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0.010000	TBNB	UNDER_DISPUTE	SBI Satellite	9876543221	Satellite, Ahmedabad 380015	2025-11-07 20:18:01.375563	2025-11-07 20:18:15.973	2025-11-07 22:18:54.83	0x9fc2a306a10456105f4c38f2b413cd66aeb0eb873616598be406fa2a90b3cb86	2025-11-07 20:18:01.375563	Asia/Calcutta	07/11/2025, 20:18:01 Calcutta	0x2d18ff72b5bb6a38fe4d65617d79ab3aeef44a88374828aec39300c9ce56e9dd	31	0x2f065d88e1c604d486b11e037e74d5f3a11c80fc762b8d32d3a59aa17a3f6f12	\N	10	2025-11-11 12:35:21.595	\N
+55	9	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0.010000	TBNB	UNDER_DISPUTE	SBI Satellite	9876543221	Satellite, Ahmedabad 380015	2025-11-07 20:19:25.036986	2025-11-07 20:19:30.682	2025-11-07 22:19:55.256	0xb54cc2d2202d2409c4ed45c42e5a123599b912b06e8bf9eaaad260261ed9def6	2025-11-07 20:19:25.036986	Asia/Calcutta	07/11/2025, 20:19:25 Calcutta	0x26e708a0cbbc521f24fe36495d8630b44d87c3bdc2c97ed415e4731a3659e426	32	0x0f1749cb02f7009b82d044e9e4f0cb8a9a7e6c355cc2926aa3c9c62e4c4ca234	\N	11	2025-11-11 12:35:21.632	\N
+52	11	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	0.010000	TBNB	UNDER_DISPUTE	SBI Satellite	9876543221	Satellite, Ahmedabad 380015	2025-11-07 20:15:10.500664	2025-11-07 20:15:29.82	2025-11-07 22:15:56.412	0x66cf69ab5009a3913249601a7821ea67072b21c98dd2ee703e317eedd84d78a5	2025-11-07 20:15:10.500664	Asia/Calcutta	07/11/2025, 20:15:10 Calcutta	0xb75b75836f70318c37e9dfe0c224dfbccd2a9ac3ade7815cdf73435dd2b40505	29	0x4f746eff2119feaf9049f7c70774e99e6d12500f26d1866307c266704d6a9786	\N	8	2025-11-11 12:35:21.538	\N
+\.
+
+
+--
+-- Data for Name: otp_logs; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY public.otp_logs (id, user_address, otp_hash, created_at, expires_at, used, order_id) FROM stdin;
+\.
+
+
+--
+-- Data for Name: payment_confirmations; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY public.payment_confirmations (id, order_id, buyer_confirmed, seller_confirmed, buyer_confirmed_at, seller_confirmed_at, created_at, updated_at) FROM stdin;
+1	30	t	t	2025-10-15 19:28:10.863	2025-10-14 21:43:02.183	2025-10-14 21:40:05.410707	2025-10-15 19:28:10.8645
+9	31	t	t	2025-10-15 20:02:21.914	2025-10-15 20:02:27.217	2025-10-15 20:02:21.91576	2025-10-15 20:02:27.217872
+11	32	t	t	2025-10-15 20:21:39.055	2025-10-15 20:21:51.733	2025-10-15 20:21:39.056114	2025-10-15 20:21:51.733812
+13	33	t	t	2025-10-15 20:32:47.812	2025-10-15 20:32:25.234	2025-10-15 20:32:25.235118	2025-10-15 20:32:47.812272
+15	34	t	t	2025-10-15 21:19:57.254	2025-10-15 21:20:33.795	2025-10-15 21:19:57.254633	2025-10-15 21:20:33.796201
+17	38	t	t	2025-10-23 12:00:50.14	2025-10-23 12:01:26.062	2025-10-23 12:00:50.140929	2025-10-23 12:01:26.062837
+\.
+
+
+--
+-- Data for Name: reviews; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY public.reviews (id, reviewer_address, reviewee_address, order_id, rating, message, is_visible, is_approved, created_at, updated_at, approved_by, approved_at) FROM stdin;
+5	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	\N	5	dd	t	t	2025-10-17 21:01:16.030146	2025-10-18 18:18:32.977006	1	2025-10-18 18:18:11.779191
+16	0x249394a922d8d41a75660d4087f0e4dd6674849f	0x249394a922d8d41a75660d4087f0e4dd6674849f	\N	4	Best platform in p2p	t	f	2025-10-23 13:05:10.680421	2025-10-23 13:05:10.680421	\N	\N
+17	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	\N	5	o	t	f	2025-10-23 14:08:38.54058	2025-10-23 14:08:38.54058	\N	\N
+18	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	\N	5	Good platfomr	t	f	2025-10-23 14:28:08.63707	2025-10-23 14:28:08.63707	\N	\N
+\.
+
+
+--
+-- Data for Name: support; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY public.support (id, type, value, label, active, priority, created_at, updated_at) FROM stdin;
+1	phone	+91-9876543210	Primary Support	t	1	2025-09-29 17:47:33.312952	2025-09-29 17:47:33.312952
+2	phone	+91-9876543211	Secondary Support	t	2	2025-09-29 17:47:33.312952	2025-09-29 17:47:33.312952
+3	email	support@zotrust.com	Primary Email	t	1	2025-09-29 17:47:33.312952	2025-09-29 17:47:33.312952
+4	email	help@zotrust.com	Secondary Email	t	2	2025-09-29 17:47:33.312952	2025-09-29 17:47:33.312952
+\.
+
+
+--
+-- Data for Name: transactions; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY public.transactions (id, transaction_number, order_id, buyer_address, seller_address, amount, token, transaction_type, status, created_at, completed_at) FROM stdin;
+1	TXN-1760098362507-5	5	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	0.200000	TBNB	BUY	PENDING	2025-10-10 17:42:42.50554	\N
+4	TXN-1760099366672-7	7	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	0.200000	TBNB	BUY	PENDING	2025-10-10 17:59:26.669757	\N
+5	TXN-1760101517578-10	10	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	0.200000	TBNB	BUY	PENDING	2025-10-10 18:35:17.57275	\N
+6	TXN-1760101697976-11	11	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	0.200000	TBNB	BUY	PENDING	2025-10-10 18:38:17.972294	\N
+7	TXN-1760452697275-28	28	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	0.200000	TBNB	BUY	PENDING	2025-10-14 20:08:17.278418	\N
+8	TXN-1760453089088-30	30	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	0.100000	TBNB	BUY	PENDING	2025-10-14 20:14:49.08933	\N
+9	TXN-1760537606810-31	31	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	0.100000	TBNB	BUY	PENDING	2025-10-15 19:43:26.812198	\N
+10	TXN-1760539439770-32	32	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	0.100000	TBNB	BUY	PENDING	2025-10-15 20:13:59.771709	\N
+11	TXN-1760540475612-33	33	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	0.150000	TBNB	BUY	PENDING	2025-10-15 20:31:15.616172	\N
+12	TXN-1760543327877-34	34	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	0.100000	TBNB	BUY	PENDING	2025-10-15 21:18:47.880551	\N
+13	TXN-1761111377997-35	35	0x583c8c7b321f80e966e072e57e1bb5cc2698d685	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0.150000	TBNB	BUY	PENDING	2025-10-22 11:06:17.998727	\N
+14	TXN-1761199979635-38	38	0x249394a922d8d41a75660d4087f0e4dd6674849f	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0.020000	TBNB	SELL	PENDING	2025-10-23 11:42:59.636557	\N
+15	TXN-1761752074319-41	41	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	0.100000	TBNB	SELL	PENDING	2025-10-29 21:04:34.321243	\N
+16	TXN-1762346978430-42	42	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	0.010000	TBNB	SELL	PENDING	2025-11-05 18:19:38.433703	\N
+17	TXN-1762355897725-46	46	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0.020000	TBNB	SELL	PENDING	2025-11-05 20:48:17.726985	\N
+18	TXN-1762356141098-48	48	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	0.100000	TBNB	SELL	PENDING	2025-11-05 20:52:21.100552	\N
+19	TXN-1762436235048-51	51	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0.010000	TBNB	SELL	PENDING	2025-11-06 19:07:15.050716	\N
+20	TXN-1762526756425-52	52	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	0.010000	TBNB	SELL	PENDING	2025-11-07 20:15:56.427891	\N
+21	TXN-1762526847138-53	53	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0.010000	TBNB	BUY	PENDING	2025-11-07 20:17:27.139555	\N
+22	TXN-1762526934838-54	54	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0.010000	TBNB	BUY	PENDING	2025-11-07 20:18:54.839896	\N
+23	TXN-1762526995262-55	55	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	0.010000	TBNB	SELL	PENDING	2025-11-07 20:19:55.264209	\N
+\.
+
+
+--
+-- Data for Name: users; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY public.users (id, address, name, phone, city, selected_agent_id, verified, verified_at, created_at, updated_at, location_id, selected_agent_ids) FROM stdin;
+11	0xf919f62c49796f3dd1fbc9aeef9001483c53bc0d	Hh	6999999999	\N	\N	t	2025-10-23 11:19:09.835633	2025-10-23 11:15:43.881466	2025-11-05 20:16:40.562853	5	{14,13}
+8	0x583c8c7b321f80e966e072e57e1bb5cc2698d685	dev	9898341345	\N	\N	t	2025-10-12 14:12:03.897406	2025-10-12 14:11:44.141535	2025-11-02 14:08:08.823783	5	{14}
+14	0xadmin00000000000000000000000000000000000	Admin Support	\N	\N	\N	t	\N	2025-11-02 10:36:27.710489	2025-11-02 10:36:27.710489	\N	\N
+13	0x249394a922d8d41a75660d4087f0e4dd6674849f	Heming	9726846660	\N	\N	t	2025-10-23 12:21:42.265854	2025-10-23 11:20:27.497489	2025-11-02 11:22:32.515407	5	{14,13}
+3	0xe046a7922d49f4d1b2b6d7db631dfdfd5876ae19	Heming Patel	09726846660	\N	\N	t	2025-11-07 20:15:22.97692	2025-10-10 17:09:11.360961	2025-11-09 13:44:08.676656	5	{13,14}
+9	0xd1c9d52f075aed0f4cf21418e5af0eebb3368297	prabhudev	9898341345	\N	\N	t	2025-11-07 20:15:00.117115	2025-10-22 11:03:12.559406	2025-11-09 13:50:49.179891	5	{14,13}
+2	0x1dbcbb2774307e3535da493f34039cfa7dbfd8f9	prabh	9898341345	\N	\N	t	2025-10-10 17:20:57.119023	2025-10-10 17:08:48.710002	2025-11-05 16:39:53.800205	5	{14}
+\.
+
+
+--
+-- Name: admin_notifications_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('public.admin_notifications_id_seq', 15, true);
+
+
+--
+-- Name: admin_users_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('public.admin_users_id_seq', 1, true);
+
+
+--
+-- Name: ads_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('public.ads_id_seq', 12, true);
+
+
+--
+-- Name: agents_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('public.agents_id_seq', 25, true);
+
+
+--
+-- Name: app_settings_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('public.app_settings_id_seq', 5, true);
+
+
+--
+-- Name: appeals_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('public.appeals_id_seq', 10, true);
+
+
+--
+-- Name: audit_logs_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('public.audit_logs_id_seq', 673, true);
+
+
+--
+-- Name: calls_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('public.calls_id_seq', 147, true);
+
+
+--
+-- Name: dispute_timeline_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('public.dispute_timeline_id_seq', 51, true);
+
+
+--
+-- Name: disputes_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('public.disputes_id_seq', 11, true);
+
+
+--
+-- Name: locations_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('public.locations_id_seq', 10, true);
+
+
+--
+-- Name: orders_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('public.orders_id_seq', 55, true);
+
+
+--
+-- Name: otp_logs_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('public.otp_logs_id_seq', 1, true);
+
+
+--
+-- Name: payment_confirmations_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('public.payment_confirmations_id_seq', 18, true);
+
+
+--
+-- Name: reviews_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('public.reviews_id_seq', 18, true);
+
+
+--
+-- Name: support_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('public.support_id_seq', 4, true);
+
+
+--
+-- Name: transactions_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('public.transactions_id_seq', 23, true);
+
+
+--
+-- Name: users_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('public.users_id_seq', 15, true);
+
+
+--
+-- Name: admin_notifications admin_notifications_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.admin_notifications
+    ADD CONSTRAINT admin_notifications_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: admin_users admin_users_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.admin_users
+    ADD CONSTRAINT admin_users_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: admin_users admin_users_username_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.admin_users
+    ADD CONSTRAINT admin_users_username_key UNIQUE (username);
+
+
+--
+-- Name: ads ads_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ads
+    ADD CONSTRAINT ads_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: agents agents_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.agents
+    ADD CONSTRAINT agents_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: app_settings app_settings_key_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.app_settings
+    ADD CONSTRAINT app_settings_key_key UNIQUE (key);
+
+
+--
+-- Name: app_settings app_settings_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.app_settings
+    ADD CONSTRAINT app_settings_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: appeals appeals_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.appeals
+    ADD CONSTRAINT appeals_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: audit_logs audit_logs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.audit_logs
+    ADD CONSTRAINT audit_logs_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: calls calls_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.calls
+    ADD CONSTRAINT calls_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: dispute_timeline dispute_timeline_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.dispute_timeline
+    ADD CONSTRAINT dispute_timeline_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: disputes disputes_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.disputes
+    ADD CONSTRAINT disputes_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: locations locations_name_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.locations
+    ADD CONSTRAINT locations_name_key UNIQUE (name);
+
+
+--
+-- Name: locations locations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.locations
+    ADD CONSTRAINT locations_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: orders orders_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.orders
+    ADD CONSTRAINT orders_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: otp_logs otp_logs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.otp_logs
+    ADD CONSTRAINT otp_logs_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: payment_confirmations payment_confirmations_order_id_unique; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.payment_confirmations
+    ADD CONSTRAINT payment_confirmations_order_id_unique UNIQUE (order_id);
+
+
+--
+-- Name: payment_confirmations payment_confirmations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.payment_confirmations
+    ADD CONSTRAINT payment_confirmations_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: reviews reviews_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.reviews
+    ADD CONSTRAINT reviews_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: support support_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.support
+    ADD CONSTRAINT support_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: transactions transactions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.transactions
+    ADD CONSTRAINT transactions_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: transactions transactions_transaction_number_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.transactions
+    ADD CONSTRAINT transactions_transaction_number_key UNIQUE (transaction_number);
+
+
+--
+-- Name: users users_address_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.users
+    ADD CONSTRAINT users_address_key UNIQUE (address);
+
+
+--
+-- Name: users users_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.users
+    ADD CONSTRAINT users_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: idx_admin_notifications_dispute_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_admin_notifications_dispute_id ON public.admin_notifications USING btree (dispute_id);
+
+
+--
+-- Name: idx_admin_notifications_status; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_admin_notifications_status ON public.admin_notifications USING btree (status);
+
+
+--
+-- Name: idx_ads_active; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_ads_active ON public.ads USING btree (active);
+
+
+--
+-- Name: idx_ads_active_city; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_ads_active_city ON public.ads USING btree (active, city);
+
+
+--
+-- Name: idx_ads_city; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_ads_city ON public.ads USING btree (city);
+
+
+--
+-- Name: idx_ads_location; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_ads_location ON public.ads USING btree (location_id);
+
+
+--
+-- Name: idx_ads_owner; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_ads_owner ON public.ads USING btree (owner_address);
+
+
+--
+-- Name: idx_ads_owner_agent; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_ads_owner_agent ON public.ads USING btree (owner_selected_agent_id);
+
+
+--
+-- Name: idx_ads_token; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_ads_token ON public.ads USING btree (token);
+
+
+--
+-- Name: idx_ads_type; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_ads_type ON public.ads USING btree (type);
+
+
+--
+-- Name: idx_agents_city; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_agents_city ON public.agents USING btree (city);
+
+
+--
+-- Name: idx_agents_location; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_agents_location ON public.agents USING btree (location_id);
+
+
+--
+-- Name: idx_agents_verified; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_agents_verified ON public.agents USING btree (verified);
+
+
+--
+-- Name: idx_appeals_appellant; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_appeals_appellant ON public.appeals USING btree (appellant_address);
+
+
+--
+-- Name: idx_appeals_dispute_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_appeals_dispute_id ON public.appeals USING btree (dispute_id);
+
+
+--
+-- Name: idx_appeals_order_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_appeals_order_id ON public.appeals USING btree (order_id);
+
+
+--
+-- Name: idx_audit_action; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_audit_action ON public.audit_logs USING btree (action);
+
+
+--
+-- Name: idx_audit_created; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_audit_created ON public.audit_logs USING btree (created_at);
+
+
+--
+-- Name: idx_audit_details; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_audit_details ON public.audit_logs USING gin (details);
+
+
+--
+-- Name: idx_audit_logs_user; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_audit_logs_user ON public.audit_logs USING btree (user_address);
+
+
+--
+-- Name: idx_audit_user; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_audit_user ON public.audit_logs USING btree (user_address);
+
+
+--
+-- Name: idx_calls_caller; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_calls_caller ON public.calls USING btree (caller_address);
+
+
+--
+-- Name: idx_calls_participants; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_calls_participants ON public.calls USING btree (caller_address, receiver_address);
+
+
+--
+-- Name: idx_dispute_timeline_dispute_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_dispute_timeline_dispute_id ON public.dispute_timeline USING btree (dispute_id);
+
+
+--
+-- Name: idx_dispute_timeline_order_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_dispute_timeline_order_id ON public.dispute_timeline USING btree (order_id);
+
+
+--
+-- Name: idx_disputes_order_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_disputes_order_id ON public.disputes USING btree (order_id);
+
+
+--
+-- Name: idx_disputes_status; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_disputes_status ON public.disputes USING btree (status);
+
+
+--
+-- Name: idx_orders_ad; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_orders_ad ON public.orders USING btree (ad_id);
+
+
+--
+-- Name: idx_orders_blockchain_trade_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_orders_blockchain_trade_id ON public.orders USING btree (blockchain_trade_id);
+
+
+--
+-- Name: idx_orders_buyer; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_orders_buyer ON public.orders USING btree (buyer_address);
+
+
+--
+-- Name: idx_orders_created_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_orders_created_at ON public.orders USING btree (created_at);
+
+
+--
+-- Name: idx_orders_seller; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_orders_seller ON public.orders USING btree (seller_address);
+
+
+--
+-- Name: idx_orders_start_time; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_orders_start_time ON public.orders USING btree (start_time);
+
+
+--
+-- Name: idx_orders_state; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_orders_state ON public.orders USING btree (state);
+
+
+--
+-- Name: idx_otp_expires; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_otp_expires ON public.otp_logs USING btree (expires_at);
+
+
+--
+-- Name: idx_otp_logs_order; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_otp_logs_order ON public.otp_logs USING btree (order_id);
+
+
+--
+-- Name: idx_otp_user; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_otp_user ON public.otp_logs USING btree (user_address);
+
+
+--
+-- Name: idx_payment_confirmations_order_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_payment_confirmations_order_id ON public.payment_confirmations USING btree (order_id);
+
+
+--
+-- Name: idx_reviews_approved; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_reviews_approved ON public.reviews USING btree (is_approved);
+
+
+--
+-- Name: idx_reviews_created_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_reviews_created_at ON public.reviews USING btree (created_at);
+
+
+--
+-- Name: idx_reviews_order; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_reviews_order ON public.reviews USING btree (order_id);
+
+
+--
+-- Name: idx_reviews_order_id_null; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_reviews_order_id_null ON public.reviews USING btree (order_id) WHERE (order_id IS NULL);
+
+
+--
+-- Name: idx_reviews_rating; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_reviews_rating ON public.reviews USING btree (rating);
+
+
+--
+-- Name: idx_reviews_reviewee; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_reviews_reviewee ON public.reviews USING btree (reviewee_address);
+
+
+--
+-- Name: idx_reviews_reviewer; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_reviews_reviewer ON public.reviews USING btree (reviewer_address);
+
+
+--
+-- Name: idx_reviews_visible; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_reviews_visible ON public.reviews USING btree (is_visible);
+
+
+--
+-- Name: idx_support_active; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_support_active ON public.support USING btree (active, priority);
+
+
+--
+-- Name: idx_transactions_buyer; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_transactions_buyer ON public.transactions USING btree (buyer_address);
+
+
+--
+-- Name: idx_transactions_number; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_transactions_number ON public.transactions USING btree (transaction_number);
+
+
+--
+-- Name: idx_transactions_order; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_transactions_order ON public.transactions USING btree (order_id);
+
+
+--
+-- Name: idx_transactions_seller; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_transactions_seller ON public.transactions USING btree (seller_address);
+
+
+--
+-- Name: idx_tx_order; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_tx_order ON public.transactions USING btree (order_id);
+
+
+--
+-- Name: idx_users_address; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_users_address ON public.users USING btree (address);
+
+
+--
+-- Name: idx_users_location; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_users_location ON public.users USING btree (location_id);
+
+
+--
+-- Name: idx_users_verified; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_users_verified ON public.users USING btree (verified);
+
+
+--
+-- Name: app_settings update_app_settings_updated_at; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER update_app_settings_updated_at BEFORE UPDATE ON public.app_settings FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+
+
+--
+-- Name: support update_support_updated_at; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER update_support_updated_at BEFORE UPDATE ON public.support FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+
+
+--
+-- Name: users update_users_updated_at; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON public.users FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+
+
+--
+-- Name: admin_notifications admin_notifications_dispute_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.admin_notifications
+    ADD CONSTRAINT admin_notifications_dispute_id_fkey FOREIGN KEY (dispute_id) REFERENCES public.disputes(id) ON DELETE CASCADE;
+
+
+--
+-- Name: admin_notifications admin_notifications_order_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.admin_notifications
+    ADD CONSTRAINT admin_notifications_order_id_fkey FOREIGN KEY (order_id) REFERENCES public.orders(id) ON DELETE CASCADE;
+
+
+--
+-- Name: ads ads_location_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ads
+    ADD CONSTRAINT ads_location_id_fkey FOREIGN KEY (location_id) REFERENCES public.locations(id);
+
+
+--
+-- Name: ads ads_owner_address_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ads
+    ADD CONSTRAINT ads_owner_address_fkey FOREIGN KEY (owner_address) REFERENCES public.users(address);
+
+
+--
+-- Name: ads ads_owner_selected_agent_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ads
+    ADD CONSTRAINT ads_owner_selected_agent_id_fkey FOREIGN KEY (owner_selected_agent_id) REFERENCES public.agents(id);
+
+
+--
+-- Name: agents agents_location_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.agents
+    ADD CONSTRAINT agents_location_id_fkey FOREIGN KEY (location_id) REFERENCES public.locations(id);
+
+
+--
+-- Name: appeals appeals_dispute_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.appeals
+    ADD CONSTRAINT appeals_dispute_id_fkey FOREIGN KEY (dispute_id) REFERENCES public.disputes(id) ON DELETE CASCADE;
+
+
+--
+-- Name: appeals appeals_order_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.appeals
+    ADD CONSTRAINT appeals_order_id_fkey FOREIGN KEY (order_id) REFERENCES public.orders(id) ON DELETE CASCADE;
+
+
+--
+-- Name: calls calls_caller_address_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.calls
+    ADD CONSTRAINT calls_caller_address_fkey FOREIGN KEY (caller_address) REFERENCES public.users(address);
+
+
+--
+-- Name: calls calls_receiver_address_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.calls
+    ADD CONSTRAINT calls_receiver_address_fkey FOREIGN KEY (receiver_address) REFERENCES public.users(address);
+
+
+--
+-- Name: dispute_timeline dispute_timeline_dispute_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.dispute_timeline
+    ADD CONSTRAINT dispute_timeline_dispute_id_fkey FOREIGN KEY (dispute_id) REFERENCES public.disputes(id) ON DELETE CASCADE;
+
+
+--
+-- Name: dispute_timeline dispute_timeline_order_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.dispute_timeline
+    ADD CONSTRAINT dispute_timeline_order_id_fkey FOREIGN KEY (order_id) REFERENCES public.orders(id) ON DELETE CASCADE;
+
+
+--
+-- Name: disputes disputes_order_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.disputes
+    ADD CONSTRAINT disputes_order_id_fkey FOREIGN KEY (order_id) REFERENCES public.orders(id) ON DELETE CASCADE;
+
+
+--
+-- Name: ads fk_ads_location; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ads
+    ADD CONSTRAINT fk_ads_location FOREIGN KEY (location_id) REFERENCES public.locations(id);
+
+
+--
+-- Name: agents fk_agents_location; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.agents
+    ADD CONSTRAINT fk_agents_location FOREIGN KEY (location_id) REFERENCES public.locations(id);
+
+
+--
+-- Name: orders fk_orders_ad; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.orders
+    ADD CONSTRAINT fk_orders_ad FOREIGN KEY (ad_id) REFERENCES public.ads(id);
+
+
+--
+-- Name: orders fk_orders_buyer; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.orders
+    ADD CONSTRAINT fk_orders_buyer FOREIGN KEY (buyer_address) REFERENCES public.users(address);
+
+
+--
+-- Name: orders fk_orders_seller; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.orders
+    ADD CONSTRAINT fk_orders_seller FOREIGN KEY (seller_address) REFERENCES public.users(address);
+
+
+--
+-- Name: otp_logs fk_otp_logs_order; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.otp_logs
+    ADD CONSTRAINT fk_otp_logs_order FOREIGN KEY (order_id) REFERENCES public.orders(id);
+
+
+--
+-- Name: payment_confirmations fk_payment_confirmations_order; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.payment_confirmations
+    ADD CONSTRAINT fk_payment_confirmations_order FOREIGN KEY (order_id) REFERENCES public.orders(id);
+
+
+--
+-- Name: reviews fk_reviews_approved_by; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.reviews
+    ADD CONSTRAINT fk_reviews_approved_by FOREIGN KEY (approved_by) REFERENCES public.admin_users(id);
+
+
+--
+-- Name: reviews fk_reviews_order; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.reviews
+    ADD CONSTRAINT fk_reviews_order FOREIGN KEY (order_id) REFERENCES public.orders(id) ON DELETE CASCADE;
+
+
+--
+-- Name: reviews fk_reviews_reviewee; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.reviews
+    ADD CONSTRAINT fk_reviews_reviewee FOREIGN KEY (reviewee_address) REFERENCES public.users(address);
+
+
+--
+-- Name: reviews fk_reviews_reviewer; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.reviews
+    ADD CONSTRAINT fk_reviews_reviewer FOREIGN KEY (reviewer_address) REFERENCES public.users(address);
+
+
+--
+-- Name: transactions fk_transactions_buyer; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.transactions
+    ADD CONSTRAINT fk_transactions_buyer FOREIGN KEY (buyer_address) REFERENCES public.users(address);
+
+
+--
+-- Name: transactions fk_transactions_order; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.transactions
+    ADD CONSTRAINT fk_transactions_order FOREIGN KEY (order_id) REFERENCES public.orders(id);
+
+
+--
+-- Name: transactions fk_transactions_seller; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.transactions
+    ADD CONSTRAINT fk_transactions_seller FOREIGN KEY (seller_address) REFERENCES public.users(address);
+
+
+--
+-- Name: users fk_users_location; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.users
+    ADD CONSTRAINT fk_users_location FOREIGN KEY (location_id) REFERENCES public.locations(id);
+
+
+--
+-- Name: orders orders_ad_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.orders
+    ADD CONSTRAINT orders_ad_id_fkey FOREIGN KEY (ad_id) REFERENCES public.ads(id);
+
+
+--
+-- Name: orders orders_buyer_address_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.orders
+    ADD CONSTRAINT orders_buyer_address_fkey FOREIGN KEY (buyer_address) REFERENCES public.users(address);
+
+
+--
+-- Name: orders orders_dispute_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.orders
+    ADD CONSTRAINT orders_dispute_id_fkey FOREIGN KEY (dispute_id) REFERENCES public.disputes(id);
+
+
+--
+-- Name: orders orders_payment_confirmation_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.orders
+    ADD CONSTRAINT orders_payment_confirmation_id_fkey FOREIGN KEY (payment_confirmation_id) REFERENCES public.payment_confirmations(id);
+
+
+--
+-- Name: orders orders_seller_address_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.orders
+    ADD CONSTRAINT orders_seller_address_fkey FOREIGN KEY (seller_address) REFERENCES public.users(address);
+
+
+--
+-- Name: otp_logs otp_logs_order_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.otp_logs
+    ADD CONSTRAINT otp_logs_order_id_fkey FOREIGN KEY (order_id) REFERENCES public.orders(id);
+
+
+--
+-- Name: payment_confirmations payment_confirmations_order_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.payment_confirmations
+    ADD CONSTRAINT payment_confirmations_order_id_fkey FOREIGN KEY (order_id) REFERENCES public.orders(id) ON DELETE CASCADE;
+
+
+--
+-- Name: reviews reviews_approved_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.reviews
+    ADD CONSTRAINT reviews_approved_by_fkey FOREIGN KEY (approved_by) REFERENCES public.admin_users(id);
+
+
+--
+-- Name: reviews reviews_order_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.reviews
+    ADD CONSTRAINT reviews_order_id_fkey FOREIGN KEY (order_id) REFERENCES public.orders(id) ON DELETE CASCADE;
+
+
+--
+-- Name: reviews reviews_reviewee_address_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.reviews
+    ADD CONSTRAINT reviews_reviewee_address_fkey FOREIGN KEY (reviewee_address) REFERENCES public.users(address);
+
+
+--
+-- Name: reviews reviews_reviewer_address_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.reviews
+    ADD CONSTRAINT reviews_reviewer_address_fkey FOREIGN KEY (reviewer_address) REFERENCES public.users(address);
+
+
+--
+-- Name: transactions transactions_buyer_address_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.transactions
+    ADD CONSTRAINT transactions_buyer_address_fkey FOREIGN KEY (buyer_address) REFERENCES public.users(address);
+
+
+--
+-- Name: transactions transactions_order_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.transactions
+    ADD CONSTRAINT transactions_order_id_fkey FOREIGN KEY (order_id) REFERENCES public.orders(id);
+
+
+--
+-- Name: transactions transactions_seller_address_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.transactions
+    ADD CONSTRAINT transactions_seller_address_fkey FOREIGN KEY (seller_address) REFERENCES public.users(address);
+
+
+--
+-- Name: users users_location_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.users
+    ADD CONSTRAINT users_location_id_fkey FOREIGN KEY (location_id) REFERENCES public.locations(id);
+
+
+--
+-- PostgreSQL database dump complete
+--
+
+\unrestrict jhylJu3eA56aiKSvc5heCTXP6MSIcjbgfmR1Kglgw5p1J20VfivK4WUtS1RMc0O
+

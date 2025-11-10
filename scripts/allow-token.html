@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Allow Token - ZoTrust Escrow</title>
+  <script src="https://cdn.jsdelivr.net/npm/ethers@6.7.0/dist/ethers.umd.min.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 800px;
+      margin: 50px auto;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    .container {
+      background: white;
+      padding: 30px;
+      border-radius: 10px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    h1 {
+      color: #333;
+      border-bottom: 3px solid #4CAF50;
+      padding-bottom: 10px;
+    }
+    .section {
+      margin: 20px 0;
+      padding: 15px;
+      background: #f9f9f9;
+      border-left: 4px solid #4CAF50;
+    }
+    button {
+      background: #4CAF50;
+      color: white;
+      padding: 12px 24px;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 16px;
+      margin: 5px;
+    }
+    button:hover {
+      background: #45a049;
+    }
+    button:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+    }
+    .warning {
+      background: #fff3cd;
+      border-left-color: #ffc107;
+      color: #856404;
+    }
+    .success {
+      background: #d4edda;
+      border-left-color: #28a745;
+      color: #155724;
+    }
+    .error {
+      background: #f8d7da;
+      border-left-color: #dc3545;
+      color: #721c24;
+    }
+    input {
+      padding: 10px;
+      width: 100%;
+      margin: 5px 0;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-family: monospace;
+    }
+    .log {
+      background: #1e1e1e;
+      color: #0f0;
+      padding: 15px;
+      border-radius: 5px;
+      font-family: monospace;
+      font-size: 12px;
+      max-height: 400px;
+      overflow-y: auto;
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🔐 Allow Token - ZoTrust Escrow</h1>
+    
+    <div class="section warning">
+      <h3>⚠️ Admin Only</h3>
+      <p>This operation requires contract admin privileges.</p>
+      <p>Make sure you're connected with the admin wallet.</p>
+    </div>
+
+    <div class="section">
+      <h3>Contract Details</h3>
+      <p><strong>Escrow Contract:</strong> <code>0x878A2a0d3452533F7a2cB0E3053258AB66C03d0F</code></p>
+      <p><strong>Network:</strong> BSC Testnet (Chain ID: 97)</p>
+    </div>
+
+    <div class="section">
+      <h3>Quick Actions</h3>
+      <button onclick="connectWallet()">Connect Wallet</button>
+      <button onclick="checkAdmin()">Check Admin Status</button>
+      <button onclick="allowTBNB()">✅ Allow TBNB</button>
+      <button onclick="allowUSDT()">✅ Allow USDT</button>
+      <button onclick="allowUSDC()">✅ Allow USDC</button>
+    </div>
+
+    <div class="section">
+      <h3>Custom Token</h3>
+      <label>Token Address:</label>
+      <input type="text" id="customToken" placeholder="0x...">
+      <button onclick="allowCustomToken()">Allow Custom Token</button>
+      <button onclick="checkTokenStatus()">Check Status</button>
+    </div>
+
+    <div class="section">
+      <h3>Status</h3>
+      <p id="status">Not connected</p>
+    </div>
+
+    <div class="log" id="log"></div>
+  </div>
+
+  <script>
+    const CONTRACT_ADDRESS = '0x878A2a0d3452533F7a2cB0E3053258AB66C03d0F';
+    
+    const CONTRACT_ABI = [
+      "function admin() public view returns (address)",
+      "function setAllowedToken(address _token, bool _allowed) public",
+      "function allowedTokens(address _token) public view returns (bool)"
+    ];
+
+    const TOKENS = {
+      'TBNB': '0xae13d989daC2f0dEbFf460aC112a837C89BAa7cd',
+      'USDT': '0x7ef95a0FEE0Dd31b22626fA2e10Ee6A223F8a684',
+      'USDC': '0x64544969ed7EBf5f083679233325356EbE738930'
+    };
+
+    let provider, signer, contract, account;
+
+    function log(message, type = 'info') {
+      const logDiv = document.getElementById('log');
+      const timestamp = new Date().toLocaleTimeString();
+      let prefix = '📝';
+      if (type === 'success') prefix = '✅';
+      if (type === 'error') prefix = '❌';
+      if (type === 'warning') prefix = '⚠️';
+      
+      logDiv.innerHTML += `[${timestamp}] ${prefix} ${message}\n`;
+      logDiv.scrollTop = logDiv.scrollHeight;
+    }
+
+    function setStatus(message, type = 'info') {
+      const statusDiv = document.getElementById('status');
+      statusDiv.textContent = message;
+      statusDiv.className = 'section ' + type;
+    }
+
+    async function connectWallet() {
+      try {
+        if (!window.ethereum) {
+          log('MetaMask not found!', 'error');
+          setStatus('Please install MetaMask', 'error');
+          return;
+        }
+
+        log('Connecting to MetaMask...');
+        const accounts = await ethereum.request({ method: 'eth_requestAccounts' });
+        account = accounts[0];
+        
+        // Check network
+        const chainId = await ethereum.request({ method: 'eth_chainId' });
+        if (chainId !== '0x61') {
+          log('Wrong network! Please switch to BSC Testnet', 'warning');
+          setStatus('Please switch to BSC Testnet (Chain ID: 97)', 'warning');
+          
+          try {
+            await ethereum.request({
+              method: 'wallet_switchEthereumChain',
+              params: [{ chainId: '0x61' }],
+            });
+          } catch (switchError) {
+            log('Failed to switch network', 'error');
+          }
+          return;
+        }
+
+        provider = new ethers.BrowserProvider(window.ethereum);
+        signer = await provider.getSigner();
+        contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
+
+        log(`Connected: ${account}`, 'success');
+        setStatus(`Connected: ${account.substring(0, 10)}...`, 'success');
+
+      } catch (error) {
+        log(`Connection error: ${error.message}`, 'error');
+        setStatus('Connection failed', 'error');
+      }
+    }
+
+    async function checkAdmin() {
+      try {
+        if (!contract) {
+          log('Please connect wallet first', 'warning');
+          return;
+        }
+
+        log('Checking admin status...');
+        const adminAddress = await contract.admin();
+        const isAdmin = adminAddress.toLowerCase() === account.toLowerCase();
+
+        log(`Contract Admin: ${adminAddress}`);
+        log(`Your Address: ${account}`);
+        log(`Is Admin: ${isAdmin ? 'YES ✅' : 'NO ❌'}`, isAdmin ? 'success' : 'error');
+
+        if (isAdmin) {
+          setStatus('✅ You are the contract admin', 'success');
+        } else {
+          setStatus('❌ You are NOT the contract admin', 'error');
+        }
+
+      } catch (error) {
+        log(`Error: ${error.message}`, 'error');
+      }
+    }
+
+    async function allowToken(tokenAddress, tokenName) {
+      try {
+        if (!contract) {
+          log('Please connect wallet first', 'warning');
+          return;
+        }
+
+        log(`Allowing ${tokenName} (${tokenAddress})...`);
+        
+        const tx = await contract.setAllowedToken(tokenAddress, true);
+        log(`Transaction sent: ${tx.hash}`, 'success');
+        log('Waiting for confirmation...');
+
+        const receipt = await tx.wait();
+        log(`✅ ${tokenName} allowed! Block: ${receipt.blockNumber}`, 'success');
+        setStatus(`✅ ${tokenName} is now allowed`, 'success');
+
+      } catch (error) {
+        log(`Error: ${error.message}`, 'error');
+        setStatus(`Failed to allow ${tokenName}`, 'error');
+      }
+    }
+
+    async function allowTBNB() {
+      await allowToken(TOKENS.TBNB, 'TBNB');
+    }
+
+    async function allowUSDT() {
+      await allowToken(TOKENS.USDT, 'USDT');
+    }
+
+    async function allowUSDC() {
+      await allowToken(TOKENS.USDC, 'USDC');
+    }
+
+    async function allowCustomToken() {
+      const tokenAddress = document.getElementById('customToken').value;
+      if (!tokenAddress || !tokenAddress.startsWith('0x')) {
+        log('Invalid token address', 'error');
+        return;
+      }
+      await allowToken(tokenAddress, 'Custom Token');
+    }
+
+    async function checkTokenStatus() {
+      try {
+        const tokenAddress = document.getElementById('customToken').value;
+        if (!tokenAddress || !tokenAddress.startsWith('0x')) {
+          log('Invalid token address', 'error');
+          return;
+        }
+
+        if (!contract) {
+          log('Please connect wallet first', 'warning');
+          return;
+        }
+
+        log(`Checking status for: ${tokenAddress}...`);
+        const isAllowed = await contract.allowedTokens(tokenAddress);
+        
+        log(`Token ${tokenAddress}: ${isAllowed ? 'ALLOWED ✅' : 'NOT ALLOWED ❌'}`, 
+            isAllowed ? 'success' : 'error');
+
+      } catch (error) {
+        log(`Error: ${error.message}`, 'error');
+      }
+    }
+
+    // Auto-connect on load
+    window.addEventListener('load', () => {
+      if (typeof ethers === 'undefined') {
+        log('❌ Ethers.js failed to load. Please refresh the page.', 'error');
+        setStatus('Ethers.js loading error - Please refresh', 'error');
+      } else {
+        log(`✅ Ethers.js loaded (version ${ethers.version || 'unknown'})`, 'success');
+        log('Page loaded. Click "Connect Wallet" to start.');
+      }
+    });
+  </script>
+</body>
+</html>
+

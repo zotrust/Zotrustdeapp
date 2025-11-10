@@ -1,0 +1,39 @@
+# Database Configuration
+DB_HOST=localhost
+DB_PORT=5432
+DB_USER=postgres
+DB_PASSWORD=postgres
+DB_NAME=zotrust_p2p
+
+# JWT Secret (change this to a secure random string in production)
+JWT_SECRET=your_super_secret_jwt_key_change_this_in_production_12345
+
+# Server Configuration
+PORT=5000
+NODE_ENV=development
+
+# Blockchain Configuration (BSC Testnet)
+BSC_RPC_URL=https://data-seed-prebsc-1-s1.binance.org:8545/
+
+# IMPORTANT: Replace these with your actual values
+# ⚠️  CONTRACT_ADDRESS - Your deployed smart contract address on BSC Testnet
+CONTRACT_ADDRESS=0x0000000000000000000000000000000000000000
+
+# ⚠️  RELAYER_PRIVATE_KEY - Private key of the wallet that will send transactions
+# This wallet needs to have testnet BNB for gas fees
+# NEVER share this key or commit it to git!
+RELAYER_PRIVATE_KEY=0x0000000000000000000000000000000000000000000000000000000000000000
+
+# Redis Configuration (optional)
+REDIS_HOST=localhost
+REDIS_PORT=6379
+
+# OTP Configuration
+OTP_EXPIRY_MINUTES=60
+
+# Order Configuration
+ACCEPT_TIMEOUT_MINUTES=5
+LOCK_DURATION_HOURS=1
+
+# CORS Origins (comma-separated)
+CORS_ORIGINS=http://localhost:5173,http://192.168.0.246:5173,http://172.18.0.1:5173
