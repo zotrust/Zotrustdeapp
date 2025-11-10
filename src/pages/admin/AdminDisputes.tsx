@@ -13,7 +13,7 @@ import {
 import toast from 'react-hot-toast';
 import { useWalletStore } from '../../stores/walletStore';
 import { ethers } from 'ethers';
-import { ZOTRUST_CONTRACT_ABI, ZOTRUST_CONTRACT_ADDRESS, BSC_TESTNET_CHAIN_ID } from '../../config/contracts';
+import { ZOTRUST_CONTRACT_ABI, ZOTRUST_CONTRACT_ADDRESS, BSC_MAINNET_CHAIN_ID } from '../../config/contracts';
 
 interface Appeal {
   id: string;
@@ -264,7 +264,7 @@ const AdminDisputes: React.FC = () => {
       // Connect to contract
       const provider = new ethers.BrowserProvider(window.ethereum as any);
       const network = await provider.getNetwork();
-      if (Number(network.chainId) !== BSC_TESTNET_CHAIN_ID) {
+      if (Number(network.chainId) !== BSC_MAINNET_CHAIN_ID) {
         return; // Wrong network
       }
 
@@ -349,9 +349,9 @@ const AdminDisputes: React.FC = () => {
       setShowWalletModal(false);
       await connectTrustWallet();
 
-      // Ensure BSC Testnet
-      if (chainId !== BSC_TESTNET_CHAIN_ID) {
-        await switchToNetwork(BSC_TESTNET_CHAIN_ID);
+      // Ensure BSC Mainnet
+      if (chainId !== BSC_MAINNET_CHAIN_ID) {
+        await switchToNetwork(BSC_MAINNET_CHAIN_ID);
       }
 
       toast.success('Trust Wallet connected successfully!');
@@ -367,9 +367,9 @@ const AdminDisputes: React.FC = () => {
       setShowWalletModal(false);
       await connectMetaMask();
 
-      // Ensure BSC Testnet
-      if (chainId !== BSC_TESTNET_CHAIN_ID) {
-        await switchToNetwork(BSC_TESTNET_CHAIN_ID);
+      // Ensure BSC Mainnet
+      if (chainId !== BSC_MAINNET_CHAIN_ID) {
+        await switchToNetwork(BSC_MAINNET_CHAIN_ID);
       }
 
       toast.success('MetaMask connected successfully!');
@@ -403,14 +403,14 @@ const AdminDisputes: React.FC = () => {
         features: {
           analytics: false
         },
-        networks: [{ id: 97, name: 'BSC Testnet' }]
+        networks: [{ id: 56, name: 'BSC Mainnet' }]
       });
 
       await appKit.open();
 
       // After successful connect, ensure network
-      if (chainId !== BSC_TESTNET_CHAIN_ID) {
-        await switchToNetwork(BSC_TESTNET_CHAIN_ID);
+      if (chainId !== BSC_MAINNET_CHAIN_ID) {
+        await switchToNetwork(BSC_MAINNET_CHAIN_ID);
       }
 
       toast.success('Connected with Reown');
@@ -478,10 +478,10 @@ const handleResolveAppeal = async (appealId: string, releaseToBuyer: boolean, re
     }
 
     // 2) Ensure correct network
-    if (chainId !== BSC_TESTNET_CHAIN_ID) {
-      toast.loading('Switching to BSC Testnet...', { id: 'switch-network' });
-      await switchToNetwork(BSC_TESTNET_CHAIN_ID);
-      toast.success('Switched to BSC Testnet', { id: 'switch-network' });
+    if (chainId !== BSC_MAINNET_CHAIN_ID) {
+      toast.loading('Switching to BSC Mainnet...', { id: 'switch-network' });
+      await switchToNetwork(BSC_MAINNET_CHAIN_ID);
+      toast.success('Switched to BSC Mainnet', { id: 'switch-network' });
     }
 
     // 3) Get appeal and trade ID
@@ -522,15 +522,15 @@ const handleResolveAppeal = async (appealId: string, releaseToBuyer: boolean, re
 
     // Verify network
     const network = await provider.getNetwork();
-    if (Number(network.chainId) !== BSC_TESTNET_CHAIN_ID) {
-      throw new Error(`Wrong network! Expected BSC Testnet (97), got chain ${network.chainId}`);
+    if (Number(network.chainId) !== BSC_MAINNET_CHAIN_ID) {
+      throw new Error(`Wrong network! Expected BSC Mainnet (56), got chain ${network.chainId}`);
     }
 
     // Health check before proceeding
     toast.loading('Checking RPC connection health...', { id: 'resolve-chain' });
     const healthCheck = await checkRpcHealth(provider);
     if (!healthCheck.healthy) {
-      setRpcHelpMessage(`RPC health check failed: ${healthCheck.error}. Please switch to a reliable BSC Testnet RPC endpoint.`);
+      setRpcHelpMessage(`RPC health check failed: ${healthCheck.error}. Please switch to a reliable BSC Mainnet RPC endpoint.`);
       setShowRpcHelp(true);
       throw new Error(`RPC node is unhealthy: ${healthCheck.error}. Please switch RPC and retry.`);
     }
@@ -551,7 +551,7 @@ const handleResolveAppeal = async (appealId: string, releaseToBuyer: boolean, re
     } catch (adminError: any) {
       console.error('❌ Failed to fetch contract admin after retries:', adminError);
       if (isRpcIndexingError(adminError)) {
-        setRpcHelpMessage('RPC node cannot execute admin() call even after retries. The RPC endpoint may be overloaded, rate-limited, or missing state history. Please switch to a reliable BSC Testnet RPC endpoint.');
+        setRpcHelpMessage('RPC node cannot execute admin() call even after retries. The RPC endpoint may be overloaded, rate-limited, or missing state history. Please switch to a reliable BSC Mainnet RPC endpoint.');
         setShowRpcHelp(true);
         throw new Error('RPC node error: Cannot verify admin permissions after multiple attempts. Please switch RPC and retry.');
       }
@@ -574,7 +574,7 @@ const handleResolveAppeal = async (appealId: string, releaseToBuyer: boolean, re
       );
     } catch (error: any) {
       if (isRpcIndexingError(error)) {
-        setRpcHelpMessage('RPC node cannot fetch trade data. Please switch to a reliable BSC Testnet RPC endpoint.');
+        setRpcHelpMessage('RPC node cannot fetch trade data. Please switch to a reliable BSC Mainnet RPC endpoint.');
         setShowRpcHelp(true);
         throw new Error('RPC node error: Cannot fetch trade status. Please switch RPC and retry.');
       }
@@ -757,7 +757,7 @@ const handleResolveAppeal = async (appealId: string, releaseToBuyer: boolean, re
       } catch (error: any) {
         console.error('Error opening appeal window:', error);
         if (isRpcIndexingError(error)) {
-          setRpcHelpMessage('RPC node error while opening appeal window. Please switch to a reliable BSC Testnet RPC endpoint.');
+          setRpcHelpMessage('RPC node error while opening appeal window. Please switch to a reliable BSC Mainnet RPC endpoint.');
           setShowRpcHelp(true);
         }
         // Might already be open, continue
@@ -888,7 +888,7 @@ const handleResolveAppeal = async (appealId: string, releaseToBuyer: boolean, re
       } catch (appealError: any) {
         console.error('❌ Failed to file admin appeal:', appealError);
         if (isRpcIndexingError(appealError)) {
-          setRpcHelpMessage('RPC node error while filing appeal. Please switch to a reliable BSC Testnet RPC endpoint.');
+          setRpcHelpMessage('RPC node error while filing appeal. Please switch to a reliable BSC Mainnet RPC endpoint.');
           setShowRpcHelp(true);
         }
         throw new Error(`Failed to file admin appeal: ${appealError.message || appealError.reason || 'Unknown error'}`);
@@ -938,7 +938,7 @@ const handleResolveAppeal = async (appealId: string, releaseToBuyer: boolean, re
         // Show RPC help but don't block the transaction
         setRpcHelpMessage(
           'RPC node cannot estimate gas, but transaction will proceed with a safe default gas limit. ' +
-          'For better reliability, consider switching to a more reliable BSC Testnet RPC endpoint.'
+          'For better reliability, consider switching to a more reliable BSC Mainnet RPC endpoint.'
         );
         setShowRpcHelp(true);
       } else {
@@ -1085,12 +1085,12 @@ const markAppealResolvedDB = async (appealId: string, resolution: string, reason
               <div className="flex items-center space-x-2 text-white">
                 <CheckCircle size={16} className="text-green-400" />
                 <span className="text-sm font-mono">{address?.slice(0, 6)}...{address?.slice(-4)}</span>
-                {chainId !== BSC_TESTNET_CHAIN_ID && (
+                {chainId !== BSC_MAINNET_CHAIN_ID && (
                   <button
-                    onClick={() => switchToNetwork(BSC_TESTNET_CHAIN_ID)}
+                    onClick={() => switchToNetwork(BSC_MAINNET_CHAIN_ID)}
                     className="text-xs bg-yellow-600 hover:bg-yellow-700 px-2 py-1 rounded"
                   >
-                    Switch to BSC Testnet
+                    Switch to BSC Mainnet
                   </button>
                 )}
               </div>
@@ -1691,15 +1691,15 @@ const markAppealResolvedDB = async (appealId: string, resolution: string, reason
               )}
 
               <p className="text-gray-300 text-sm mb-3">
-                <strong className="text-white">Recommended BSC Testnet RPC endpoints</strong> (try in this order):
+                <strong className="text-white">Recommended BSC Mainnet RPC endpoints</strong> (try in this order):
               </p>
               <div className="space-y-2 mb-4">
                 {[
-                  { url: 'https://bsc-testnet.publicnode.com', label: 'PublicNode (Recommended)' },
-                  { url: 'https://data-seed-prebsc-1-s1.bnbchain.org:8545/', label: 'Binance Official #1' },
-                  { url: 'https://data-seed-prebsc-2-s1.bnbchain.org:8545/', label: 'Binance Official #2' },
-                  { url: 'https://bsc-testnet-rpc.publicnode.com', label: 'PublicNode Alt' },
-                  { url: 'https://endpoints.omniatech.io/v1/bsc/testnet/public', label: 'Omniatech' }
+                  { url: 'https://bsc-dataseed.binance.org/', label: 'Binance Official #1' },
+                  { url: 'https://bsc-dataseed1.defibit.io/', label: 'DeFiBit #1' },
+                  { url: 'https://bsc-dataseed1.nodereal.io', label: 'NodeReal #1' },
+                  { url: 'https://bsc.publicnode.com', label: 'PublicNode' },
+                  { url: 'https://bsc-mainnet-rpc.publicnode.com', label: 'PublicNode Alt' }
                 ].map(({ url, label }) => (
                   <div key={url} className="bg-white/5 rounded p-3 border border-white/10">
                     <div className="flex items-center justify-between mb-2">
@@ -1740,7 +1740,7 @@ const markAppealResolvedDB = async (appealId: string, resolution: string, reason
               <div className="mt-4">
                 <p className="text-white font-semibold mb-2">How to change RPC in MetaMask:</p>
                 <ol className="list-decimal list-inside text-sm text-gray-300 space-y-1">
-                  <li>Open MetaMask ➜ Settings ➜ Networks ➜ BSC Testnet.</li>
+                  <li>Open MetaMask ➜ Settings ➜ Networks ➜ BSC Mainnet.</li>
                   <li>Change RPC URL to one of the above and Save.</li>
                   <li>Reconnect wallet and retry the action.</li>
                 </ol>
@@ -1750,7 +1750,7 @@ const markAppealResolvedDB = async (appealId: string, resolution: string, reason
                 <p className="text-white font-semibold mb-2">How to change RPC in Trust Wallet:</p>
                 <ol className="list-decimal list-inside text-sm text-gray-300 space-y-1">
                   <li>Open DApp Browser ➜ Network selector.</li>
-                  <li>Edit or add BSC Testnet with the new RPC URL.</li>
+                  <li>Edit or add BSC Mainnet with the new RPC URL.</li>
                   <li>Reload page and reconnect wallet.</li>
                 </ol>
               </div>

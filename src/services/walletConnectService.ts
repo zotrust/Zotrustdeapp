@@ -1,7 +1,7 @@
 // WalletConnect Service for Trust Wallet and other mobile wallets
 import { createAppKit } from '@reown/appkit';
 import { EthersAdapter } from '@reown/appkit-adapter-ethers';
-import { bsc, bscTestnet } from '@reown/appkit/networks';
+import { bsc } from '@reown/appkit/networks';
 import { ethers } from 'ethers';
 
 export interface WalletConnectConfig {
@@ -44,25 +44,11 @@ export class WalletConnectService {
       // Create ethers adapter
       const ethersAdapter = new EthersAdapter();
 
-      // Create the modal - only BSC networks with BSC Testnet as default
+      // Create the modal - BSC Mainnet only
       this.appKit = createAppKit({
         adapters: [ethersAdapter],
         projectId,
-        networks: [
-          {
-            ...bscTestnet,
-            rpcUrls: {
-              default: {
-                http: [
-                  'https://data-seed-prebsc-1-s1.binance.org:8545',
-                  'https://data-seed-prebsc-2-s1.binance.org:8545',
-                  'https://data-seed-prebsc-1-s2.binance.org:8545'
-                ]
-              }
-            }
-          },
-          bsc
-        ], // BSC Testnet first (default) with correct RPC URLs
+        networks: [bsc], // BSC Mainnet only
         metadata: {
           name: 'Zotrust P2P Trading',
           description: 'Decentralized P2P Trading Platform with Voice Calls on BSC',
@@ -87,14 +73,14 @@ export class WalletConnectService {
           if (provider) {
             this.provider = new ethers.BrowserProvider(provider);
             
-            // Ensure we're on BSC Testnet
+            // Ensure we're on BSC Mainnet
             const currentChainId = this.appKit.getChainId();
-            if (currentChainId !== 97) {
-              console.log('🔄 WalletConnect: Switching to BSC Testnet...');
+            if (currentChainId !== 56) {
+              console.log('🔄 WalletConnect: Switching to BSC Mainnet...');
               try {
-                await this.appKit.switchNetwork({ chainId: 97 });
+                await this.appKit.switchNetwork({ chainId: 56 });
               } catch (error) {
-                console.warn('Failed to auto-switch to BSC Testnet:', error);
+                console.warn('Failed to auto-switch to BSC Mainnet:', error);
               }
             }
             
@@ -136,7 +122,7 @@ export class WalletConnectService {
       // Check if already connected
       const account = this.appKit.getAccount();
       if (account && account.isConnected && account.address) {
-        const chainId = this.appKit.getChainId() || 56; // Default to BSC mainnet
+        const chainId = this.appKit.getChainId() || 56; // Default to BSC Mainnet
         return {
           address: account.address,
           chainId: chainId
@@ -159,7 +145,7 @@ export class WalletConnectService {
             if (newAccount && newAccount.isConnected && newAccount.address) {
               isResolved = true;
               
-              const chainId = this.appKit.getChainId() || 56; // Default to BSC mainnet
+              const chainId = this.appKit.getChainId() || 56; // Default to BSC Mainnet
               resolve({
                 address: newAccount.address,
                 chainId: chainId
@@ -175,7 +161,7 @@ export class WalletConnectService {
             const account = this.appKit.getAccount();
             if (account && account.isConnected && account.address) {
               isResolved = true;
-              const chainId = this.appKit.getChainId() || 56;
+              const chainId = this.appKit.getChainId() || 56; // Default to BSC Mainnet
               resolve({
                 address: account.address,
                 chainId: chainId
@@ -247,7 +233,7 @@ export class WalletConnectService {
 
     return { 
       address: account.address, 
-      chainId: chainId || 97
+      chainId: chainId || 56
     };
   }
 

@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Order, Ad } from '../types';
 import { useWalletStore } from '../stores/walletStore';
 import { useUserStore } from '../stores/userStore';
+import { useNotificationStore } from '../stores/notificationStore';
 import { APP_CONFIG } from '../config/constants';
 import CallModal from '../components/CallModal';
 import DisputeResolution from '../components/DisputeResolution';
@@ -11,12 +12,13 @@ import clsx from 'clsx';
 import toast from 'react-hot-toast';
 import io from 'socket.io-client';
 import { blockchainService } from '../services/blockchainService';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { TOKENS } from '../config/contracts';
 
 const Orders: React.FC = () => {
   const [orders, setOrders] = useState<Order[]>([]);
   const navigate = useNavigate();
+  const location = useLocation();
   const [myAds, setMyAds] = useState<Ad[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingAds, setIsLoadingAds] = useState(false);
@@ -55,6 +57,7 @@ const Orders: React.FC = () => {
   const [showFundLockedPopover, setShowFundLockedPopover] = useState<{isOpen: boolean, orderId: string}>({isOpen: false, orderId: ''});
   const { address, connectionError, clearError } = useWalletStore();
   const { user } = useUserStore();
+  const { setUnreadOrdersCount, clearUnreadOrdersCount } = useNotificationStore();
   
   // Track ongoing user info requests to prevent duplicates
   const fetchingUsers = useRef(new Set<string>());
@@ -442,6 +445,12 @@ const Orders: React.FC = () => {
     }
   }, [address]);
 
+  // Clear unread count when Orders page is viewed/mounted
+  useEffect(() => {
+    // Clear count when component mounts (user is viewing orders page)
+    clearUnreadOrdersCount();
+  }, [clearUnreadOrdersCount]);
+
   // Add timer to force re-render every second to update countdown and server time
   const [tick, setTick] = useState(0);
   useEffect(() => {
@@ -572,6 +581,14 @@ const Orders: React.FC = () => {
       }));
 
       setOrders(mapped);
+      
+      // Update unread orders count when orders are fetched
+      // This will be cleared when user views the orders page
+      if (mapped.length > 0) {
+        setUnreadOrdersCount(mapped.length);
+      } else {
+        clearUnreadOrdersCount();
+      }
       
       // Check for state changes and show popover to buyers
       if (previousOrders.length > 0) {
@@ -812,8 +829,8 @@ const Orders: React.FC = () => {
       console.log('💡 Wallet instructions:', blockchainService.getWalletInstructions());
       
       // Get token config
-      const tokenSymbol = order?.token || 'TBNB';
-      const tokenConfig = ((TOKENS as any)[tokenSymbol]) || TOKENS.TBNB;
+      const tokenSymbol = order?.token || 'BNB';
+      const tokenConfig = ((TOKENS as any)[tokenSymbol]) || TOKENS.BNB;
       const tokenAddress = tokenConfig.address;
       const isNativeBNB = tokenConfig.isNative || false;
       
@@ -930,7 +947,7 @@ const Orders: React.FC = () => {
           }
         );
         
-        console.log('🔗 View TX: https://testnet.bscscan.com/tx/' + lockFundsTxHash);
+        console.log('🔗 View TX: https://bscscan.com/tx/' + lockFundsTxHash);
         
         fetchOrders(); // Refresh to show updated state
       } else {

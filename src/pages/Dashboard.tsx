@@ -136,7 +136,6 @@ const Dashboard: React.FC = () => {
 
   const getNetworkName = () => {
     switch (chainId) {
-      case 97: return 'BSC Testnet';
       case 56: return 'BSC Mainnet';
       case 1: return 'Ethereum Mainnet';
       default: return `Network ${chainId}`;
@@ -144,7 +143,7 @@ const Dashboard: React.FC = () => {
   };
 
   const isCorrectNetwork = () => {
-    return chainId === 97 ;
+    return chainId === 56;
   };
 
   // Show loading state while restoring wallet
@@ -344,7 +343,7 @@ const Dashboard: React.FC = () => {
                 : 'bg-red-500/20 text-red-300'
             }`}>
               {getNetworkName()}
-              {!isCorrectNetwork() && ' (Switch to BSC)'}
+              {!isCorrectNetwork() && ' (Switch to BSC Mainnet)'}
             </span>
           )}
         </div>
@@ -363,13 +362,13 @@ const Dashboard: React.FC = () => {
                      chainId === 56 ? 'Connected to BSC Mainnet' : 
                      `Connected to Network ${chainId}`}
                   </p>
-                  <p className="text-red-400 text-xs mt-1">Please switch to BSC Testnet</p>
+                  <p className="text-red-400 text-xs mt-1">Please switch to BSC Mainnet</p>
                 </div>
                 <button
-                  onClick={() => switchToNetwork(97)}
+                  onClick={() => switchToNetwork(56)}
                   className="w-full bg-orange-500/20 hover:bg-orange-500/30 text-orange-300 py-2 px-4 rounded-lg font-medium transition-colors"
                 >
-                  Switch to BSC Testnet
+                  Switch to BSC Mainnet
                 </button>
               </div>
             )}
@@ -428,24 +427,34 @@ const Dashboard: React.FC = () => {
           </button>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-3 gap-2">
           <div className="bg-violet-500/10 backdrop-blur-lg rounded-lg p-3 border border-violet-500/20">
             <div className="flex items-center justify-between mb-1">
-              <span className="text-violet-200 text-xs font-medium">TBNB</span>
+              <span className="text-violet-200 text-xs font-medium">BNB</span>
               <ArrowUpRight size={14} className="text-violet-400" />
             </div>
-            <p className="text-white font-bold text-lg">
-              {isConnected ? `${parseFloat(balance.usdt || '0').toFixed(4)}` : '0.0000'}
+            <p className="text-white font-bold text-base">
+              {isConnected ? `${parseFloat((balance as any).bnb || '0').toFixed(4)}` : '0.0000'}
             </p>
           </div>
 
           <div className="bg-violet-500/10 backdrop-blur-lg rounded-lg p-3 border border-violet-500/20">
             <div className="flex items-center justify-between mb-1">
               <span className="text-violet-200 text-xs font-medium">USDT</span>
+              <ArrowUpRight size={14} className="text-violet-400" />
+            </div>
+            <p className="text-white font-bold text-base">
+              {isConnected ? `${parseFloat(balance.usdt || '0').toFixed(4)}` : '0.0000'}
+            </p>
+          </div>
+
+          <div className="bg-violet-500/10 backdrop-blur-lg rounded-lg p-3 border border-violet-500/20">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-violet-200 text-xs font-medium">USDC</span>
               <ArrowDownLeft size={14} className="text-violet-400" />
             </div>
-            <p className="text-white font-bold text-lg">
-              {isConnected ? `${parseFloat(balance.usdc || '0').toFixed(4)}` : '0.0000'}
+            <p className="text-white font-bold text-base">
+              {isConnected ? `${parseFloat(balance.wbnb || '0').toFixed(4)}` : '0.0000'}
             </p>
           </div>
         </div>

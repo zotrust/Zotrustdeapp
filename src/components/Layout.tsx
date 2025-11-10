@@ -1,10 +1,11 @@
 
 import React, { useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import {Home, Users, FileText, User, Phone, CreditCard} from 'lucide-react';
+import {Home, Users, FileText, User, Phone} from 'lucide-react';
 import { useCallNotifications } from '../providers/CallNotificationProvider';
 import { useWalletStore } from '../stores/walletStore';
 import { useUserStore } from '../stores/userStore';
+import { useNotificationStore } from '../stores/notificationStore';
 import logo from './logo.jpeg';
 
 interface LayoutProps {
@@ -16,8 +17,10 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const { incomingCall, isConnected: callServiceConnected } = useCallNotifications();
   const { isConnected: walletConnected, address } = useWalletStore();
   const { user } = useUserStore();
+  const { unreadOrdersCount } = useNotificationStore();
 
   const isActive = (path: string) => location.pathname === path;
+  const isOrdersPage = location.pathname === '/orders';
 
   // Ensure mobile viewport is properly set
   useEffect(() => {
@@ -161,6 +164,13 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               <span className="text-[10px] sm:text-xs font-medium leading-tight">Orders</span>
               {incomingCall && (
                 <div className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 sm:w-3 sm:h-3 bg-red-500 rounded-full animate-pulse" />
+              )}
+              {!isOrdersPage && unreadOrdersCount > 0 && (
+                <div className="absolute -top-1 -right-1 min-w-[18px] h-[18px] bg-red-500 rounded-full flex items-center justify-center px-1">
+                  <span className="text-white text-[10px] font-bold">
+                    {unreadOrdersCount > 99 ? '99+' : unreadOrdersCount}
+                  </span>
+                </div>
               )}
             </Link>
 

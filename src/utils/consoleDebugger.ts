@@ -19,10 +19,10 @@ if (typeof window !== 'undefined') {
   (window as any).verifyContract = verifyContractDeployment;
   
   // Network switch helper via dynamic import to avoid hook usage here
-  (window as any).switchToTestnet = async () => {
+  (window as any).switchToMainnet = async () => {
     const { useZotrustContract } = await import('../hooks/useZotrustContract');
-    const { switchToTestnet } = useZotrustContract();
-    return switchToTestnet();
+    const { switchToMainnet } = useZotrustContract();
+    return switchToMainnet();
   };
   
   console.log('🔍 Contract Debugger loaded!');
@@ -33,5 +33,5 @@ if (typeof window !== 'undefined') {
   console.log('   window.testAdmin() - Test admin function');
   console.log('   window.testTradeCounter() - Test trade counter');
   console.log('   window.testAllowedTokens("0x...") - Test token allowance');
-  console.log('   window.switchToTestnet() - Switch wallet to BSC Testnet');
+  console.log('   window.switchToMainnet() - Switch wallet to BSC Mainnet');
 }

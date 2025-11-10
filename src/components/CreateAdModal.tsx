@@ -34,7 +34,7 @@ const CreateAdModal: React.FC<CreateAdModalProps> = ({ isOpen, onClose, onSucces
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState<FormData>({
     type: 'BUY',
-    token: 'TBNB',
+    token: 'USDT',
     priceInr: '',
     minAmountInr: '500', // Default min amount
     maxAmountInr: '', // Will be auto-calculated
@@ -46,14 +46,10 @@ const CreateAdModal: React.FC<CreateAdModalProps> = ({ isOpen, onClose, onSucces
 
   // Get balance for selected token
   const getTokenBalance = () => {
-    if (formData.token === 'TBNB') {
-      return parseFloat(balance.usdt || '0'); // Using USDT balance for TBNB display
-    } else if (formData.token === 'WBNB') {
-      return parseFloat(balance.wbnb || '0');
-    } else if (formData.token === 'USDT') {
+    if (formData.token === 'USDT') {
       return parseFloat(balance.usdt || '0');
     } else if (formData.token === 'USDC') {
-      return parseFloat(balance.usdc || '0');
+      return parseFloat(balance.wbnb || '0'); // USDC is stored in wbnb field
     } else {
       return 0;
     }
@@ -259,7 +255,7 @@ const CreateAdModal: React.FC<CreateAdModalProps> = ({ isOpen, onClose, onSucces
         // Reset form
         setFormData({
           type: 'BUY',
-          token: 'TBNB',
+          token: 'USDT',
           priceInr: '',
           minAmountInr: '500', // Default min amount
           maxAmountInr: '', // Will be auto-calculated
@@ -302,7 +298,12 @@ const CreateAdModal: React.FC<CreateAdModalProps> = ({ isOpen, onClose, onSucces
             initial={{ scale: 0.9, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.9, opacity: 0 }}
-            className="bg-slate-900 rounded-xl overflow-scroll h-[80vh] p-6 w-full max-w-md border border-white/20"
+            className={clsx(
+              'bg-slate-900 rounded-xl overflow-scroll h-[80vh] p-6 w-full max-w-md border-2',
+              formData.type === 'BUY'
+                ? 'border-green-500/50'
+                : 'border-red-500/50'
+            )}
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-6">
@@ -340,8 +341,12 @@ const CreateAdModal: React.FC<CreateAdModalProps> = ({ isOpen, onClose, onSucces
                       className={clsx(
                         'py-2 px-4 rounded-lg font-medium transition-all',
                         formData.type === type
-                          ? 'bg-gradient-to-r from-blue-500 to-purple-500 text-white'
-                          : 'bg-white/10 text-gray-300 border border-white/20'
+                          ? type === 'BUY'
+                            ? 'bg-gradient-to-r from-green-500 to-emerald-500 text-white'
+                            : 'bg-gradient-to-r from-red-500 to-pink-500 text-white'
+                          : type === 'BUY'
+                            ? 'bg-white/10 text-green-300 border border-green-500/30 hover:bg-green-500/10'
+                            : 'bg-white/10 text-red-300 border border-red-500/30 hover:bg-red-500/10'
                       )}
                     >
                       {type}
@@ -355,8 +360,8 @@ const CreateAdModal: React.FC<CreateAdModalProps> = ({ isOpen, onClose, onSucces
                 <label className="block text-sm font-medium text-gray-300 mb-2">
                   Token
                 </label>
-                <div className="grid grid-cols-4 gap-2">
-                  {['TBNB', 'WBNB', 'USDT', 'USDC'].map((token) => (
+                <div className="grid grid-cols-2 gap-2">
+                  {['USDT', 'USDC'].map((token) => (
                     <button
                       key={token}
                       type="button"
@@ -651,7 +656,12 @@ const CreateAdModal: React.FC<CreateAdModalProps> = ({ isOpen, onClose, onSucces
                   formData.selectedAgentIds.length === 0 ||
                   (formData.type === 'SELL' && tokenBalance === 0)
                 }
-                className="w-full bg-gradient-to-r from-green-500 to-emerald-500 text-white py-3 px-4 rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                className={clsx(
+                  'w-full text-white py-3 px-4 rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed',
+                  formData.type === 'BUY'
+                    ? 'bg-gradient-to-r from-green-500 to-emerald-500'
+                    : 'bg-gradient-to-r from-red-500 to-pink-500'
+                )}
                 whileTap={{ scale: 0.98 }}
               >
                 {isLoading ? 'Creating...' : formData.type === 'SELL' && tokenBalance === 0 ? `No ${formData.token} to Sell` : 'Create Ad'}

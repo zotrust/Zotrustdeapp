@@ -3,6 +3,7 @@ export interface WalletState {
   isConnected: boolean;
   chainId: number | null;
   balance: {
+    bnb: string;
     usdt: string;
     wbnb: string;
     usdc: string;
@@ -40,7 +41,7 @@ export interface Ad {
   ownerSelectedAgentIds: string[]; // Changed to support multiple agents
   owner_name?: string;
   type: 'BUY' | 'SELL';
-  token: 'TBNB' | 'WBNB' | 'USDT' | 'USDC';
+  token: 'USDT' | 'USDC';
   priceInr: string;
   minAmount: string;
   maxAmount: string;
@@ -61,7 +62,7 @@ export interface Order {
   buyerAddress: string;
   sellerAddress: string;
   amount: number;
-  token: 'TBNB' | 'WBNB' | 'USDT' | 'USDC';
+  token: 'USDT' | 'USDC';
   priceInr: number;
   state: 'CREATED' | 'ACCEPTED' | 'LOCKED' | 'RELEASED' | 'CANCELLED' | 'EXPIRED' | 'UNDER_DISPUTE' | 'REFUNDED';
   agentBranch: string;
@@ -90,7 +91,7 @@ export interface Order {
 
 export interface CreateAdData {
   type: 'BUY' | 'SELL';
-  token: 'TBNB' | 'WBNB' | 'USDT' | 'USDC';
+  token: 'USDT' | 'USDC';
   priceInr: string;
   minAmount: string;
   maxAmount: string;

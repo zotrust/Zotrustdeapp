@@ -151,22 +151,22 @@ const WalletSelectionModal: React.FC<WalletSelectionModalProps> = ({
                     </div>
                   </motion.button>
 
-                  {/* Trust Wallet Mobile */}
+                  {/* Trust Wallet Mobile - Use WalletConnect */}
                   <motion.button
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
-                    onClick={() => handleWalletSelect('trustwallet')}
+                    onClick={() => handleWalletSelect('walletconnect')}
                     disabled={isConnecting}
                     className="w-full p-4 bg-gradient-to-r from-blue-500/20 to-cyan-500/20 border border-blue-500/30 rounded-lg text-left hover:from-blue-500/30 hover:to-cyan-500/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <div className="flex items-center space-x-4">
                       <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-lg flex items-center justify-center">
-                        <Smartphone size={24} className="text-white" />
+                        <QrCode size={24} className="text-white" />
                       </div>
                       <div>
                         <h3 className="font-semibold text-white">Trust Wallet</h3>
                         <p className="text-sm text-gray-400">
-                          {isTrustWallet ? 'Detected - Open in Trust Wallet app' : 'Open in Trust Wallet app'}
+                          Connect via WalletConnect (Universal)
                         </p>
                       </div>
                     </div>

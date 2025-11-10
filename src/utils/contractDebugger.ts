@@ -2,7 +2,7 @@ import { ethers } from 'ethers';
 import { 
   ZOTRUST_CONTRACT_ABI, 
   ZOTRUST_CONTRACT_ADDRESS,
-  BSC_TESTNET_RPC,
+  BSC_MAINNET_RPC,
   TOKENS
 } from '../config/contracts';
 
@@ -28,12 +28,12 @@ export const debugSmartContract = async () => {
     const network = await provider.getNetwork();
     console.log(`✅ Network connected: ${network.name} (ChainID: ${network.chainId})`);
 
-    // 3. Check if on BSC Testnet
-    if (network.chainId !== 97n) {
-      console.warn('⚠️  Not on BSC Testnet! Current chain:', network.chainId);
-      console.log('💡 Please switch to BSC Testnet (ChainID: 97)');
+    // 3. Check if on BSC Mainnet
+    if (network.chainId !== 56n) {
+      console.warn('⚠️  Not on BSC Mainnet! Current chain:', network.chainId);
+      console.log('💡 Please switch to BSC Mainnet (ChainID: 56)');
     } else {
-      console.log('✅ Connected to BSC Testnet');
+      console.log('✅ Connected to BSC Mainnet');
     }
 
     // 4. Check contract address
@@ -55,7 +55,7 @@ export const debugSmartContract = async () => {
 
     // 6. Test contract connection
     console.log('\n🔗 Testing contract connection...');
-    const readProvider = new ethers.JsonRpcProvider(BSC_TESTNET_RPC);
+    const readProvider = new ethers.JsonRpcProvider(BSC_MAINNET_RPC);
     const contract = new ethers.Contract(ZOTRUST_CONTRACT_ADDRESS, ZOTRUST_CONTRACT_ABI, readProvider);
     
     try {
@@ -112,11 +112,11 @@ export const debugSmartContract = async () => {
       
       // Check balance
       const balance = await provider.getBalance(address);
-      const tbnbBalance = ethers.formatEther(balance);
-      console.log(`✅ TBNB balance: ${tbnbBalance} TBNB`);
+      const bnbBalance = ethers.formatEther(balance);
+      console.log(`✅ BNB balance: ${bnbBalance} BNB`);
       
-      if (parseFloat(tbnbBalance) < 0.01) {
-        console.warn('⚠️  Low TBNB balance! Get more from: https://testnet.bnbchain.org/faucet-smart');
+      if (parseFloat(bnbBalance) < 0.01) {
+        console.warn('⚠️  Low BNB balance! Please add more BNB to your wallet');
       }
       
     } catch (error) {
@@ -144,17 +144,17 @@ export const debugSmartContract = async () => {
     // 10. Summary
     console.log('\n📊 ===== DEBUG SUMMARY =====');
     console.log('✅ Wallet: Connected');
-    console.log('✅ Network: BSC Testnet');
+    console.log('✅ Network: BSC Mainnet');
     console.log('✅ Contract: Address configured');
     console.log('✅ ABI: Functions loaded');
     console.log('✅ Tokens: Addresses configured');
-    console.log('✅ Connection: Ready for testing');
+    console.log('✅ Connection: Ready for production');
     
-    console.log('\n🚀 Ready to test your Zotrust P2P platform!');
+    console.log('\n🚀 Ready to use your Zotrust P2P platform!');
     console.log('💡 Next steps:');
-    console.log('   1. Create a test ad');
-    console.log('   2. Place a test order');
-    console.log('   3. Test the complete flow');
+    console.log('   1. Create an ad');
+    console.log('   2. Place an order');
+    console.log('   3. Complete the trade flow');
     
     return true;
 
@@ -184,11 +184,11 @@ export const quickContractCheck = async () => {
     console.log(`📋 Contract: ${ZOTRUST_CONTRACT_ADDRESS}`);
     console.log(`📋 ABI Functions: ${ZOTRUST_CONTRACT_ABI.length}`);
     
-    if (network.chainId === 97n) {
-      console.log('✅ Ready for BSC Testnet testing');
+    if (network.chainId === 56n) {
+      console.log('✅ Ready for BSC Mainnet');
       return true;
     } else {
-      console.log('⚠️  Switch to BSC Testnet (ChainID: 97)');
+      console.log('⚠️  Switch to BSC Mainnet (ChainID: 56)');
       return false;
     }
   } catch (error) {

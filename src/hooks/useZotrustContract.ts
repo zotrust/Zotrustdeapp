@@ -3,10 +3,10 @@ import { useWalletStore } from '../stores/walletStore';
 import { 
   ZOTRUST_CONTRACT_ABI, 
   ZOTRUST_CONTRACT_ADDRESS,
-  BSC_TESTNET_CHAIN_ID,
-  BSC_TESTNET_RPC,
+  BSC_MAINNET_CHAIN_ID,
+  BSC_MAINNET_RPC,
   TOKENS,
-  BSC_TESTNET_PARAMS
+  BSC_MAINNET_PARAMS
 } from '../config/contracts';
 import { debugSmartContract, quickContractCheck, testContractFunction } from '../utils/contractDebugger';
 import toast from 'react-hot-toast';
@@ -14,10 +14,10 @@ import toast from 'react-hot-toast';
 export const useZotrustContract = () => {
   const { address, chainId } = useWalletStore();
 
-  // Verify testnet connection
-  const ensureTestnet = () => {
-    if (chainId !== BSC_TESTNET_CHAIN_ID) {
-      throw new Error(`Please switch to BSC Testnet (ChainID: ${BSC_TESTNET_CHAIN_ID})`);
+  // Verify mainnet connection
+  const ensureMainnet = () => {
+    if (chainId !== BSC_MAINNET_CHAIN_ID) {
+      throw new Error(`Please switch to BSC Mainnet (ChainID: ${BSC_MAINNET_CHAIN_ID})`);
     }
   };
 
@@ -25,7 +25,7 @@ export const useZotrustContract = () => {
     if (!window.ethereum) {
       throw new Error('Wallet not connected');
     }
-    ensureTestnet();
+    ensureMainnet();
 
     const provider = new ethers.BrowserProvider(window.ethereum as any);
     const signer = await provider.getSigner();
@@ -33,7 +33,7 @@ export const useZotrustContract = () => {
   };
 
   const getReadOnlyContract = () => {
-    const readProvider = new ethers.JsonRpcProvider(BSC_TESTNET_RPC);
+    const readProvider = new ethers.JsonRpcProvider(BSC_MAINNET_RPC);
     return new ethers.Contract(ZOTRUST_CONTRACT_ADDRESS, ZOTRUST_CONTRACT_ABI, readProvider);
   };
 
@@ -92,7 +92,7 @@ export const useZotrustContract = () => {
     counterParty: string = '0x0000000000000000000000000000000000000000'
   ) => {
     try {
-      ensureTestnet();
+      ensureMainnet();
       const contract = await getContract();
       
       const tokenAddress = TOKENS[tokenSymbol as keyof typeof TOKENS].address;
@@ -104,7 +104,7 @@ export const useZotrustContract = () => {
         counterParty
       );
 
-      toast.loading('Creating trade on testnet...', { id: 'create-trade' });
+      toast.loading('Creating trade on blockchain...', { id: 'create-trade' });
       
       const receipt = await tx.wait();
       
@@ -140,7 +140,7 @@ export const useZotrustContract = () => {
 
   const lockFunds = async (tradeId: number) => {
     try {
-      ensureTestnet();
+      ensureMainnet();
       const contract = await getContract();
       
       const tx = await contract.lockFunds(tradeId);
@@ -164,7 +164,7 @@ export const useZotrustContract = () => {
 
   const releaseFunds = async (tradeId: number) => {
     try {
-      ensureTestnet();
+      ensureMainnet();
       const contract = await getContract();
       
       const tx = await contract.releaseFunds(tradeId);
@@ -188,7 +188,7 @@ export const useZotrustContract = () => {
 
   const cancelTrade = async (tradeId: number) => {
     try {
-      ensureTestnet();
+      ensureMainnet();
       const contract = await getContract();
       
       const tx = await contract.cancelTrade(tradeId);
@@ -212,11 +212,11 @@ export const useZotrustContract = () => {
 
   const approveToken = async (tokenSymbol: string, amount: string) => {
     try {
-      ensureTestnet();
+      ensureMainnet();
       
-      // For TBNB (native token), no approval needed
-      if (tokenSymbol === 'TBNB') {
-        toast.success('TBNB is native token - no approval needed!');
+      // For BNB (native token), no approval needed
+      if (tokenSymbol === 'BNB') {
+        toast.success('BNB is native token - no approval needed!');
         return null;
       }
       
@@ -260,16 +260,16 @@ export const useZotrustContract = () => {
     }
   };
 
-  const switchToTestnet = async (): Promise<boolean> => {
+  const switchToMainnet = async (): Promise<boolean> => {
     try {
       if (!window.ethereum) throw new Error('Wallet provider not found');
 
       // Try switching first
       await (window.ethereum as any).request({
         method: 'wallet_switchEthereumChain',
-        params: [{ chainId: '0x61' }]
+        params: [{ chainId: '0x38' }]
       });
-      toast.success('Switched to BSC Testnet');
+      toast.success('Switched to BSC Mainnet');
       return true;
     } catch (switchError: any) {
       // 4902 = Unrecognized chain, try adding network
@@ -277,19 +277,19 @@ export const useZotrustContract = () => {
         try {
           await (window.ethereum as any).request({
             method: 'wallet_addEthereumChain',
-            params: [BSC_TESTNET_PARAMS]
+            params: [BSC_MAINNET_PARAMS]
           });
-          toast.success('BSC Testnet added and switched');
+          toast.success('BSC Mainnet added and switched');
           return true;
         } catch (addError: any) {
-          console.error('Failed to add BSC Testnet:', addError);
-          toast.error('Failed to add BSC Testnet');
+          console.error('Failed to add BSC Mainnet:', addError);
+          toast.error('Failed to add BSC Mainnet');
           return false;
         }
       }
 
       console.error('Failed to switch network:', switchError);
-      toast.error('Failed to switch to BSC Testnet');
+      toast.error('Failed to switch to BSC Mainnet');
       return false;
     }
   };
@@ -310,7 +310,7 @@ export const useZotrustContract = () => {
     // Utilities
     getContract,
     getReadOnlyContract,
-    isTestnet: chainId === BSC_TESTNET_CHAIN_ID,
+    isMainnet: chainId === BSC_MAINNET_CHAIN_ID,
     
     // Debug functions
     debugContract: debugSmartContract,
@@ -318,6 +318,6 @@ export const useZotrustContract = () => {
     testFunction: testContractFunction,
 
     // Network helper
-    switchToTestnet
+    switchToMainnet
   };
 };

@@ -66,8 +66,9 @@ const detectMobileWallets = () => {
 export const useWalletStore = create<WalletStore>((set, get) => ({
   address: null,
   isConnected: false,
-  chainId: null, // BSC Testnet
+  chainId: null, // BSC Mainnet
   balance: {
+    bnb: '0',
     usdt: '0',
     wbnb: '0',
     usdc: '0'
@@ -184,16 +185,17 @@ export const useWalletStore = create<WalletStore>((set, get) => ({
         walletType: 'metamask'
       });
 
-      // Save wallet state to cookies
+      // Save wallet state to cookies and sessionStorage
       saveWalletState(address, 'metamask', parsedChainId);
+      sessionStorage.setItem('walletType', 'metamask');
 
-      // Enforce BSC Testnet only - Force switch if not on testnet
-      if (parsedChainId !== 97) {
-        console.log('🔄 Switching to BSC Testnet...');
-        toast.loading('Switching to BSC Testnet...', { id: 'network-switch' });
+      // Enforce BSC Mainnet only - Force switch if not on mainnet
+      if (parsedChainId !== 56) {
+        console.log('🔄 Switching to BSC Mainnet...');
+        toast.loading('Switching to BSC Mainnet...', { id: 'network-switch' });
         
         try {
-          await get().switchToNetwork(97);
+          await get().switchToNetwork(56);
           
           // Wait a moment for network switch to complete
           await new Promise(resolve => setTimeout(resolve, 1000));
@@ -205,15 +207,15 @@ export const useWalletStore = create<WalletStore>((set, get) => ({
           
           const newParsedChainId = parseInt(newChainId, 16);
           
-          if (newParsedChainId === 97) {
-            set({ chainId: 97 });
-            toast.success('Switched to BSC Testnet!', { id: 'network-switch' });
+          if (newParsedChainId === 56) {
+            set({ chainId: 56 });
+            toast.success('Switched to BSC Mainnet!', { id: 'network-switch' });
           } else {
-            throw new Error('Failed to switch to BSC Testnet');
+            throw new Error('Failed to switch to BSC Mainnet');
           }
         } catch (switchError: any) {
           console.error('Network switch failed:', switchError);
-          const error = 'Please manually switch to BSC Testnet in MetaMask';
+          const error = 'Please manually switch to BSC Mainnet in MetaMask';
           set({ connectionError: error });
           toast.error(error, { id: 'network-switch' });
           return;
@@ -309,14 +311,15 @@ export const useWalletStore = create<WalletStore>((set, get) => ({
 
     // Save wallet state to cookies
     saveWalletState(address, 'trustwallet', parsedChainId);
+    sessionStorage.setItem('walletType', 'trustwallet');
 
-    // Enforce BSC Testnet only - Force switch if not on testnet
-    if (parsedChainId !== 97) {
-      console.log('🔄 Switching to BSC Testnet...');
-      toast.loading('Switching to BSC Testnet...', { id: 'network-switch' });
+    // Enforce BSC Mainnet only - Force switch if not on mainnet
+    if (parsedChainId !== 56) {
+      console.log('🔄 Switching to BSC Mainnet...');
+      toast.loading('Switching to BSC Mainnet...', { id: 'network-switch' });
       
       try {
-        await get().switchToNetwork(97);
+        await get().switchToNetwork(56);
         
         // Wait a moment for network switch to complete
         await new Promise(resolve => setTimeout(resolve, 1000));
@@ -328,15 +331,15 @@ export const useWalletStore = create<WalletStore>((set, get) => ({
         
         const newParsedChainId = parseInt(newChainId, 16);
         
-        if (newParsedChainId === 97) {
-          set({ chainId: 97 });
-          toast.success('Switched to BSC Testnet!', { id: 'network-switch' });
+        if (newParsedChainId === 56) {
+          set({ chainId: 56 });
+          toast.success('Switched to BSC Mainnet!', { id: 'network-switch' });
         } else {
-          throw new Error('Failed to switch to BSC Testnet');
+          throw new Error('Failed to switch to BSC Mainnet');
         }
       } catch (switchError: any) {
         console.error('Network switch failed:', switchError);
-        const error = 'Please manually switch to BSC Testnet in Trust Wallet';
+        const error = 'Please manually switch to BSC Mainnet in Trust Wallet';
         set({ connectionError: error });
         toast.error(error, { id: 'network-switch' });
         return;
@@ -375,10 +378,50 @@ export const useWalletStore = create<WalletStore>((set, get) => ({
       await fetchUserProfile(address);
       
       toast.success(`Wallet connected and logged in! ${address.slice(0, 6)}...${address.slice(-4)}`);
-    } catch (signError) {
-      console.error('Signature failed:', signError);
-      toast.error('Please sign the message to complete login');
-      // Still continue even if signature fails
+    } catch (signError: any) {
+      // Check if user rejected the signature request
+      const isUserRejection = 
+        signError?.code === 'ACTION_REJECTED' ||
+        signError?.code === 4001 ||
+        signError?.message?.includes('User rejected') ||
+        signError?.message?.includes('user rejected') ||
+        signError?.message?.includes('user-denied') ||
+        signError?.reason === 'rejected';
+      
+      if (isUserRejection) {
+        // User intentionally rejected signature - don't show error, just info
+        console.log('ℹ️ User skipped signature - wallet connected but not authenticated');
+        
+        // Try to fetch user profile anyway (in case they're already logged in)
+        try {
+          await fetchUserProfile(address);
+          toast.success(`Wallet connected! ${address.slice(0, 6)}...${address.slice(-4)}`, {
+            duration: 3000,
+            icon: 'ℹ️'
+          });
+        } catch (profileError) {
+          // If profile fetch fails, show a friendly message
+          toast(`Wallet connected! Sign in later to access all features.`, {
+            duration: 4000,
+            icon: 'ℹ️'
+          });
+        }
+      } else {
+        // Actual error (not user rejection)
+        console.error('Signature failed:', signError);
+        
+        // Try to fetch user profile anyway
+        try {
+          await fetchUserProfile(address);
+          toast.success(`Wallet connected! ${address.slice(0, 6)}...${address.slice(-4)}`);
+        } catch (profileError) {
+          // Show error only if it's not a user rejection
+          toast.error('Failed to authenticate. Wallet connected but some features may be limited.', {
+            duration: 4000
+          });
+        }
+      }
+      // Always continue - wallet is connected even without signature
     }
   },
 
@@ -399,26 +442,27 @@ export const useWalletStore = create<WalletStore>((set, get) => ({
         walletType: 'walletconnect'
       });
 
-      // Save wallet state to cookies
+      // Save wallet state to cookies and sessionStorage
       saveWalletState(address, 'walletconnect', chainId);
+      sessionStorage.setItem('walletType', 'walletconnect');
 
-      // Enforce BSC Testnet only
-      if (chainId !== 97) {
-        console.log('🔄 WalletConnect: Not on BSC Testnet, attempting to switch...');
-        toast.loading('Switching to BSC Testnet...', { id: 'walletconnect-switch' });
+      // Enforce BSC Mainnet only
+      if (chainId !== 56) {
+        console.log('🔄 WalletConnect: Not on BSC Mainnet, attempting to switch...');
+        toast.loading('Switching to BSC Mainnet...', { id: 'walletconnect-switch' });
         
         try {
           // Use WalletConnect service to switch network
-          await walletConnectService.switchNetwork(97);
+          await walletConnectService.switchNetwork(56);
           
           // Wait a moment for network switch to complete
           await new Promise(resolve => setTimeout(resolve, 2000));
           
           // Update chainId after switch
           const newChainId = walletConnectService.getChainId();
-          if (newChainId === 97) {
-            set({ chainId: 97 });
-            toast.success('Switched to BSC Testnet!', { id: 'walletconnect-switch' });
+          if (newChainId === 56) {
+            set({ chainId: 56 });
+            toast.success('Switched to BSC Mainnet!', { id: 'walletconnect-switch' });
           } else {
             // If we can't verify the switch, just continue with the connection
             console.log('Network switch attempted, continuing with connection...');
@@ -426,7 +470,7 @@ export const useWalletStore = create<WalletStore>((set, get) => ({
           }
         } catch (switchError: any) {
           console.error('WalletConnect network switch failed:', switchError);
-          const error = 'Please manually switch to BSC Testnet in your wallet';
+          const error = 'Please manually switch to BSC Mainnet in your wallet';
           set({ connectionError: error });
           toast.error(error, { id: 'walletconnect-switch' });
           return;
@@ -434,7 +478,21 @@ export const useWalletStore = create<WalletStore>((set, get) => ({
       }
 
       await get().authenticateUser(address);
-      await get().updateBalances();
+      
+      // Wait a moment for provider to be fully ready, then fetch balances
+      console.log('💰 WalletConnect: Waiting for provider to be ready...');
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Fetch balances with retry
+      try {
+        await get().updateBalances();
+        console.log('✅ WalletConnect: Balances fetched successfully');
+      } catch (balanceError) {
+        console.error('❌ WalletConnect: Balance fetch failed, retrying...', balanceError);
+        // Retry after another delay
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        await get().updateBalances();
+      }
 
     } catch (error: any) {
       console.error('WalletConnect connection failed:', error);
@@ -477,12 +535,13 @@ export const useWalletStore = create<WalletStore>((set, get) => ({
       address: null,
       isConnected: false,
       chainId: null,
-      balance: { usdt: '0', wbnb: '0', usdc: '0' },
+      balance: { bnb: '0', usdt: '0', wbnb: '0', usdc: '0' },
       connectionError: null,
       walletType: null
     });
 
-    // Clear wallet state from cookies
+    // Clear wallet state from cookies and sessionStorage
+    sessionStorage.removeItem('walletType');
     clearWalletState();
     
     // Try to keep user logged in by fetching from database
@@ -531,7 +590,7 @@ export const useWalletStore = create<WalletStore>((set, get) => ({
         if (switchError.code === 4902) {
           const network = NETWORKS[targetChainId as keyof typeof NETWORKS];
           if (network) {
-            console.log('➕ Adding BSC Testnet to wallet...');
+            console.log('➕ Adding BSC Mainnet to wallet...');
             await (window.ethereum as any)!.request({
               method: 'wallet_addEthereumChain',
               params: [{
@@ -546,7 +605,7 @@ export const useWalletStore = create<WalletStore>((set, get) => ({
                 },
               }],
             });
-            console.log('✅ BSC Testnet added to wallet');
+            console.log('✅ BSC Mainnet added to wallet');
           } else {
             throw new Error(`Network configuration not found for chain ID: ${targetChainId}`);
           }
@@ -581,9 +640,9 @@ export const useWalletStore = create<WalletStore>((set, get) => ({
 
     set({ isUpdatingBalances: true });
     
-    // For BSC Testnet (97), show TBNB balance and skip ERC20 calls
-    if (chainId === 97) {
-      console.log('🧪 BSC Testnet: Checking TBNB balance');
+    // For BSC Mainnet (56), show BNB balance and ERC20 tokens
+    if (chainId === 56) {
+      console.log('🌐 BSC Mainnet: Checking BNB balance');
       try {
         let provider: ethers.BrowserProvider;
 
@@ -591,57 +650,184 @@ export const useWalletStore = create<WalletStore>((set, get) => ({
         if (walletType === 'metamask') {
           provider = new ethers.BrowserProvider(window.ethereum! as any);
         } else {
-          const wcProvider = walletConnectService.getProvider();
+          // For WalletConnect, ensure service is initialized
+          let wcProvider = walletConnectService.getProvider();
           if (!wcProvider) {
-            throw new Error('WalletConnect provider not available');
+            console.log('🔄 WalletConnect: Initializing service for balance fetch...');
+            await walletConnectService.initialize();
+            wcProvider = walletConnectService.getProvider();
           }
-          provider = wcProvider;
+          
+          if (!wcProvider) {
+            console.error('❌ WalletConnect provider not available, retrying...');
+            // Wait a bit and retry
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            const retryProvider = walletConnectService.getProvider();
+            if (!retryProvider) {
+              throw new Error('WalletConnect provider not available');
+            }
+            provider = retryProvider;
+          } else {
+            provider = wcProvider;
+          }
         }
 
-        // Get TBNB balance (native token on testnet)
-        const balance = await provider.getBalance(address);
-        const tbnbBalance = ethers.formatEther(balance);
-
-        // Get WBNB balance (ERC20 token)
-        let wbnbBalance = '0.00';
+        // Get BNB balance (native token)
+        let bnbBalance = '0.00';
         try {
-          console.log('📊 Fetching WBNB balance for:', address);
-          const wbnbAddress = '0xae13d989daC2f0dEbFf460aC112a837C89BAa7cd'; // WBNB on BSC Testnet
-          const erc20Abi = [
-            'function balanceOf(address) view returns (uint256)',
-            'function decimals() view returns (uint8)',
-            'function symbol() view returns (string)'
-          ];
-          const wbnbContract = new ethers.Contract(wbnbAddress, erc20Abi, provider);
-          
-          // Get balance
-          const wbnbBal = await wbnbContract.balanceOf(address);
-          console.log('🔍 WBNB Raw Balance:', wbnbBal.toString());
-          
-          // Format with proper decimals
-          wbnbBalance = parseFloat(ethers.formatEther(wbnbBal)).toFixed(6);
-          console.log('✅ WBNB Formatted Balance:', wbnbBalance);
-          
+          console.log('📊 Fetching BNB balance for:', address);
+          const balance = await provider.getBalance(address);
+          bnbBalance = parseFloat(ethers.formatEther(balance)).toFixed(6);
+          console.log('✅ BNB Formatted Balance:', bnbBalance);
         } catch (error: any) {
-          console.error('❌ Failed to fetch WBNB balance:', error);
-          console.error('Error details:', error.message);
-          wbnbBalance = '0.000000';
+          console.error('❌ Failed to fetch BNB balance:', error);
+          bnbBalance = '0.000000';
+        }
+
+        // ERC20 ABI for balance checking (shared for USDT and USDC)
+        const erc20Abi = [
+          'function balanceOf(address) view returns (uint256)',
+          'function decimals() view returns (uint8)'
+        ];
+
+        // Get USDT balance with retry logic and fallback to read-only provider
+        let usdtBalance = '0.00';
+        const usdtAddress = '0x55d398326f99059fF775485246999027B3197955'; // USDT on BSC Mainnet
+        
+        let retryCount = 0;
+        const maxRetries = 2;
+        let useReadOnlyProvider = false;
+        
+        while (retryCount < maxRetries) {
+          try {
+            console.log(`📊 Fetching USDT balance for: ${address} (attempt ${retryCount + 1})`);
+            
+            // Use read-only provider as fallback if wallet provider fails
+            let contractProvider: ethers.BrowserProvider | ethers.JsonRpcProvider = provider;
+            if (useReadOnlyProvider || retryCount > 0) {
+              console.log('🔄 Using read-only RPC provider for USDT balance...');
+              const { BSC_MAINNET_RPC } = await import('../config/contracts');
+              contractProvider = new ethers.JsonRpcProvider(BSC_MAINNET_RPC);
+            }
+            
+            const usdtContract = new ethers.Contract(usdtAddress, erc20Abi, contractProvider);
+            
+            // Try direct call with timeout
+            const usdtBal = await Promise.race([
+              usdtContract.balanceOf(address),
+              new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 15000))
+            ]) as bigint;
+            
+            const usdtDecimals = await Promise.race([
+              usdtContract.decimals(),
+              new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 15000))
+            ]) as number;
+            
+            usdtBalance = parseFloat(ethers.formatUnits(usdtBal, usdtDecimals)).toFixed(6);
+            console.log('✅ USDT Formatted Balance:', usdtBalance);
+            break; // Success, exit retry loop
+          } catch (error: any) {
+            retryCount++;
+            console.error(`❌ Failed to fetch USDT balance (attempt ${retryCount}):`, error);
+            
+            // If it's a CALL_EXCEPTION, try read-only provider on next attempt
+            if (error.code === 'CALL_EXCEPTION' || error.message?.includes('missing revert data')) {
+              useReadOnlyProvider = true;
+              console.log('🔄 CALL_EXCEPTION detected, will use read-only provider on retry');
+            }
+            
+            if (retryCount < maxRetries) {
+              // Wait before retrying (exponential backoff)
+              await new Promise(resolve => setTimeout(resolve, 2000 * retryCount));
+            } else {
+              // All retries failed, use fallback
+              console.warn('⚠️ All USDT balance fetch attempts failed, using fallback');
+              usdtBalance = '0.000000';
+            }
+          }
+        }
+
+        // Get USDC balance with retry logic and fallback to read-only provider
+        let usdcBalance = '0.00';
+        const usdcAddress = '0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d'; // USDC on BSC Mainnet
+        
+        retryCount = 0;
+        useReadOnlyProvider = false;
+        
+        while (retryCount < maxRetries) {
+          try {
+            console.log(`📊 Fetching USDC balance for: ${address} (attempt ${retryCount + 1})`);
+            
+            // Use read-only provider as fallback if wallet provider fails
+            let contractProvider: ethers.BrowserProvider | ethers.JsonRpcProvider = provider;
+            if (useReadOnlyProvider || retryCount > 0) {
+              console.log('🔄 Using read-only RPC provider for USDC balance...');
+              const { BSC_MAINNET_RPC } = await import('../config/contracts');
+              contractProvider = new ethers.JsonRpcProvider(BSC_MAINNET_RPC);
+            }
+            
+            const usdcContract = new ethers.Contract(usdcAddress, erc20Abi, contractProvider);
+            
+            // Try direct call with timeout
+            const usdcBal = await Promise.race([
+              usdcContract.balanceOf(address),
+              new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 15000))
+            ]) as bigint;
+            
+            const usdcDecimals = await Promise.race([
+              usdcContract.decimals(),
+              new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 15000))
+            ]) as number;
+            
+            usdcBalance = parseFloat(ethers.formatUnits(usdcBal, usdcDecimals)).toFixed(6);
+            console.log('✅ USDC Formatted Balance:', usdcBalance);
+            break; // Success, exit retry loop
+          } catch (error: any) {
+            retryCount++;
+            console.error(`❌ Failed to fetch USDC balance (attempt ${retryCount}):`, error);
+            
+            // If it's a CALL_EXCEPTION, try read-only provider on next attempt
+            if (error.code === 'CALL_EXCEPTION' || error.message?.includes('missing revert data')) {
+              useReadOnlyProvider = true;
+              console.log('🔄 CALL_EXCEPTION detected, will use read-only provider on retry');
+            }
+            
+            if (retryCount < maxRetries) {
+              // Wait before retrying (exponential backoff)
+              await new Promise(resolve => setTimeout(resolve, 2000 * retryCount));
+            } else {
+              // All retries failed, use fallback
+              console.warn('⚠️ All USDC balance fetch attempts failed, using fallback');
+              usdcBalance = '0.000000';
+            }
+          }
         }
 
         set({
           balance: {
-            usdt: parseFloat(tbnbBalance).toFixed(6), // Show TBNB balance as primary
-            wbnb: wbnbBalance, // WBNB (Wrapped BNB)
-            usdc: '0.000000' // No USDC on testnet
+            bnb: bnbBalance, // BNB balance (native token)
+            usdt: usdtBalance, // USDT balance
+            wbnb: usdcBalance, // USDC balance (stored in wbnb field for display)
+            usdc: '0.000000' // Reserved field
           }
         });
 
-        console.log('💰 TBNB balance updated:', tbnbBalance);
-        console.log('💰 WBNB balance updated:', wbnbBalance);
+        console.log('💰 BNB balance updated:', bnbBalance);
+        console.log('💰 USDT balance updated:', usdtBalance);
+        console.log('💰 USDC balance updated:', usdcBalance);
+        
+        // Show success toast if balances are non-zero
+        if (parseFloat(bnbBalance) > 0 || parseFloat(usdtBalance) > 0 || parseFloat(usdcBalance) > 0) {
+          toast.success(`Balances: BNB ${parseFloat(bnbBalance).toFixed(4)}, USDT ${parseFloat(usdtBalance).toFixed(2)}, USDC ${parseFloat(usdcBalance).toFixed(2)}`, {
+            duration: 3000,
+            icon: '💰'
+          });
+        }
       } catch (error) {
-        console.error('Failed to fetch TBNB balance:', error);
+        console.error('Failed to fetch token balances:', error);
         set({
           balance: {
+            bnb: '0.00',
             usdt: '0.00',
             wbnb: '0.00',
             usdc: '0.00'
@@ -652,8 +838,8 @@ export const useWalletStore = create<WalletStore>((set, get) => ({
       return;
     }
 
-    // For other networks (not 97), show native balance only
-    console.log('ℹ️ Non-BSC Testnet network: showing native balance only');
+    // For other networks (not 56), show native balance only
+    console.log('ℹ️ Non-BSC Mainnet network: showing native balance only');
     try {
       let provider: ethers.BrowserProvider;
 
@@ -672,7 +858,8 @@ export const useWalletStore = create<WalletStore>((set, get) => ({
 
       set({
         balance: {
-          usdt: nativeBalance,
+          bnb: nativeBalance,
+          usdt: '0.00',
           wbnb: '0.00',
           usdc: '0.00'
         }
@@ -681,13 +868,14 @@ export const useWalletStore = create<WalletStore>((set, get) => ({
       console.log('Native balance updated:', nativeBalance);
     } catch (error) {
       console.error('Failed to fetch native balance:', error);
-      set({
-        balance: {
-          usdt: '0.00',
-          wbnb: '0.00',
-          usdc: '0.00'
-        }
-      });
+        set({
+          balance: {
+            bnb: '0.00',
+            usdt: '0.00',
+            wbnb: '0.00',
+            usdc: '0.00'
+          }
+        });
     }
   },
 
@@ -718,16 +906,24 @@ export const useWalletStore = create<WalletStore>((set, get) => ({
 
       console.log('🔄 Restoring wallet state from cookies:', walletState);
 
+      // Restore walletType from sessionStorage first (most recent), fallback to cookie
+      let walletType = walletState.walletType as WalletType;
+      const sessionWalletType = sessionStorage.getItem('walletType');
+      if (sessionWalletType && ['metamask', 'trustwallet', 'walletconnect'].includes(sessionWalletType)) {
+        walletType = sessionWalletType as WalletType;
+        console.log('📦 Restored walletType from sessionStorage:', walletType);
+      }
+
       // Set the basic state
       set({
         address: walletState.address,
         isConnected: true,
         chainId: walletState.chainId,
-        walletType: walletState.walletType as WalletType
+        walletType: walletType
       });
 
-      // Try to restore the connection based on wallet type
-      if (walletState.walletType === 'metamask') {
+      // Try to restore the connection based on wallet type (use restored walletType)
+      if (walletType === 'metamask') {
         // For MetaMask, check if still connected
         if (window.ethereum) {
           try {
@@ -743,7 +939,7 @@ export const useWalletStore = create<WalletStore>((set, get) => ({
             get().disconnect();
           }
         }
-      } else if (walletState.walletType === 'walletconnect') {
+      } else if (walletType === 'walletconnect') {
         // For WalletConnect, try to restore session
         try {
           await walletConnectService.initialize();
@@ -803,20 +999,20 @@ if (typeof window !== 'undefined') {
       useWalletStore.setState({ chainId: parsedChainId });
       
       // Check if on correct network
-      if (parsedChainId !== 97) {
-        console.log('⚠️ Wrong network detected, requesting switch to BSC Testnet');
-        toast.error('Please switch to BSC Testnet for proper functionality');
+      if (parsedChainId !== 56) {
+        console.log('⚠️ Wrong network detected, requesting switch to BSC Mainnet');
+        toast.error('Please switch to BSC Mainnet for proper functionality');
         
-        // Try to switch to BSC Testnet
+        // Try to switch to BSC Mainnet
         try {
-          await useWalletStore.getState().switchToNetwork(97);
-          toast.success('Switched to BSC Testnet!');
+          await useWalletStore.getState().switchToNetwork(56);
+          toast.success('Switched to BSC Mainnet!');
         } catch (error) {
           console.error('Failed to auto-switch network:', error);
         }
       } else {
-        console.log('✅ Connected to BSC Testnet');
-        toast.success('Connected to BSC Testnet!');
+        console.log('✅ Connected to BSC Mainnet');
+        toast.success('Connected to BSC Mainnet!');
       }
       
       // Update balances when network changes

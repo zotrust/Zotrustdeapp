@@ -1,70 +1,70 @@
 // Import the correct P2PEscrowV2 ABI
 import { ZOTRUST_CONTRACT_ABI } from './contracts-abi';
 
-// BSC Testnet Chain ID (97)
-export const BSC_TESTNET_CHAIN_ID = 97;
+// BSC Mainnet Chain ID (56)
+export const BSC_MAINNET_CHAIN_ID = 56;
 
 // Re-export ABI for backwards compatibility
 export { ZOTRUST_CONTRACT_ABI };
 
-// Testnet Contract Address (replace with your deployed testnet address)
+// Mainnet Contract Address
 export const ZOTRUST_CONTRACT_ADDRESS = '0x878A2a0d3452533F7a2cB0E3053258AB66C03d0F';
 
-// Testnet Token Addresses (BSC Testnet - TBNB Primary)
+// Mainnet Token Addresses (BSC Mainnet - BNB Primary)
 export const TOKENS = {
-  TBNB: {
-    symbol: 'TBNB',
+  BNB: {
+    symbol: 'BNB',
     address: '0x0000000000000000000000000000000000000000', // ✅ Native BNB (address(0) with msg.value support)
     decimals: 18,
     isNative: true // Native token - requires msg.value in transactions
   },
   WBNB: {
     symbol: 'WBNB',
-    address: '0xae13d989daC2f0dEbFf460aC112a837C89BAa7cd', // Wrapped BNB (ERC20)
+    address: '0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c', // Wrapped BNB (ERC20) on Mainnet
     decimals: 18,
     isNative: false
   },
   USDT: {
     symbol: 'USDT',
-    address: '0x7ef95a0FEE0Dd31b22626fA2e10Ee6A223F8a684', // PancakeSwap Testnet USDT
+    address: '0x55d398326f99059fF775485246999027B3197955', // BSC Mainnet USDT
     decimals: 18,
     isNative: false
   },
   USDC: {
     symbol: 'USDC',
-    address: '0x64544969ed7EBf5f083679233325356EbE738930', // BSC Testnet USDC
+    address: '0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d', // BSC Mainnet USDC
     decimals: 18,
     isNative: false
   },
   BUSD: {
     symbol: 'BUSD',
-    address: '0x78867BbEeF44f2326bF8DDd1941a4439382EF2A7', // PancakeSwap Testnet BUSD
+    address: '0xe9e7CEA3DedcA5984780Bafc599bD69ADd087D56', // BSC Mainnet BUSD
     decimals: 18,
     isNative: false
   },
   CAKE: {
     symbol: 'CAKE',
-    address: '0xFa60D973F7642B748046464eAD5d4c8c4b8A0C7c', // PancakeSwap Testnet CAKE
+    address: '0x0E09FaBB73Bd3Ade0a17ECC321fD13a19e81cE82', // PancakeSwap Mainnet CAKE
     decimals: 18,
     isNative: false
   }
 };
 
 
-// Testnet RPC URL
-export const BSC_TESTNET_RPC = 'https://data-seed-prebsc-1-s1.binance.org:8545/';
+// Mainnet RPC URL
+export const BSC_MAINNET_RPC = 'https://bsc-dataseed.binance.org/';
 
 // Network Config for wallet connection
-export const BSC_TESTNET_PARAMS = {
-  chainId: '0x61', // 97 in hex
-  chainName: 'BSC Testnet',
+export const BSC_MAINNET_PARAMS = {
+  chainId: '0x38', // 56 in hex
+  chainName: 'BSC Mainnet',
   nativeCurrency: {
     name: 'BNB',
     symbol: 'BNB',
     decimals: 18
   },
-  rpcUrls: [BSC_TESTNET_RPC],
-  blockExplorerUrls: ['https://testnet.bscscan.com']
+  rpcUrls: [BSC_MAINNET_RPC],
+  blockExplorerUrls: ['https://bscscan.com']
 };
 
 // ERC20 ABI for balance checking
@@ -92,13 +92,13 @@ export const ERC20_ABI = [
   }
 ];
 
-// Testnet Contract Addresses (for walletStore compatibility)
+// Mainnet Contract Addresses (for walletStore compatibility)
 export const CONTRACTS = {
-  BSC_TESTNET: {
+  BSC_MAINNET: {
     USDT: TOKENS.USDT.address,
     USDC: TOKENS.USDC.address,
     BUSD: TOKENS.BUSD.address,
-    chainId: 97
+    chainId: 56
   }
 };
 
@@ -108,10 +108,5 @@ export const NETWORKS = {
     name: 'BSC Mainnet',
     rpcUrl: 'https://bsc-dataseed.binance.org/',
     blockExplorerUrl: 'https://bscscan.com'
-  },
-  97: {
-    name: 'BSC Testnet',
-    rpcUrl: 'https://data-seed-prebsc-1-s1.binance.org:8545/',
-    blockExplorerUrl: 'https://testnet.bscscan.com'
   }
 };

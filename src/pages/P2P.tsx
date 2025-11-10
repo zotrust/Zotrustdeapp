@@ -13,7 +13,7 @@ import toast from 'react-hot-toast';
 
 const P2P: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'BUY' | 'SELL'>('BUY');
-  const [selectedToken, setSelectedToken] = useState<'TBNB' | 'USDT' | 'USDC'>('TBNB');
+  const [selectedToken, setSelectedToken] = useState<'USDT' | 'USDC'>('USDT');
   const [ads, setAds] = useState<Ad[]>([]);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [callModal, setCallModal] = useState<{ isOpen: boolean; ad: Ad | null }>({
@@ -424,8 +424,12 @@ const P2P: React.FC = () => {
               className={clsx(
                 'py-2 px-3 sm:py-3 sm:px-4 rounded-md font-medium transition-all text-sm sm:text-base',
                 activeTab === tab
-                  ? 'bg-gradient-to-r from-blue-500 to-purple-500 text-white'
-                  : 'text-gray-300 hover:text-white'
+                  ? tab === 'BUY'
+                    ? 'bg-gradient-to-r from-green-500 to-emerald-500 text-white'
+                    : 'bg-gradient-to-r from-red-500 to-pink-500 text-white'
+                  : tab === 'BUY'
+                    ? 'text-green-300 hover:text-green-200 hover:bg-green-500/10'
+                    : 'text-red-300 hover:text-red-200 hover:bg-red-500/10'
               )}
               whileTap={{ scale: 0.98 }}
             >
@@ -438,7 +442,7 @@ const P2P: React.FC = () => {
       {/* Token Selection */}
       <div className="flex items-center justify-between gap-2">
         <div className="flex space-x-1 sm:space-x-2">
-          {(['TBNB', 'USDT', 'USDC'] as const).map((token) => (
+          {(['USDT', 'USDC'] as const).map((token) => (
             <motion.button
               key={token}
               onClick={() => setSelectedToken(token)}
@@ -701,11 +705,21 @@ const P2P: React.FC = () => {
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
-              className="bg-slate-900 rounded-lg p-4 sm:p-6 w-full max-w-md border border-white/20 max-h-[90vh] overflow-y-auto"
+              className={clsx(
+                'bg-slate-900 rounded-lg p-4 sm:p-6 w-full max-w-md border-2 max-h-[90vh] overflow-y-auto',
+                orderModal.ad.type === 'BUY'
+                  ? 'border-red-500/50'
+                  : 'border-green-500/50'
+              )}
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex items-center justify-between mb-4 sm:mb-6">
-                <h3 className="text-lg sm:text-xl font-bold text-white">
+                <h3 className={clsx(
+                  'text-lg sm:text-xl font-bold',
+                  orderModal.ad.type === 'BUY' 
+                    ? 'text-red-400' 
+                    : 'text-green-400'
+                )}>
                   {orderModal.ad.type === 'BUY' ? 'Sell Request' : 'Buy Request'}
                 </h3>
                 <button

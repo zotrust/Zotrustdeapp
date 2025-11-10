@@ -1,5 +1,7 @@
 import { ethers } from 'ethers';
 import { ZOTRUST_CONTRACT_ABI, ZOTRUST_CONTRACT_ADDRESS } from '../config/contracts';
+import { useWalletStore } from '../stores/walletStore';
+import { walletConnectService } from './walletConnectService';
 
 /**
  * Blockchain Service - Direct Smart Contract Interaction
@@ -13,19 +15,105 @@ export class BlockchainService {
 
   /**
    * Initialize provider and connect wallet
+   * Uses the correct provider based on walletType from walletStore
    */
   async init() {
-    if (!window.ethereum) {
-      throw new Error('Please install MetaMask, Trust Wallet, or another Web3 wallet');
-    }
-
     try {
-      // Request wallet connection
-      await (window.ethereum as any).request({ method: 'eth_requestAccounts' });
+      // Get walletType from walletStore to determine which provider to use
+      const walletType = useWalletStore.getState().walletType;
       
-      // Create provider and signer
-      this.provider = new ethers.BrowserProvider(window.ethereum as any);
-      this.signer = await this.provider.getSigner();
+      console.log('🔍 Initializing blockchain service with walletType:', walletType);
+
+      let provider: ethers.BrowserProvider;
+      
+      if (walletType === 'walletconnect') {
+        // Use WalletConnect provider
+        // Get the singleton instance
+        const wcService = walletConnectService;
+        
+        // Ensure WalletConnect is initialized
+        if (!(wcService as any).isInitialized) {
+          console.log('🔄 WalletConnect not initialized, initializing now...');
+          await wcService.initialize();
+          // Wait a bit for provider to be set
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+        
+        // Try to get provider from WalletConnect service
+        let wcProvider = wcService.getProvider();
+        console.log('🔍 WalletConnect provider from service:', wcProvider ? 'Found' : 'Not found');
+        
+        // If provider not available, try to get it from appKit directly
+        if (!wcProvider) {
+          const appKit = (wcService as any).appKit;
+          if (appKit) {
+            console.log('🔍 Trying to get provider from appKit...');
+            const walletProvider = appKit.getWalletProvider();
+            if (walletProvider) {
+              wcProvider = new ethers.BrowserProvider(walletProvider);
+              console.log('✅ Got WalletConnect provider from appKit');
+            } else {
+              console.warn('⚠️ appKit.getWalletProvider() returned null');
+            }
+          } else {
+            console.warn('⚠️ appKit is not available');
+          }
+        }
+        
+        // If still no provider, check if account is connected and try to get provider again
+        if (!wcProvider) {
+          const isConnected = wcService.isConnected();
+          console.log('🔍 WalletConnect connected status:', isConnected);
+          
+          if (isConnected) {
+            // Wait a bit and try again
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            wcProvider = wcService.getProvider();
+            console.log('🔍 Retry: WalletConnect provider:', wcProvider ? 'Found' : 'Still not found');
+            
+            // Last attempt: get from appKit again
+            if (!wcProvider) {
+              const appKit = (wcService as any).appKit;
+              if (appKit) {
+                const walletProvider = appKit.getWalletProvider();
+                if (walletProvider) {
+                  wcProvider = new ethers.BrowserProvider(walletProvider);
+                  console.log('✅ Got WalletConnect provider from appKit (retry)');
+                }
+              }
+            }
+          }
+        }
+        
+        if (!wcProvider) {
+          throw new Error('WalletConnect provider not available. Please reconnect your wallet via WalletConnect.');
+        }
+        
+        provider = wcProvider;
+        console.log('✅ Using WalletConnect provider for transactions');
+      } else {
+        // Use window.ethereum for MetaMask/Trust Wallet
+        if (!window.ethereum) {
+          throw new Error('Please install MetaMask, Trust Wallet, or another Web3 wallet');
+        }
+        
+        // Request wallet connection if not already connected
+        try {
+          await (window.ethereum as any).request({ method: 'eth_requestAccounts' });
+        } catch (error: any) {
+          // If already connected, this might fail, but that's okay
+          if (error.code !== 4001) {
+            console.warn('eth_requestAccounts failed (might already be connected):', error);
+          }
+        }
+        
+        provider = new ethers.BrowserProvider(window.ethereum as any);
+        console.log('✅ Using window.ethereum provider');
+      }
+      
+      // Create signer from provider
+      this.provider = provider;
+      this.signer = await provider.getSigner();
       
       // Initialize contract with signer (for write operations)
       this.contract = new ethers.Contract(
@@ -34,13 +122,14 @@ export class BlockchainService {
         this.signer
       );
 
+      const address = await this.signer.getAddress();
       console.log('✅ Blockchain service initialized');
       console.log('📋 Contract:', ZOTRUST_CONTRACT_ADDRESS);
-      console.log('👛 Wallet:', await this.signer.getAddress());
+      console.log('👛 Wallet:', address);
       
       // Detect wallet type for better error messages
-      const walletType = this.detectWalletType();
-      console.log('🔍 Detected wallet type:', walletType);
+      const detectedWalletType = this.detectWalletType();
+      console.log('🔍 Detected wallet type:', detectedWalletType);
       
       return true;
     } catch (error) {
@@ -51,9 +140,42 @@ export class BlockchainService {
 
   /**
    * Detect the type of wallet being used
+   * Uses walletType from walletStore if available, otherwise detects from window.ethereum
    */
   private detectWalletType(): string {
-    if (!window.ethereum) return 'unknown';
+    // First, try to get walletType from walletStore (most accurate)
+    // Use a more defensive approach to avoid circular dependency issues
+    try {
+      // Check if useWalletStore is available and accessible
+      if (typeof useWalletStore !== 'undefined' && useWalletStore?.getState) {
+        const walletType = useWalletStore.getState()?.walletType;
+        if (walletType) {
+          switch (walletType) {
+            case 'metamask':
+              return 'MetaMask';
+            case 'trustwallet':
+              return 'Trust Wallet';
+            case 'walletconnect':
+              // Check if it's Trust Wallet via WalletConnect
+              if (window.ethereum?.isTrust || window.ethereum?.isTrustWallet) {
+                return 'Trust Wallet (via WalletConnect)';
+              }
+              return 'WalletConnect';
+            default:
+              break;
+          }
+        }
+      }
+    } catch (error: any) {
+      // Silently handle errors - fallback to detection from window.ethereum
+      // Don't log the error details to avoid noise
+      if (process.env.NODE_ENV === 'development') {
+        console.warn('Could not get walletType from store, using fallback detection');
+      }
+    }
+    
+    // Fallback to detection from window.ethereum
+    if (!window.ethereum) return 'Unknown Wallet';
     
     if (window.ethereum.isMetaMask) return 'MetaMask';
     if (window.ethereum.isTrust || window.ethereum.isTrustWallet) return 'Trust Wallet';
@@ -199,8 +321,32 @@ export class BlockchainService {
    * For ERC20, seller must approve: amount + seller's extra fee
    */
   private async approveToken(tokenAddress: string, amount: string): Promise<string> {
+    // Get wallet type first to ensure correct provider initialization
+    const walletTypeFromStore = useWalletStore.getState()?.walletType;
+    
+    // Ensure provider and signer are initialized with correct wallet
     if (!this.provider || !this.signer) {
       await this.init();
+    }
+    
+    // Double-check that we have the correct provider for WalletConnect
+    if (walletTypeFromStore === 'walletconnect') {
+      // Always re-initialize for WalletConnect to ensure we have the latest provider
+      console.log('🔄 Ensuring WalletConnect provider is available...');
+      await this.init();
+      
+      // Verify we have the provider
+      if (!this.provider) {
+        throw new Error('WalletConnect provider not available. Please ensure your wallet is connected via WalletConnect.');
+      }
+      
+      // Verify we have the signer
+      if (!this.signer) {
+        throw new Error('WalletConnect signer not available. Please ensure your wallet is connected via WalletConnect.');
+      }
+      
+      const signerAddress = await this.signer.getAddress();
+      console.log('✅ WalletConnect provider verified, signer address:', signerAddress);
     }
 
     // Native BNB doesn't need approval
@@ -213,35 +359,46 @@ export class BlockchainService {
       console.log('🔓 Approving ERC20 token spending...');
       console.log('🪙 Token:', tokenAddress);
       console.log('💰 Trade Amount:', amount);
+      console.log('👛 Wallet Type:', walletTypeFromStore);
 
+      // ERC20 ABI for approve function
+      const erc20ABI = [
+        "function approve(address spender, uint256 amount) public returns (bool)",
+        "function allowance(address owner, address spender) public view returns (uint256)",
+        "function decimals() public view returns (uint8)"
+      ];
+
+      const tokenContract = new ethers.Contract(tokenAddress, erc20ABI, this.signer);
+      
+      // Get token decimals (USDT/USDC on BSC use 18 decimals, but check to be sure)
+      let tokenDecimals = 18;
+      try {
+        tokenDecimals = await tokenContract.decimals();
+        console.log('📊 Token decimals:', tokenDecimals);
+      } catch (error) {
+        console.warn('⚠️ Could not fetch token decimals, assuming 18');
+      }
+      
       // Get fee constants from contract
       console.log('📊 Fetching fee structure for approval...');
       const SELLER_EXTRA_BPS = await this.contract!.SELLER_EXTRA_BPS();
       const BPS_DENOM = await this.contract!.BPS_DENOM();
 
-      // Calculate seller's total (amount + extra fee)
-      const amountWei = ethers.parseUnits(amount, 18);
+      // Calculate seller's total (amount + extra fee) with correct decimals
+      const amountWei = ethers.parseUnits(amount, tokenDecimals);
       const extraFee = (amountWei * SELLER_EXTRA_BPS) / BPS_DENOM;
       const sellerTotal = amountWei + extraFee;
-
+      
       console.log('💵 Seller Extra Fee (BPS):', SELLER_EXTRA_BPS.toString());
-      console.log('💵 Extra Fee Amount:', ethers.formatEther(extraFee));
-      console.log('💰 Total to Approve:', ethers.formatEther(sellerTotal));
-
-      // ERC20 ABI for approve function
-      const erc20ABI = [
-        "function approve(address spender, uint256 amount) public returns (bool)",
-        "function allowance(address owner, address spender) public view returns (uint256)"
-      ];
-
-      const tokenContract = new ethers.Contract(tokenAddress, erc20ABI, this.signer);
+      console.log('💵 Extra Fee Amount:', ethers.formatUnits(extraFee, tokenDecimals));
+      console.log('💰 Total to Approve:', ethers.formatUnits(sellerTotal, tokenDecimals));
       
       // Check current allowance
       const signerAddress = await this.signer!.getAddress();
       const currentAllowance = await tokenContract.allowance(signerAddress, ZOTRUST_CONTRACT_ADDRESS);
 
-      console.log('📊 Current allowance:', ethers.formatUnits(currentAllowance, 18));
-      console.log('📊 Required amount (with fees):', ethers.formatEther(sellerTotal));
+      console.log('📊 Current allowance:', ethers.formatUnits(currentAllowance, tokenDecimals));
+      console.log('📊 Required amount (with fees):', ethers.formatUnits(sellerTotal, tokenDecimals));
 
       // If already approved enough, skip
       if (currentAllowance >= sellerTotal) {
@@ -250,7 +407,45 @@ export class BlockchainService {
       }
 
       // Approve tokens (including seller's extra fee)
-      const approveTx = await tokenContract.approve(ZOTRUST_CONTRACT_ADDRESS, sellerTotal);
+      // For Trust Wallet and WalletConnect, use explicit gas settings
+      const walletType = this.detectWalletType();
+      // walletTypeFromStore is already declared at the top of the function
+      const isTrustWallet = walletTypeFromStore === 'trustwallet' || 
+                           walletTypeFromStore === 'walletconnect' ||
+                           walletType.toLowerCase().includes('trust');
+      
+      let approveTx;
+      if (isTrustWallet) {
+        console.log('🔧 Trust Wallet/WalletConnect detected - using explicit gas settings');
+        try {
+          // Estimate gas first
+          const gasEstimate = await tokenContract.approve.estimateGas(
+            ZOTRUST_CONTRACT_ADDRESS,
+            sellerTotal
+          );
+          
+          // Add 30% buffer for Trust Wallet/WalletConnect (increased from 20%)
+          const gasLimit = (gasEstimate * 130n) / 100n;
+          
+          console.log('⛽ Estimated gas:', gasEstimate.toString());
+          console.log('⛽ Gas limit with buffer:', gasLimit.toString());
+          
+          approveTx = await tokenContract.approve(
+            ZOTRUST_CONTRACT_ADDRESS,
+            sellerTotal,
+            {
+              gasLimit: gasLimit
+            }
+          );
+        } catch (gasError: any) {
+          console.warn('⚠️ Gas estimation failed, trying without explicit gas:', gasError);
+          // Fallback: try without explicit gas limit
+          approveTx = await tokenContract.approve(ZOTRUST_CONTRACT_ADDRESS, sellerTotal);
+        }
+      } else {
+        approveTx = await tokenContract.approve(ZOTRUST_CONTRACT_ADDRESS, sellerTotal);
+      }
+      
       console.log('📡 Approval transaction sent:', approveTx.hash);
       console.log('⏳ Waiting for confirmation...');
 
@@ -261,23 +456,33 @@ export class BlockchainService {
       return approveTx.hash;
     } catch (error: any) {
       console.error('💥 Error approving token:', error);
+      console.error('💥 Error details:', {
+        code: error.code,
+        reason: error.reason,
+        message: error.message,
+        data: error.data
+      });
       
       const walletType = this.detectWalletType();
       
-      if (error.code === 'ACTION_REJECTED') {
-        throw new Error(`Token approval rejected by user in ${walletType}`);
-      } else if (error.code === 'INSUFFICIENT_FUNDS') {
-        throw new Error(`Insufficient balance for gas fees in ${walletType}`);
+      // Provide more helpful error messages
+      if (error.code === 'ACTION_REJECTED' || error.code === 4001) {
+        throw new Error(`Token approval rejected by user in ${walletType}. Please try again and approve the transaction in your wallet.`);
+      } else if (error.code === 'INSUFFICIENT_FUNDS' || error.code === -32000) {
+        throw new Error(`Insufficient BNB for gas fees in ${walletType}. Please add more BNB to your wallet for transaction fees.`);
       } else if (error.code === 'UNSUPPORTED_OPERATION') {
-        throw new Error(`Token approval not supported by ${walletType}. Please try with a different wallet.`);
+        throw new Error(`Token approval not supported by ${walletType}. Please try with a different wallet or ensure you have sufficient BNB for gas.`);
       } else if (error.reason) {
         throw new Error(`Approval failed: ${error.reason}`);
-      } else if (error.message?.includes('User rejected')) {
-        throw new Error(`Token approval rejected by user in ${walletType}`);
-      } else if (error.message?.includes('insufficient funds')) {
-        throw new Error(`Insufficient balance for gas fees in ${walletType}`);
+      } else if (error.message?.includes('User rejected') || error.message?.includes('user rejected') || error.message?.includes('user-denied')) {
+        throw new Error(`Token approval rejected by user in ${walletType}. Please try again and approve the transaction.`);
+      } else if (error.message?.includes('insufficient funds') || error.message?.includes('insufficient balance')) {
+        throw new Error(`Insufficient BNB for gas fees in ${walletType}. Please add more BNB to your wallet.`);
+      } else if (error.message?.includes('CALL_EXCEPTION') || error.message?.includes('missing revert data')) {
+        throw new Error(`Token approval failed in ${walletType}. Please ensure you have sufficient token balance and BNB for gas.`);
       } else {
-        throw new Error(`Failed to approve token spending using ${walletType}`);
+        const errorMsg = error.message || 'Unknown error';
+        throw new Error(`Failed to approve token spending using ${walletType}. ${errorMsg}`);
       }
     }
   }
@@ -626,11 +831,11 @@ export class BlockchainService {
   }
 
   /**
-   * Check if wallet is connected to correct network (BSC Testnet)
+   * Check if wallet is connected to correct network (BSC Mainnet)
    */
   async checkNetwork(): Promise<boolean> {
     const network = await this.getNetwork();
-    const expectedChainId = 97; // BSC Testnet
+    const expectedChainId = 56; // BSC Mainnet
     
     if (network.chainId !== expectedChainId) {
       console.warn(`⚠️ Wrong network! Expected: ${expectedChainId}, Got: ${network.chainId}`);
@@ -641,9 +846,9 @@ export class BlockchainService {
   }
 
   /**
-   * Switch to BSC Testnet
+   * Switch to BSC Mainnet
    */
-  async switchToBSCTestnet() {
+  async switchToBSCMainnet() {
     if (!window.ethereum) {
       throw new Error('Wallet not found');
     }
@@ -651,7 +856,7 @@ export class BlockchainService {
     try {
       await (window.ethereum as any).request({
         method: 'wallet_switchEthereumChain',
-        params: [{ chainId: '0x61' }], // 97 in hex
+        params: [{ chainId: '0x38' }], // 56 in hex
       });
     } catch (switchError: any) {
       // Chain not added, try adding it
@@ -659,15 +864,15 @@ export class BlockchainService {
         await (window.ethereum as any).request({
           method: 'wallet_addEthereumChain',
           params: [{
-            chainId: '0x61',
-            chainName: 'BSC Testnet',
+            chainId: '0x38',
+            chainName: 'BSC Mainnet',
             nativeCurrency: {
               name: 'BNB',
               symbol: 'BNB',
               decimals: 18
             },
-            rpcUrls: ['https://data-seed-prebsc-1-s1.binance.org:8545/'],
-            blockExplorerUrls: ['https://testnet.bscscan.com']
+            rpcUrls: ['https://bsc-dataseed.binance.org/'],
+            blockExplorerUrls: ['https://bscscan.com']
           }],
         });
       } else {
