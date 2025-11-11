@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Check Trade Status - P2P Escrow V2</title>
+    <!-- Load ethers.js with fallback -->
+    <script src="https://cdn.ethers.io/lib/ethers-5.7.2.umd.min.js" 
+            onerror="this.onerror=null; this.src='https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js';"></script>
+    <script>
+        // Verify ethers is loaded
+        function checkEthersLoaded() {
+            if (typeof ethers === 'undefined') {
+                console.warn('ethers.js not loaded, trying fallback...');
+                const script = document.createElement('script');
+                script.src = 'https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js';
+                script.onload = function() {
+                    console.log('✅ ethers.js loaded from fallback CDN');
+                };
+                script.onerror = function() {
+                    console.error('❌ Failed to load ethers.js from both CDNs');
+                    alert('Failed to load ethers.js library. Please check your internet connection and refresh the page.');
+                };
+                document.head.appendChild(script);
+                return false;
+            }
+            console.log('✅ ethers.js loaded successfully');
+            return true;
+        }
+        
+        // Check on page load
+        window.addEventListener('load', function() {
+            setTimeout(checkEthersLoaded, 500);
+        });
+    </script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            color: #fff;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 2rem;
+        }
+        .input-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+        }
+        input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.1);
+            color: #fff;
+            font-size: 16px;
+        }
+        input::placeholder {
+            color: rgba(255, 255, 255, 0.6);
+        }
+        button {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            border-radius: 10px;
+            color: #fff;
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        button:hover {
+            transform: scale(1.02);
+        }
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .result {
+            margin-top: 30px;
+            padding: 20px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 10px;
+            display: none;
+        }
+        .result.show {
+            display: block;
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: 600;
+            margin: 5px;
+        }
+        .status-CREATED { background: #fbbf24; color: #000; }
+        .status-LOCKED { background: #3b82f6; color: #fff; }
+        .status-RELEASED { background: #10b981; color: #fff; }
+        .status-CANCELLED { background: #ef4444; color: #fff; }
+        .status-UNDER_DISPUTE { background: #f97316; color: #fff; }
+        .info-box {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 15px;
+            border-radius: 10px;
+            margin: 10px 0;
+        }
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .info-row:last-child {
+            border-bottom: none;
+        }
+        .warning {
+            background: rgba(251, 191, 36, 0.2);
+            border: 2px solid #fbbf24;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 10px 0;
+        }
+        .error {
+            background: rgba(239, 68, 68, 0.2);
+            border: 2px solid #ef4444;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 10px 0;
+        }
+        .success {
+            background: rgba(16, 185, 129, 0.2);
+            border: 2px solid #10b981;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 10px 0;
+        }
+        .loading {
+            text-align: center;
+            padding: 20px;
+        }
+        .spinner {
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-top: 4px solid #fff;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Check Trade Status on Blockchain</h1>
+        
+        <div class="input-group">
+            <label for="tradeId">Trade ID:</label>
+            <input type="number" id="tradeId" placeholder="Enter trade ID (e.g., 1)" value="1">
+        </div>
+        
+        <button id="checkBtn" onclick="checkTradeStatus()">Check Trade Status</button>
+        
+        <div id="result" class="result">
+            <div id="content"></div>
+        </div>
+    </div>
+
+    <script>
+        const CONTRACT_ADDRESS = '0x6722FE6DdCe1F7389daa70aD5C65e51f9F375E6e';
+        const BSC_MAINNET_RPC = 'https://bsc-dataseed.binance.org/';
+        const BSC_MAINNET_CHAIN_ID = 56;
+
+        // Contract ABI (minimal - only what we need)
+        const CONTRACT_ABI = [
+            {
+                "inputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
+                "name": "trades",
+                "outputs": [
+                    {"internalType": "uint256", "name": "id", "type": "uint256"},
+                    {"internalType": "address", "name": "seller", "type": "address"},
+                    {"internalType": "address", "name": "buyer", "type": "address"},
+                    {"internalType": "address", "name": "token", "type": "address"},
+                    {"internalType": "uint256", "name": "amount", "type": "uint256"},
+                    {"internalType": "enum P2PEscrowV2.Status", "name": "status", "type": "uint8"},
+                    {"internalType": "uint256", "name": "lockedAt", "type": "uint256"},
+                    {"internalType": "uint256", "name": "appealStartAt", "type": "uint256"},
+                    {"internalType": "bool", "name": "buyerPaid", "type": "bool"},
+                    {"internalType": "bool", "name": "sellerReceived", "type": "bool"},
+                    {"internalType": "bool", "name": "appealFiled", "type": "bool"},
+                    {"internalType": "bool", "name": "isNativeLocked", "type": "bool"}
+                ],
+                "stateMutability": "view",
+                "type": "function"
+            }
+        ];
+
+        const STATUS_MAP = {
+            0: 'CREATED',
+            1: 'LOCKED',
+            2: 'RELEASED',
+            3: 'CANCELLED',
+            4: 'UNDER_DISPUTE'
+        };
+
+        async function checkTradeStatus() {
+            // Check if ethers is loaded
+            if (typeof ethers === 'undefined') {
+                alert('ethers.js library is not loaded. Please refresh the page and try again.');
+                return;
+            }
+
+            const tradeId = document.getElementById('tradeId').value;
+            const checkBtn = document.getElementById('checkBtn');
+            const result = document.getElementById('result');
+            const content = document.getElementById('content');
+
+            if (!tradeId || tradeId <= 0) {
+                alert('Please enter a valid trade ID');
+                return;
+            }
+
+            checkBtn.disabled = true;
+            checkBtn.textContent = 'Checking...';
+            result.classList.add('show');
+            content.innerHTML = '<div class="loading"><div class="spinner"></div><p>Checking blockchain...</p></div>';
+
+            try {
+                // Check if MetaMask is installed
+                if (typeof window.ethereum === 'undefined') {
+                    // Try using read-only provider instead
+                    console.log('No wallet found, using read-only provider...');
+                    const provider = new ethers.providers.JsonRpcProvider(BSC_MAINNET_RPC);
+                    
+                    // Create contract instance
+                    const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, provider);
+                    
+                    // Get trade details
+                    console.log('Fetching trade details for ID:', tradeId);
+                    const trade = await contract.trades(tradeId);
+                    
+                    displayTradeStatus(trade, tradeId, null);
+                    checkBtn.disabled = false;
+                    checkBtn.textContent = 'Check Trade Status';
+                    return;
+                }
+
+                // Connect to provider
+                const provider = new ethers.providers.Web3Provider(window.ethereum);
+                const network = await provider.getNetwork();
+
+                // Check network
+                if (Number(network.chainId) !== BSC_MAINNET_CHAIN_ID) {
+                    content.innerHTML = `
+                        <div class="error">
+                            <h3>❌ Wrong Network</h3>
+                            <p>Please switch to BSC Mainnet (Chain ID: ${BSC_MAINNET_CHAIN_ID})</p>
+                            <p>Current Network: ${network.name} (Chain ID: ${network.chainId})</p>
+                        </div>
+                    `;
+                    checkBtn.disabled = false;
+                    checkBtn.textContent = 'Check Trade Status';
+                    return;
+                }
+
+                // Create contract instance
+                const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, provider);
+
+                // Get trade details
+                console.log('Fetching trade details for ID:', tradeId);
+                const trade = await contract.trades(tradeId);
+                
+                displayTradeStatus(trade, tradeId, network);
+                
+                checkBtn.disabled = false;
+                checkBtn.textContent = 'Check Trade Status';
+
+            } catch (error) {
+                console.error('Error:', error);
+                const errorMsg = error.message || error.toString();
+                content.innerHTML = `
+                    <div class="error">
+                        <h3>❌ Error</h3>
+                        <p><strong>Message:</strong> ${errorMsg}</p>
+                        <p><strong>Details:</strong> ${error.toString()}</p>
+                        ${error.code ? `<p><strong>Error Code:</strong> ${error.code}</p>` : ''}
+                        ${error.reason ? `<p><strong>Reason:</strong> ${error.reason}</p>` : ''}
+                    </div>
+                `;
+                checkBtn.disabled = false;
+                checkBtn.textContent = 'Check Trade Status';
+            }
+        }
+
+        // Helper function to display trade status
+        function displayTradeStatus(trade, tradeId, network) {
+            const statusNumber = Number(trade.status);
+            const statusName = STATUS_MAP[statusNumber] || `UNKNOWN(${statusNumber})`;
+            const amount = ethers.utils.formatEther(trade.amount);
+            const isReleased = statusNumber === 2;
+
+            // Format addresses
+            const seller = trade.seller;
+            const buyer = trade.buyer;
+            const token = trade.token;
+
+            // Get token symbol
+            let tokenSymbol = 'Unknown';
+            if (token === '0x0000000000000000000000000000000000000000') {
+                tokenSymbol = 'BNB (Native)';
+            } else if (token.toLowerCase() === '0x55d398326f99059ff775485246999027b3197955') {
+                tokenSymbol = 'USDT';
+            } else if (token.toLowerCase() === '0x8ac76a51cc950d9822d68b83fe1ad97b32cd580d') {
+                tokenSymbol = 'USDC';
+            }
+
+            // Build result HTML
+            let html = `
+                <h2>📊 Trade Status on Blockchain</h2>
+                ${network ? `<p style="text-align: center; color: rgba(255,255,255,0.7); margin-bottom: 15px;">Network: ${network.name} (Chain ID: ${network.chainId})</p>` : '<p style="text-align: center; color: rgba(255,255,255,0.7); margin-bottom: 15px;">Using Read-Only Provider (No Wallet Required)</p>'}
+                <div class="info-box">
+                    <div class="info-row">
+                        <span><strong>Trade ID:</strong></span>
+                        <span>${tradeId}</span>
+                    </div>
+                    <div class="info-row">
+                        <span><strong>Status:</strong></span>
+                        <span><span class="status-badge status-${statusName}">${statusName}</span></span>
+                    </div>
+                    <div class="info-row">
+                        <span><strong>Amount:</strong></span>
+                        <span>${amount} ${tokenSymbol}</span>
+                    </div>
+                    <div class="info-row">
+                        <span><strong>Seller:</strong></span>
+                        <span><a href="https://bscscan.com/address/${seller}" target="_blank" style="color: #60a5fa;">${seller.slice(0, 6)}...${seller.slice(-4)}</a></span>
+                    </div>
+                    <div class="info-row">
+                        <span><strong>Buyer:</strong></span>
+                        <span><a href="https://bscscan.com/address/${buyer}" target="_blank" style="color: #60a5fa;">${buyer.slice(0, 6)}...${buyer.slice(-4)}</a></span>
+                    </div>
+                    <div class="info-row">
+                        <span><strong>Buyer Paid (Off-chain):</strong></span>
+                        <span>${trade.buyerPaid ? '✅ Yes' : '❌ No'}</span>
+                    </div>
+                    <div class="info-row">
+                        <span><strong>Seller Received (On-chain):</strong></span>
+                        <span>${trade.sellerReceived ? '✅ Yes' : '❌ No'}</span>
+                    </div>
+                    <div class="info-row">
+                        <span><strong>Appeal Filed:</strong></span>
+                        <span>${trade.appealFiled ? '⚠️ Yes' : '✅ No'}</span>
+                    </div>
+                    <div class="info-row">
+                        <span><strong>Is Native (BNB):</strong></span>
+                        <span>${trade.isNativeLocked ? '✅ Yes' : '❌ No (ERC20)'}</span>
+                    </div>
+                    ${trade.lockedAt && Number(trade.lockedAt) > 0 ? `
+                    <div class="info-row">
+                        <span><strong>Locked At:</strong></span>
+                        <span>${new Date(Number(trade.lockedAt) * 1000).toLocaleString()}</span>
+                    </div>
+                    ` : ''}
+                    ${trade.appealStartAt && Number(trade.appealStartAt) > 0 ? `
+                    <div class="info-row">
+                        <span><strong>Appeal Window Started:</strong></span>
+                        <span>${new Date(Number(trade.appealStartAt) * 1000).toLocaleString()}</span>
+                    </div>
+                    ` : ''}
+                </div>
+            `;
+
+            // Add status-specific messages
+            if (isReleased) {
+                html += `
+                    <div class="success">
+                        <h3>✅ Funds Released</h3>
+                        <p>The trade has been released on blockchain. Funds have been transferred to the buyer.</p>
+                        <p><strong>Status:</strong> ${statusName} (${statusNumber})</p>
+                    </div>
+                `;
+            } else if (statusNumber === 1) {
+                html += `
+                    <div class="warning">
+                        <h3>🔒 Funds Locked</h3>
+                        <p>The trade is locked on blockchain. Waiting for seller to confirm payment received.</p>
+                        <p><strong>Next Step:</strong> Seller should call <code>confirmReceived(${tradeId})</code> to release funds.</p>
+                        <p style="margin-top: 10px;"><strong>⚠️ IMPORTANT:</strong> If your database shows "RELEASED" but blockchain shows "LOCKED", the seller needs to call confirmReceived() on-chain to actually release the funds.</p>
+                    </div>
+                `;
+            } else if (statusNumber === 0) {
+                html += `
+                    <div class="warning">
+                        <h3>📝 Trade Created</h3>
+                        <p>The trade has been created but funds are not locked yet.</p>
+                        <p><strong>Next Step:</strong> Seller should lock funds using <code>lockFunds()</code> or <code>lockFundsNative()</code>.</p>
+                    </div>
+                `;
+            } else if (statusNumber === 4) {
+                html += `
+                    <div class="error">
+                        <h3>⚠️ Under Dispute</h3>
+                        <p>The trade is under dispute. Admin decision is required.</p>
+                    </div>
+                `;
+            }
+
+            // Database sync warning
+            html += `
+                <div class="info-box" style="margin-top: 20px;">
+                    <h3>💡 Database Sync Check</h3>
+                    <p>Compare this blockchain status with your database:</p>
+                    <ul style="margin-left: 20px; margin-top: 10px;">
+                        <li>If database shows "RELEASED" but blockchain shows "LOCKED" → Seller needs to call confirmReceived()</li>
+                        <li>If database shows "LOCKED" but blockchain shows "RELEASED" → Database needs to be updated</li>
+                        <li>If both show same status → Everything is synced ✅</li>
+                    </ul>
+                </div>
+            `;
+
+            document.getElementById('content').innerHTML = html;
+        }
+
+        // Auto-check on page load if tradeId is in URL
+        window.addEventListener('load', function() {
+            // Wait a bit for ethers to load
+            setTimeout(function() {
+                if (typeof ethers !== 'undefined') {
+                    const urlParams = new URLSearchParams(window.location.search);
+                    const tradeId = urlParams.get('tradeId');
+                    if (tradeId) {
+                        document.getElementById('tradeId').value = tradeId;
+                        checkTradeStatus();
+                    }
+                } else {
+                    console.warn('ethers.js not loaded yet, waiting...');
+                }
+            }, 1000);
+        });
+    </script>
+</body>
+</html>
+

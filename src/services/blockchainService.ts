@@ -93,13 +93,13 @@ export class BlockchainService {
         console.log('✅ Using WalletConnect provider for transactions');
       } else {
         // Use window.ethereum for MetaMask/Trust Wallet
-        if (!window.ethereum) {
-          throw new Error('Please install MetaMask, Trust Wallet, or another Web3 wallet');
-        }
-        
+    if (!window.ethereum) {
+      throw new Error('Please install MetaMask, Trust Wallet, or another Web3 wallet');
+    }
+
         // Request wallet connection if not already connected
-        try {
-          await (window.ethereum as any).request({ method: 'eth_requestAccounts' });
+    try {
+      await (window.ethereum as any).request({ method: 'eth_requestAccounts' });
         } catch (error: any) {
           // If already connected, this might fail, but that's okay
           if (error.code !== 4001) {
@@ -124,7 +124,7 @@ export class BlockchainService {
         ZOTRUST_CONTRACT_ABI,
         this.signer
       );
-      
+
       console.log('✅ Contract initialized');
       console.log('📋 Contract Address:', ZOTRUST_CONTRACT_ADDRESS);
       console.log('👛 Wallet Address:', address);
@@ -330,10 +330,10 @@ export class BlockchainService {
           // Estimate gas first
           console.log('⛽ Estimating gas...');
           const gasEstimate = await this.contract.createTrade.estimateGas(
-            orderData.token,
-            amountWei,
-            orderData.buyer
-          );
+        orderData.token,
+        amountWei,
+        orderData.buyer
+      );
           
           // Add 30% buffer for WalletConnect
           const gasLimit = (gasEstimate * 130n) / 100n;
@@ -689,7 +689,7 @@ export class BlockchainService {
       } catch (error) {
         console.warn('⚠️ Could not fetch token decimals, assuming 18');
       }
-      
+
       // Get fee constants from contract
       console.log('📊 Fetching fee structure for approval...');
       let SELLER_EXTRA_BPS: bigint;
@@ -730,7 +730,7 @@ export class BlockchainService {
       const amountWei = ethers.parseUnits(amount, tokenDecimals);
       const extraFee = (amountWei * SELLER_EXTRA_BPS) / BPS_DENOM;
       const sellerTotal = amountWei + extraFee;
-      
+
       console.log('💵 Seller Extra Fee (BPS):', SELLER_EXTRA_BPS.toString());
       console.log('💵 Extra Fee Amount:', ethers.formatUnits(extraFee, tokenDecimals));
       console.log('💰 Total to Approve:', ethers.formatUnits(sellerTotal, tokenDecimals));
@@ -755,7 +755,7 @@ export class BlockchainService {
       
       const signerAddressForApproval = await this.signer.getAddress();
       console.log('👛 Approving with signer address:', signerAddressForApproval);
-      
+
       // Approve tokens (including seller's extra fee)
       // For Trust Wallet and WalletConnect, use explicit gas settings
       const walletType = this.detectWalletType();
@@ -1079,13 +1079,14 @@ export class BlockchainService {
 
   /**
    * Release funds after payment confirmation (buyer/seller calls this with OTP)
-   * @param tradeId - Order ID from database
+   * @param _tradeId - Order ID from database
    * @returns Transaction hash
+   * @deprecated Funds are auto-released when seller confirms via confirmReceived()
    */
-  async releaseFunds(tradeId: number): Promise<string> {
-    // Contract auto-releases inside _releaseFunds when both parties confirm on-chain.
-    // Keep this method to avoid breaking imports, but make it explicit.
-    throw new Error('Direct release not supported; use markPaid/markReceived to trigger auto-release.');
+  async releaseFunds(_tradeId: number): Promise<string> {
+    // NEW CONTRACT: Funds are auto-released when seller calls confirmReceived()
+    // This function is kept for backwards compatibility but is no longer used
+    throw new Error('Direct release not supported. Seller should use confirmReceived() to release funds.');
   }
 
   /**
@@ -1157,40 +1158,73 @@ export class BlockchainService {
   }
 
   /**
-   * Buyer marks paid (on-chain) - triggers auto-release when seller also confirms
+   * Buyer marks paid (OFF-CHAIN ONLY - NEW CONTRACT)
+   * Buyer confirmation is now off-chain only, no blockchain transaction needed
+   * This function is kept for backwards compatibility but does nothing
+   * @deprecated Buyer no longer needs to confirm on-chain
    */
-  async markPaid(tradeId: number): Promise<string> {
+  async markPaid(_tradeId: number): Promise<string> {
+    console.log('ℹ️ Buyer confirmation is now off-chain only. No blockchain transaction needed.');
+    console.log('ℹ️ This function is deprecated. Buyer should confirm via frontend/database only.');
+    // Return a dummy hash since no transaction is needed
+    return 'OFF_CHAIN_CONFIRMATION';
+  }
+
+  /**
+   * Seller confirms received (on-chain) - NEW CONTRACT FLOW
+   * Seller calls this to confirm payment received and release funds to buyer
+   * Buyer confirmation is off-chain only, so seller's confirmation immediately releases funds
+   */
+  async confirmReceived(tradeId: number): Promise<string> {
     if (!this.contract || !this.signer) {
       await this.init();
     }
     
     try {
-      console.log('✅ Marking payment as sent on blockchain...');
+      console.log('✅ Seller confirming payment received on blockchain...');
       console.log('📝 Trade ID:', tradeId);
+      console.log('💡 NEW FLOW: Seller confirmation will release funds immediately to buyer');
       
       const walletType = useWalletStore.getState()?.walletType || this.detectWalletType();
       console.log('👛 Wallet Type:', walletType);
       
+      // Verify contract is available
+      if (!this.contract) {
+        throw new Error('Contract not initialized. Please reconnect your wallet.');
+      }
+      
+      // Try confirmReceived first, fallback to markReceived for backwards compatibility
+      let contractFunction: any;
+      if (this.contract.confirmReceived) {
+        contractFunction = this.contract.confirmReceived;
+        console.log('✅ Using confirmReceived() function');
+      } else if (this.contract.markReceived) {
+        contractFunction = this.contract.markReceived;
+        console.log('⚠️ Using markReceived() function (fallback)');
+      } else {
+        throw new Error('Neither confirmReceived nor markReceived function found in contract');
+      }
+      
       // For WalletConnect, estimate gas and add buffer
       let tx;
       if (walletType === 'walletconnect') {
-        console.log('🔧 WalletConnect detected - estimating gas for markPaid...');
+        console.log('🔧 WalletConnect detected - estimating gas...');
         try {
-          const gasEstimate = await this.contract!.markPaid.estimateGas(tradeId);
+          const gasEstimate = await contractFunction.estimateGas(tradeId);
           const gasLimit = (gasEstimate * 130n) / 100n;
           
           console.log('⛽ Estimated gas:', gasEstimate.toString());
           console.log('⛽ Gas limit with buffer:', gasLimit.toString());
           
-          tx = await this.contract!.markPaid(tradeId, { gasLimit: gasLimit });
+          tx = await contractFunction(tradeId, { gasLimit: gasLimit });
           console.log('✅ Transaction sent with explicit gas');
         } catch (gasError: any) {
           console.warn('⚠️ Gas estimation failed, trying without explicit gas:', gasError);
-          tx = await this.contract!.markPaid(tradeId);
+          tx = await contractFunction(tradeId);
           console.log('✅ Transaction sent without explicit gas');
         }
       } else {
-        tx = await this.contract!.markPaid(tradeId);
+        tx = await contractFunction(tradeId);
         console.log('✅ Transaction sent');
       }
       
@@ -1198,12 +1232,12 @@ export class BlockchainService {
       console.log('⏳ Waiting for confirmation...');
       
       const receipt = await tx.wait();
-      console.log('✅ Payment marked as sent on blockchain!');
+      console.log('✅ Payment confirmed and funds released to buyer!');
       console.log('📦 Block number:', receipt.blockNumber);
       
       return tx.hash;
     } catch (error: any) {
-      console.error('💥 Error marking paid:', error);
+      console.error('💥 Error confirming received:', error);
       console.error('💥 Error details:', {
         code: error.code,
         reason: error.reason,
@@ -1232,83 +1266,16 @@ export class BlockchainService {
   }
 
   /**
-   * Seller marks received (on-chain) - triggers auto-release when buyer also confirmed
+   * @deprecated Use confirmReceived() instead
+   * Kept for backwards compatibility - redirects to confirmReceived
    */
   async markReceived(tradeId: number): Promise<string> {
-    if (!this.contract || !this.signer) {
-      await this.init();
-    }
-    
-    try {
-      console.log('✅ Marking payment as received on blockchain...');
-      console.log('📝 Trade ID:', tradeId);
-      
-      const walletType = useWalletStore.getState()?.walletType || this.detectWalletType();
-      console.log('👛 Wallet Type:', walletType);
-      
-      // For WalletConnect, estimate gas and add buffer
-      let tx;
-      if (walletType === 'walletconnect') {
-        console.log('🔧 WalletConnect detected - estimating gas for markReceived...');
-        try {
-          const gasEstimate = await this.contract!.markReceived.estimateGas(tradeId);
-          const gasLimit = (gasEstimate * 130n) / 100n;
-          
-          console.log('⛽ Estimated gas:', gasEstimate.toString());
-          console.log('⛽ Gas limit with buffer:', gasLimit.toString());
-          
-          tx = await this.contract!.markReceived(tradeId, { gasLimit: gasLimit });
-          console.log('✅ Transaction sent with explicit gas');
-        } catch (gasError: any) {
-          console.warn('⚠️ Gas estimation failed, trying without explicit gas:', gasError);
-          tx = await this.contract!.markReceived(tradeId);
-          console.log('✅ Transaction sent without explicit gas');
-        }
-      } else {
-        tx = await this.contract!.markReceived(tradeId);
-        console.log('✅ Transaction sent');
-      }
-      
-      console.log('📡 Transaction hash:', tx.hash);
-      console.log('⏳ Waiting for confirmation...');
-      
-      const receipt = await tx.wait();
-      console.log('✅ Payment marked as received on blockchain!');
-      console.log('📦 Block number:', receipt.blockNumber);
-      
-      return tx.hash;
-    } catch (error: any) {
-      console.error('💥 Error marking received:', error);
-      console.error('💥 Error details:', {
-        code: error.code,
-        reason: error.reason,
-        message: error.message,
-        data: error.data
-      });
-      
-      const detectedWalletType = this.detectWalletType();
-      const walletTypeFromStore = useWalletStore.getState()?.walletType;
-      const finalWalletType = walletTypeFromStore || detectedWalletType;
-      
-      // Provide more helpful error messages
-      if (error.code === 'ACTION_REJECTED' || error.code === 4001) {
-        throw new Error(`Payment confirmation cancelled. You can try again later. The transaction was rejected in ${finalWalletType}.`);
-      } else if (error.code === 'INSUFFICIENT_FUNDS' || error.code === -32000) {
-        throw new Error(`Insufficient BNB for gas fees in ${finalWalletType}. Please add more BNB to your wallet for transaction fees.`);
-      } else if (error.reason) {
-        throw new Error(`Smart contract error: ${error.reason}`);
-      } else if (error.message?.includes('User rejected') || error.message?.includes('user rejected') || error.message?.includes('user-denied')) {
-        throw new Error(`Payment confirmation cancelled. You can try again later.`);
-      } else {
-        const errorMsg = error.message || 'Unknown error';
-        throw new Error(`Failed to confirm payment on blockchain using ${finalWalletType}. ${errorMsg}`);
-      }
-    }
+    return this.confirmReceived(tradeId);
   }
 
   /**
    * Get trade details from blockchain
-   * @param tradeId - Order ID
+   * @param tradeId - Trade ID on blockchain
    * @returns Trade details
    */
   async getTradeDetails(tradeId: number) {
@@ -1317,23 +1284,237 @@ export class BlockchainService {
     }
 
     try {
+      // Try to call trades function - it returns a struct
+      // In ethers v6, structs are returned as arrays
       const trade = await this.contract!.trades(tradeId);
       
+      console.log('📦 Raw trade data from contract:', trade);
+      
+      // Map status number to status name (matches P2PEscrowV2 contract enum)
+      const statusMap: { [key: number]: string } = {
+        0: 'CREATED',              // Trade created, not locked yet
+        1: 'LOCKED',               // Funds locked, waiting for payment confirmation
+        2: 'APPEAL_WINDOW_OPEN',   // Appeal window is open (2-48 hours after lock)
+        3: 'UNDER_DISPUTE',        // Appeal filed, trade in dispute
+        4: 'RELEASED',             // Funds released to buyer
+        5: 'REFUNDED',             // Funds refunded to seller
+        6: 'COMPLETED'             // Trade completed (final state)
+      };
+      
+      // Handle both array and object responses
+      // The contract returns a Proxy object with numeric indices (0-10)
+      // Actual fields: id, seller, buyer, token, amount, status, lockedAt, appealStartAt, buyerPaid, sellerReceived, appealFiled
+      // Note: isNativeLocked is NOT returned by the contract, we derive it from token address
+      let tradeData: any;
+      
+      // Check if it's a Proxy or array-like object
+      if (typeof trade === 'object' && trade !== null) {
+        // Handle Proxy/array-like object with numeric indices
+        tradeData = {
+          id: trade[0] ?? trade.id,
+          seller: trade[1] ?? trade.seller,
+          buyer: trade[2] ?? trade.buyer,
+          token: trade[3] ?? trade.token,
+          amount: trade[4] ?? trade.amount,
+          status: trade[5] ?? trade.status,
+          lockedAt: trade[6] ?? trade.lockedAt,
+          appealStartAt: trade[7] ?? trade.appealStartAt,
+          buyerPaid: trade[8] ?? trade.buyerPaid ?? false,
+          sellerReceived: trade[9] ?? trade.sellerReceived ?? false,
+          appealFiled: trade[10] ?? trade.appealFiled ?? false
+        };
+        
+        // Derive isNativeLocked from token address (native = address(0))
+        const tokenAddress = String(tradeData.token || '0x0').toLowerCase();
+        tradeData.isNativeLocked = tokenAddress === '0x0000000000000000000000000000000000000000' || 
+                                   tokenAddress === '0x0';
+      } else {
+        // Fallback: use as-is
+        tradeData = trade;
+        tradeData.isNativeLocked = false;
+      }
+      
+      const statusNumber = Number(tradeData.status);
+      const statusName = statusMap[statusNumber] || `UNKNOWN(${statusNumber})`;
+      
+      // Get token decimals dynamically
+      let tokenDecimals = 18; // Default
+      try {
+        if (tradeData.token && tradeData.token !== '0x0000000000000000000000000000000000000000') {
+          const tokenContract = new ethers.Contract(
+            tradeData.token,
+            ['function decimals() view returns (uint8)'],
+            this.provider!
+          );
+          tokenDecimals = await tokenContract.decimals();
+        }
+      } catch (decimalsError) {
+        console.warn('⚠️ Could not fetch token decimals, using default 18:', decimalsError);
+      }
+      
       return {
-        id: Number(trade.id),
-        adPoster: trade.adPoster,
-        counterParty: trade.counterParty,
-        seller: trade.seller,
-        buyer: trade.buyer,
-        token: trade.token,
-        amount: ethers.formatUnits(trade.amount, 18), // Assuming 18 decimals
-        adType: Number(trade.adType),
-        status: Number(trade.status),
-        expiryTime: new Date(Number(trade.expiryTime) * 1000).toISOString()
+        id: Number(tradeData.id),
+        seller: tradeData.seller,
+        buyer: tradeData.buyer,
+        token: tradeData.token,
+        amount: ethers.formatUnits(tradeData.amount, tokenDecimals),
+        status: statusNumber,
+        statusName: statusName,
+        lockedAt: tradeData.lockedAt && Number(tradeData.lockedAt) > 0 ? Number(tradeData.lockedAt) : null,
+        appealStartAt: tradeData.appealStartAt && Number(tradeData.appealStartAt) > 0 ? Number(tradeData.appealStartAt) : null,
+        buyerPaid: tradeData.buyerPaid || false,
+        sellerReceived: tradeData.sellerReceived || false,
+        appealFiled: tradeData.appealFiled || false,
+        isNativeLocked: tradeData.isNativeLocked || false
+      };
+    } catch (error: any) {
+      console.error('Error fetching trade details:', error);
+      
+      // If ABI decoding fails, try manual decoding
+      if (error.code === 'BAD_DATA' && error.data) {
+        console.log('🔄 Attempting manual decoding of trade data...');
+        try {
+          return await this.getTradeDetailsManual(tradeId);
+        } catch (manualError) {
+          console.error('Manual decoding also failed:', manualError);
+          throw error; // Throw original error
+        }
+      }
+      
+      throw error;
+    }
+  }
+
+  /**
+   * Manual decoding of trade data when ABI fails
+   * @param tradeId - Trade ID on blockchain
+   * @returns Trade details
+   */
+  private async getTradeDetailsManual(tradeId: number) {
+    if (!this.provider) {
+      await this.init();
+    }
+
+    try {
+      // Call the contract function directly using call
+      const contractAddress = ZOTRUST_CONTRACT_ADDRESS;
+      const iface = new ethers.Interface(ZOTRUST_CONTRACT_ABI);
+      const data = iface.encodeFunctionData('trades', [tradeId]);
+      
+      const result = await this.provider!.call({
+        to: contractAddress,
+        data: data
+      });
+      
+      // Decode the result manually
+      const decoded = iface.decodeFunctionResult('trades', result);
+      
+      // Map status number to status name (matches P2PEscrowV2 contract enum)
+      const statusMap: { [key: number]: string } = {
+        0: 'CREATED',              // Trade created, not locked yet
+        1: 'LOCKED',               // Funds locked, waiting for payment confirmation
+        2: 'APPEAL_WINDOW_OPEN',   // Appeal window is open (2-48 hours after lock)
+        3: 'UNDER_DISPUTE',        // Appeal filed, trade in dispute
+        4: 'RELEASED',             // Funds released to buyer
+        5: 'REFUNDED',             // Funds refunded to seller
+        6: 'COMPLETED'             // Trade completed (final state)
+      };
+      
+      const statusNumber = Number(decoded[5]); // status is 6th field (index 5)
+      const statusName = statusMap[statusNumber] || `UNKNOWN(${statusNumber})`;
+      
+      // Get token decimals
+      let tokenDecimals = 18;
+      const tokenAddress = decoded[3];
+      const isNative = !tokenAddress || 
+                      tokenAddress === '0x0000000000000000000000000000000000000000' ||
+                      String(tokenAddress).toLowerCase() === '0x0';
+      
+      try {
+        if (!isNative) {
+          const tokenContract = new ethers.Contract(
+            tokenAddress,
+            ['function decimals() view returns (uint8)'],
+            this.provider!
+          );
+          tokenDecimals = await tokenContract.decimals();
+        }
+      } catch (decimalsError) {
+        console.warn('⚠️ Could not fetch token decimals:', decimalsError);
+      }
+      
+      return {
+        id: Number(decoded[0]),
+        seller: decoded[1],
+        buyer: decoded[2],
+        token: decoded[3],
+        amount: ethers.formatUnits(decoded[4], tokenDecimals),
+        status: statusNumber,
+        statusName: statusName,
+        lockedAt: decoded[6] && Number(decoded[6]) > 0 ? Number(decoded[6]) : null,
+        appealStartAt: decoded[7] && Number(decoded[7]) > 0 ? Number(decoded[7]) : null,
+        buyerPaid: decoded[8] || false,
+        sellerReceived: decoded[9] || false,
+        appealFiled: decoded[10] || false,
+        isNativeLocked: isNative // Derived from token address, not from contract return
       };
     } catch (error) {
-      console.error('Error fetching trade details:', error);
+      console.error('Error in manual decoding:', error);
       throw error;
+    }
+  }
+
+  /**
+   * Verify trade status on blockchain and compare with database
+   * @param tradeId - Trade ID on blockchain
+   * @returns Verification result with status comparison
+   */
+  async verifyTradeStatus(tradeId: number): Promise<{
+    tradeId: number;
+    blockchainStatus: number;
+    blockchainStatusName: string;
+    isReleased: boolean;
+    seller: string;
+    buyer: string;
+    amount: string;
+    token: string;
+    buyerPaid: boolean;
+    sellerReceived: boolean;
+    details: any;
+  }> {
+    try {
+      console.log('🔍 Verifying trade status on blockchain...');
+      console.log('📝 Trade ID:', tradeId);
+      
+      const tradeDetails = await this.getTradeDetails(tradeId);
+      
+      // Check if funds are released (status 4 = RELEASED or status 6 = COMPLETED)
+      const isReleased = tradeDetails.status === 4 || tradeDetails.status === 6; // 4 = RELEASED, 6 = COMPLETED
+      
+      console.log('📊 Trade Status on Blockchain:', {
+        status: tradeDetails.status,
+        statusName: tradeDetails.statusName,
+        isReleased: isReleased,
+        buyerPaid: tradeDetails.buyerPaid,
+        sellerReceived: tradeDetails.sellerReceived
+      });
+      
+      return {
+        tradeId,
+        blockchainStatus: tradeDetails.status,
+        blockchainStatusName: tradeDetails.statusName,
+        isReleased,
+        seller: tradeDetails.seller,
+        buyer: tradeDetails.buyer,
+        amount: tradeDetails.amount,
+        token: tradeDetails.token,
+        buyerPaid: tradeDetails.buyerPaid,
+        sellerReceived: tradeDetails.sellerReceived,
+        details: tradeDetails
+      };
+    } catch (error: any) {
+      console.error('💥 Error verifying trade status:', error);
+      throw new Error(`Failed to verify trade status: ${error.message}`);
     }
   }
 

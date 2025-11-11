@@ -876,6 +876,17 @@ const Orders: React.FC = () => {
         console.log('📡 Create Trade TX Hash:', createTradeTxHash);
         console.log('📡 Lock Funds TX Hash:', lockFundsTxHash);
         
+        // Quick verification to ensure chain reflects LOCKED immediately
+        try {
+          const verification = await blockchainService.verifyTradeStatus(Number(blockchainTradeId));
+          console.log('🔎 Post-lock verify:', verification);
+          if (!verification.isReleased && verification.blockchainStatusName !== 'LOCKED') {
+            toast('Chain not yet LOCKED, retry after a few seconds.', { icon: '⏳' });
+          }
+        } catch (vErr) {
+          console.warn('Post-lock verification failed:', vErr);
+        }
+        
         toast.success(`Trade created and funds locked! ID: ${blockchainTradeId}`, {
           id: 'lock-flow',
           duration: 5000
@@ -1144,11 +1155,20 @@ const Orders: React.FC = () => {
         return;
       }
 
-      // First perform on-chain confirmation with the user's wallet
+      // NEW CONTRACT FLOW:
+      // - Buyer confirms OFF-CHAIN only (no blockchain transaction)
+      // - Seller confirms ON-CHAIN via confirmReceived() which releases funds immediately
+      
       if (type === 'SENT') {
-        await blockchainService.markPaid(tradeId);
+        // Buyer confirmation - OFF-CHAIN ONLY (no blockchain transaction needed)
+        console.log('✅ Buyer confirming payment sent (OFF-CHAIN only)...');
+        console.log('💡 NEW FLOW: Buyer confirmation is off-chain, no blockchain transaction needed');
+        // No on-chain call needed for buyer
       } else {
-        await blockchainService.markReceived(tradeId);
+        // Seller confirmation - ON-CHAIN (releases funds to buyer)
+        console.log('✅ Seller confirming payment received (ON-CHAIN)...');
+        console.log('💡 NEW FLOW: Seller confirmation will release funds immediately to buyer');
+        await blockchainService.confirmReceived(tradeId);
       }
 
       // Then notify backend to record off-chain confirmation and progress timeline
@@ -1600,6 +1620,157 @@ const Orders: React.FC = () => {
       fetchOrders();
     } catch (e: any) {
       toast.error(e?.reason || e?.message || 'Redeem failed', { id: 'redeem' });
+    }
+  };
+
+  // Seller-only helper: if DB says RELEASED but chain shows LOCKED, allow releasing on-chain
+  const handleForceReleaseOnChain = async (order: Order) => {
+    try {
+      const isSeller = order.sellerAddress.toLowerCase() === (address || '').toLowerCase();
+      if (!isSeller) {
+        toast.error('Only seller can release funds on-chain');
+        return;
+      }
+      const tradeId = Number((order as any)?.blockchain_trade_id || (order as any)?.blockchainTradeId);
+      if (!tradeId || Number.isNaN(tradeId)) {
+        toast.error('Missing blockchain trade id. Cannot release on-chain.');
+        return;
+      }
+      
+      // First verify current status
+      toast.loading('Verifying on-chain status...', { id: 'force-release' });
+      const verification = await blockchainService.verifyTradeStatus(tradeId);
+      if (verification.isReleased) {
+        toast.success('✅ Already released on-chain!', { id: 'force-release' });
+        fetchOrders(); // Refresh to sync
+        return;
+      }
+      
+      // Confirm with user
+      const shouldProceed = window.confirm(
+        `⚠️ Database shows RELEASED but blockchain shows ${verification.blockchainStatusName}.\n\n` +
+        `Funds are still locked on blockchain. Do you want to release them now?\n\n` +
+        `This will call confirmReceived() to release funds to buyer.\n\n` +
+        `Trade ID: ${tradeId}\n` +
+        `Amount: ${verification.amount} ${verification.token}`
+      );
+      
+      if (!shouldProceed) {
+        toast.dismiss('force-release');
+        return;
+      }
+      
+      // Release funds on-chain
+      toast.loading('Releasing funds on-chain...', { id: 'force-release' });
+      const txHash = await blockchainService.confirmReceived(tradeId);
+      
+      console.log('✅ Funds released on-chain, TX:', txHash);
+      
+      // Update backend to ensure database is synced
+      try {
+        const token = localStorage.getItem('authToken') || '';
+        const response = await fetch(`/api/disputes/${order.id}/confirm-payment-received`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          console.log('✅ Backend updated:', data);
+        } else {
+          console.warn('⚠️ Backend update failed, but blockchain release succeeded');
+        }
+      } catch (backendError) {
+        console.warn('⚠️ Backend update error (blockchain release succeeded):', backendError);
+      }
+      
+      toast.success(`✅ Funds released on-chain! TX: ${txHash.slice(0,10)}...`, { 
+        id: 'force-release',
+        duration: 8000
+      });
+      
+      // Refresh orders to show updated status
+      fetchOrders();
+    } catch (e: any) {
+      console.error('💥 Error releasing on-chain:', e);
+      toast.error(e?.reason || e?.message || 'Failed to release on-chain', { 
+        id: 'force-release',
+        duration: 8000
+      });
+    }
+  };
+
+  // Check and verify trade status on blockchain
+  const handleVerifyTradeStatus = async (order: Order) => {
+    try {
+      const tradeId = Number((order as any)?.blockchain_trade_id || (order as any)?.blockchainTradeId);
+      if (!tradeId || Number.isNaN(tradeId)) {
+        toast.error('Missing blockchain trade id. Cannot verify trade status.');
+        return;
+      }
+
+      toast.loading('Checking blockchain status...', { id: 'verify-status' });
+      
+      const verification = await blockchainService.verifyTradeStatus(tradeId);
+      
+      console.log('📊 Trade Status Verification:', verification);
+      
+      // Compare with database state
+      const dbState = order.state;
+      const blockchainState = verification.blockchainStatusName;
+      
+      let message = '';
+      let isError = false;
+      
+      // Check if blockchain shows RELEASED or COMPLETED (both mean funds are released)
+      const blockchainIsReleased = verification.isReleased || verification.blockchainStatus === 6; // 6 = COMPLETED
+      
+      if (dbState === 'RELEASED' && !blockchainIsReleased) {
+        const isSeller = order.sellerAddress.toLowerCase() === (address || '').toLowerCase();
+        if (isSeller) {
+          message = `⚠️ Database shows RELEASED but blockchain shows ${blockchainState}. Click "Release On-Chain" button below to release funds.`;
+        } else {
+          message = `⚠️ Database shows RELEASED but blockchain shows ${blockchainState}. Seller needs to call confirmReceived() to release funds.`;
+        }
+        isError = true;
+      } else if (dbState !== 'RELEASED' && blockchainIsReleased) {
+        message = `⚠️ Blockchain shows ${blockchainState} (funds released) but database shows ${dbState}. Database needs to be synced.`;
+        isError = true;
+      } else if (dbState === blockchainState || (dbState === 'RELEASED' && blockchainIsReleased)) {
+        message = `✅ Status synced! Both database and blockchain show ${blockchainState || 'RELEASED'}.`;
+        isError = false;
+      } else {
+        message = `📊 Database: ${dbState}, Blockchain: ${blockchainState}`;
+        isError = false;
+      }
+      
+      toast.dismiss('verify-status');
+      
+      if (isError) {
+        toast.error(message, { id: 'verify-status', duration: 8000 });
+      } else {
+        toast.success(message, { id: 'verify-status', duration: 5000 });
+      }
+      
+      // Show detailed info
+      console.log('📋 Verification Details:', {
+        tradeId: verification.tradeId,
+        databaseState: dbState,
+        blockchainStatus: verification.blockchainStatusName,
+        blockchainStatusNumber: verification.blockchainStatus,
+        isReleased: verification.isReleased,
+        buyerPaid: verification.buyerPaid,
+        sellerReceived: verification.sellerReceived,
+        amount: verification.amount,
+        token: verification.token
+      });
+      
+    } catch (error: any) {
+      console.error('Error verifying trade status:', error);
+      toast.error(`Failed to verify: ${error.message}`, { id: 'verify-status' });
     }
   };
 
@@ -2070,11 +2241,36 @@ const Orders: React.FC = () => {
                       )}
                       
                       {order.state === 'RELEASED' && (
-                        <div className="flex items-center space-x-2 text-green-400 bg-green-500/20 p-3 rounded-lg">
-                          <CheckCircle size={16} />
-                          <span className="text-sm font-medium">
-                            Order completed successfully!
-                          </span>
+                        <div className="space-y-2">
+                          <div className="flex items-center space-x-2 text-green-400 bg-green-500/20 p-3 rounded-lg">
+                            <CheckCircle size={16} />
+                            <span className="text-sm font-medium">
+                              Order completed successfully!
+                            </span>
+                          </div>
+                          {(order as any)?.blockchain_trade_id && (
+                            <motion.button
+                              onClick={() => handleVerifyTradeStatus(order)}
+                              className="w-full bg-blue-500/20 border border-blue-500/30 text-blue-300 px-3 py-2 rounded-md text-sm font-medium hover:bg-blue-500/30 transition-colors flex items-center justify-center space-x-2"
+                              whileTap={{ scale: 0.95 }}
+                              title="Verify if funds were actually released on blockchain"
+                            >
+                              <CheckCircle size={14} />
+                              <span>🔍 Verify Blockchain Status</span>
+                            </motion.button>
+                          )}
+                          {/* If DB shows RELEASED but chain is LOCKED, seller can force-release on-chain */}
+                          {(order as any)?.blockchain_trade_id && isSeller && (
+                            <motion.button
+                              onClick={() => handleForceReleaseOnChain(order)}
+                              className="w-full bg-orange-500/20 border border-orange-500/30 text-orange-300 px-3 py-2 rounded-md text-sm font-medium hover:bg-orange-500/30 transition-colors flex items-center justify-center space-x-2"
+                              whileTap={{ scale: 0.95 }}
+                              title="If blockchain still shows LOCKED, release funds on-chain"
+                            >
+                              <Lock size={14} />
+                              <span>Release On-Chain (Seller)</span>
+                            </motion.button>
+                          )}
                         </div>
                       )}
                       
@@ -2089,6 +2285,40 @@ const Orders: React.FC = () => {
                     </div>
                   )}
 
+                  {/* Status for Seller - RELEASED */}
+                  {isSeller && order.state === 'RELEASED' && (
+                    <div className="space-y-2">
+                      <div className="flex items-center space-x-2 text-green-400 bg-green-500/20 p-3 rounded-lg">
+                        <CheckCircle size={16} />
+                        <span className="text-sm font-medium">
+                          ✅ Funds released to buyer! Order completed successfully.
+                        </span>
+                      </div>
+                      {(order as any)?.blockchain_trade_id && (
+                        <div className="space-y-2">
+                          <motion.button
+                            onClick={() => handleVerifyTradeStatus(order)}
+                            className="w-full bg-blue-500/20 border border-blue-500/30 text-blue-300 px-3 py-2 rounded-md text-sm font-medium hover:bg-blue-500/30 transition-colors flex items-center justify-center space-x-2"
+                            whileTap={{ scale: 0.95 }}
+                            title="Verify if funds were actually released on blockchain"
+                          >
+                            <CheckCircle size={14} />
+                            <span>🔍 Verify Blockchain Status</span>
+                          </motion.button>
+                          <motion.button
+                            onClick={() => handleForceReleaseOnChain(order)}
+                            className="w-full bg-orange-500/20 border border-orange-500/30 text-orange-300 px-3 py-2 rounded-md text-sm font-medium hover:bg-orange-500/30 transition-colors flex items-center justify-center space-x-2"
+                            whileTap={{ scale: 0.95 }}
+                            title="If database shows RELEASED but blockchain shows LOCKED, click to release funds on-chain"
+                          >
+                            <Lock size={14} />
+                            <span>🔓 Release On-Chain (Seller)</span>
+                          </motion.button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   {/* Dispute Resolution System */}
                   {['LOCKED', 'UNDER_DISPUTE', 'APPEALED'].includes(order.state) && (
                     <div className="space-y-4">
@@ -2098,19 +2328,30 @@ const Orders: React.FC = () => {
                             <Gavel size={18} className="text-purple-400" />
                             <span className="text-purple-300 font-medium">Dispute Resolution</span>
                           </div>
-                          <button
-                            onClick={() => openDisputeModal(order.id)}
-                            className="text-purple-400 hover:text-purple-300 text-sm"
-                          >
-                            View Details
-                          </button>
+                          <div className="flex items-center space-x-2">
+                            {(order as any)?.blockchain_trade_id && (
+                              <button
+                                onClick={() => handleVerifyTradeStatus(order)}
+                                className="text-blue-400 hover:text-blue-300 text-sm px-2 py-1 rounded bg-blue-500/20 hover:bg-blue-500/30 transition-colors"
+                                title="Verify trade status on blockchain"
+                              >
+                                🔍 Verify Status
+                              </button>
+                            )}
+                            <button
+                              onClick={() => openDisputeModal(order.id)}
+                              className="text-purple-400 hover:text-purple-300 text-sm"
+                            >
+                              View Details
+                            </button>
+                          </div>
                         </div>
                         
                         {/* Quick Status */}
                         <div className="space-y-2">
                           {order.state === 'LOCKED' && (
                             <div className="text-sm text-blue-300">
-                              ⏰ Funds locked - 2 hours to confirm payment
+                              ⏰ Funds locked - Buyer confirms off-chain, Seller confirms on-chain to release funds
                             </div>
                           )}
                           {order.state === 'UNDER_DISPUTE' && (
@@ -2134,6 +2375,7 @@ const Orders: React.FC = () => {
                                   onClick={() => handleConfirmPayment(order.id, 'SENT')}
                                   className="flex-1 bg-blue-600 text-white px-3 py-2 rounded-md text-sm font-medium hover:bg-blue-700"
                                   whileTap={{ scale: 0.95 }}
+                                  title="Confirm payment sent (off-chain only - no gas fee)"
                                 >
                                   <CheckCircle size={14} className="inline mr-1" />
                                   Confirm Payment Sent
@@ -2144,6 +2386,7 @@ const Orders: React.FC = () => {
                                   onClick={() => handleConfirmPayment(order.id, 'RECEIVED')}
                                   className="flex-1 bg-green-600 text-white px-3 py-2 rounded-md text-sm font-medium hover:bg-green-700"
                                   whileTap={{ scale: 0.95 }}
+                                  title="Confirm payment received (on-chain - releases funds to buyer)"
                                 >
                                   <CheckCircle size={14} className="inline mr-1" />
                                   Confirm Payment Received

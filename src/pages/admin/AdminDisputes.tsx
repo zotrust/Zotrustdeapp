@@ -284,22 +284,38 @@ const AdminDisputes: React.FC = () => {
       }
 
       const tradeStatus = Number(trade.status);
+      // Complete status mapping (matches P2PEscrowV2 contract enum)
       const STATUS = {
+        CREATED: 0,
+        LOCKED: 1,
+        APPEAL_WINDOW_OPEN: 2,
+        UNDER_DISPUTE: 3,
         RELEASED: 4,
         REFUNDED: 5,
         COMPLETED: 6
       };
 
+      // Helper to get status name
+      const getStatusName = (statusNum: number): string => {
+        const statusKey = Object.keys(STATUS).find(k => STATUS[k as keyof typeof STATUS] === statusNum);
+        return statusKey || `UNKNOWN(${statusNum})`;
+      };
+
+      const statusName = getStatusName(tradeStatus);
+      console.log(`🔍 Trade ${tradeId} status: ${tradeStatus} (${statusName})`);
+
       // If trade is already finalized on-chain but dispute is still pending, update database
       if ((tradeStatus === STATUS.RELEASED || tradeStatus === STATUS.REFUNDED || tradeStatus === STATUS.COMPLETED) 
           && appeal.dispute_status === 'PENDING') {
-        console.log(`🔄 Syncing status: Trade ${tradeId} is ${tradeStatus === STATUS.RELEASED ? 'RELEASED' : tradeStatus === STATUS.REFUNDED ? 'REFUNDED' : 'COMPLETED'} on-chain, but dispute is PENDING. Updating...`);
+        console.log(`🔄 Syncing status: Trade ${tradeId} is ${statusName} on-chain, but dispute is PENDING. Updating...`);
         
         const token = localStorage.getItem('adminToken');
         if (!token) return;
 
-        const resolution = tradeStatus === STATUS.RELEASED ? 'TRANSFER_TO_BUYER' : 'REFUND_TO_SELLER';
-        const resolutionReason = `Trade was already ${tradeStatus === STATUS.RELEASED ? 'released' : tradeStatus === STATUS.REFUNDED ? 'refunded' : 'completed'} on-chain. Status synced automatically.`;
+        const resolution = tradeStatus === STATUS.RELEASED || tradeStatus === STATUS.COMPLETED 
+          ? 'TRANSFER_TO_BUYER' 
+          : 'REFUND_TO_SELLER';
+        const resolutionReason = `Trade was already ${statusName.toLowerCase()} on-chain. Status synced automatically.`;
 
         const response = await fetch(`/api/admin/appeals/${appeal.id}/resolve`, {
           method: 'POST',
@@ -315,7 +331,7 @@ const AdminDisputes: React.FC = () => {
 
         if (response.ok) {
           console.log('✅ Status synced successfully');
-          toast.success('Status updated: Trade was already completed on-chain', { duration: 3000 });
+          toast.success(`Status updated: Trade was already ${statusName.toLowerCase()} on-chain`, { duration: 3000 });
           fetchAppeals(); // Refresh the list
         } else if (showLoading) {
           const errorData = await response.json();
@@ -606,40 +622,14 @@ const handleResolveAppeal = async (appealId: string, releaseToBuyer: boolean, re
       console.log('✅ Trade is in UNDER_DISPUTE status. Admin can resolve (appeal filed by participant).');
     }
 
-    // 7) Handle trades that are already finalized
-    if (tradeStatus === STATUS.COMPLETED) {
-      toast.loading('Trade already completed on-chain. Updating database...', { id: 'resolve-chain' });
+    // 7) Handle trades that are already finalized (RELEASED, REFUNDED, or COMPLETED)
+    // COMPLETED (6) and RELEASED (4) both mean funds were released to buyer
+    if (tradeStatus === STATUS.COMPLETED || tradeStatus === STATUS.RELEASED) {
+      const statusName = tradeStatus === STATUS.COMPLETED ? 'completed' : 'released';
+      toast.loading(`Trade already ${statusName} on-chain. Updating database...`, { id: 'resolve-chain' });
       const token = localStorage.getItem('adminToken');
       
-      // Determine resolution based on trade history (default to TRANSFER_TO_BUYER for completed)
-      const response = await fetch(`/api/admin/appeals/${appealId}/resolve`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ 
-          resolution: 'TRANSFER_TO_BUYER', // Completed usually means funds were released
-          resolution_reason: reason || 'Trade was already completed on-chain before appeal resolution'
-        })
-      });
-      
-      if (response.ok) {
-        toast.success('✅ Appeal marked as resolved (trade already completed on-chain)', { id: 'resolve-chain' });
-        fetchAppeals();
-        setShowModal(false);
-        setConfirmResolution({ type: null, appealId: '', reason: '' });
-        setIsResolving(false);
-        return;
-      } else {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to update backend');
-      }
-    }
-
-    if (tradeStatus === STATUS.RELEASED) {
-      toast.loading('Trade already released on-chain. Updating database...', { id: 'resolve-chain' });
-      const token = localStorage.getItem('adminToken');
+      // Both COMPLETED and RELEASED mean funds were released to buyer
       const response = await fetch(`/api/admin/appeals/${appealId}/resolve`, {
         method: 'POST',
         headers: {
@@ -648,12 +638,12 @@ const handleResolveAppeal = async (appealId: string, releaseToBuyer: boolean, re
         },
         body: JSON.stringify({ 
           resolution: 'TRANSFER_TO_BUYER',
-          resolution_reason: reason || 'Trade was already released on-chain before appeal resolution'
+          resolution_reason: reason || `Trade was already ${statusName} on-chain before appeal resolution`
         })
       });
       
       if (response.ok) {
-        toast.success('✅ Appeal marked as resolved (funds already released to buyer)', { id: 'resolve-chain' });
+        toast.success(`✅ Appeal marked as resolved (funds already ${statusName} to buyer)`, { id: 'resolve-chain' });
         fetchAppeals();
         setShowModal(false);
         setConfirmResolution({ type: null, appealId: '', reason: '' });
@@ -972,6 +962,24 @@ const handleResolveAppeal = async (appealId: string, releaseToBuyer: boolean, re
     const postTxStatus = Number(postTxTrade.status);
     const postTxStatusName = getStatusName(postTxStatus);
     console.log('✅ Post-transaction status:', postTxStatus, '→', postTxStatusName);
+    
+    // Check if funds were actually released/refunded
+    const isReleased = postTxStatus === STATUS.RELEASED || postTxStatus === STATUS.COMPLETED;
+    const isRefunded = postTxStatus === STATUS.REFUNDED;
+    
+    if (releaseToBuyer && !isReleased) {
+      console.warn(`⚠️ Expected RELEASED/COMPLETED but got ${postTxStatusName}. Transaction may have failed.`);
+      toast.error(`⚠️ Transaction completed but status is ${postTxStatusName}. Please verify on BSCScan.`, { 
+        id: 'resolve-chain', 
+        duration: 10000 
+      });
+    } else if (!releaseToBuyer && !isRefunded) {
+      console.warn(`⚠️ Expected REFUNDED but got ${postTxStatusName}. Transaction may have failed.`);
+      toast.error(`⚠️ Transaction completed but status is ${postTxStatusName}. Please verify on BSCScan.`, { 
+        id: 'resolve-chain', 
+        duration: 10000 
+      });
+    }
     
     const successMessage = releaseToBuyer 
       ? `✅ On-chain: Full amount released to buyer (Status: ${postTxStatusName})` 
