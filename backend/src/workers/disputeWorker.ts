@@ -161,11 +161,25 @@ const processExpiredAppeal = async (order: any) => {
 
       // Create admin notification
       const refundNotificationMessage = `Order #${order.id} automatically refunded due to no appeals`;
-      await pool.query(
-        `INSERT INTO admin_notifications (dispute_id, order_id, notification_type, title, message, priority, status)
-         VALUES ($1, $2, 'AUTO_REFUND', 'Auto-Refund Executed', $3, 'MEDIUM', 'ACTED_UPON')`,
-        [order.dispute_id, order.id, refundNotificationMessage]
-      );
+      try {
+        await pool.query(
+          `INSERT INTO admin_notifications (dispute_id, order_id, notification_type, title, message, priority, status)
+           VALUES ($1, $2, 'AUTO_REFUND', 'Auto-Refund Executed', $3, 'MEDIUM', 'READ')`,
+          [order.dispute_id, order.id, refundNotificationMessage]
+        );
+      } catch (dbError: any) {
+        // If status constraint fails, try without status (let DB use default)
+        console.warn('⚠️ DISPUTE WORKER: Status constraint error, trying without status field:', dbError.message);
+        try {
+          await pool.query(
+            `INSERT INTO admin_notifications (dispute_id, order_id, notification_type, title, message, priority)
+             VALUES ($1, $2, 'AUTO_REFUND', 'Auto-Refund Executed', $3, 'MEDIUM')`,
+            [order.dispute_id, order.id, refundNotificationMessage]
+          );
+        } catch (retryError) {
+          console.error('❌ DISPUTE WORKER: Failed to create notification even without status:', retryError);
+        }
+      }
 
       console.log(`✅ DISPUTE WORKER: Order ${order.id} automatically refunded`);
 
@@ -196,19 +210,47 @@ const processExpiredAppeal = async (order: any) => {
       // Create high-priority admin notification for insufficient funds
       if (isInsufficientFunds) {
         const errorMessage = contractError.message || 'Insufficient funds in relayer wallet';
-        await pool.query(
-          `INSERT INTO admin_notifications (dispute_id, order_id, notification_type, title, message, priority, status)
-           VALUES ($1, $2, 'AUTO_REFUND_FAILED', '⚠️ Auto-Refund Failed: Insufficient Funds', $3, 'HIGH', 'PENDING')`,
-          [order.dispute_id, order.id, `Order #${order.id} could not be auto-refunded: ${errorMessage}. Please fund the relayer wallet and manually process this refund.`]
-        );
-        console.error(`🚨 DISPUTE WORKER: HIGH PRIORITY - Relayer wallet needs funding for order ${order.id}`);
+        try {
+          await pool.query(
+            `INSERT INTO admin_notifications (dispute_id, order_id, notification_type, title, message, priority, status)
+             VALUES ($1, $2, 'AUTO_REFUND_FAILED', '⚠️ Auto-Refund Failed: Insufficient Funds', $3, 'HIGH', 'UNREAD')`,
+            [order.dispute_id, order.id, `Order #${order.id} could not be auto-refunded: ${errorMessage}. Please fund the relayer wallet and manually process this refund.`]
+          );
+          console.error(`🚨 DISPUTE WORKER: HIGH PRIORITY - Relayer wallet needs funding for order ${order.id}`);
+        } catch (dbError: any) {
+          // If status constraint fails, try without status (let DB use default)
+          console.warn('⚠️ DISPUTE WORKER: Status constraint error, trying without status field:', dbError.message);
+          try {
+            await pool.query(
+              `INSERT INTO admin_notifications (dispute_id, order_id, notification_type, title, message, priority)
+               VALUES ($1, $2, 'AUTO_REFUND_FAILED', '⚠️ Auto-Refund Failed: Insufficient Funds', $3, 'HIGH')`,
+              [order.dispute_id, order.id, `Order #${order.id} could not be auto-refunded: ${errorMessage}. Please fund the relayer wallet and manually process this refund.`]
+            );
+          } catch (retryError) {
+            console.error('❌ DISPUTE WORKER: Failed to create notification even without status:', retryError);
+          }
+        }
       } else {
         // Regular error notification
-        await pool.query(
-          `INSERT INTO admin_notifications (dispute_id, order_id, notification_type, title, message, priority, status)
-           VALUES ($1, $2, 'AUTO_REFUND_FAILED', 'Auto-Refund Failed', $3, 'MEDIUM', 'PENDING')`,
-          [order.dispute_id, order.id, `Order #${order.id} could not be auto-refunded: ${contractError.message || 'Unknown error'}`]
-        );
+        try {
+          await pool.query(
+            `INSERT INTO admin_notifications (dispute_id, order_id, notification_type, title, message, priority, status)
+             VALUES ($1, $2, 'AUTO_REFUND_FAILED', 'Auto-Refund Failed', $3, 'MEDIUM', 'UNREAD')`,
+            [order.dispute_id, order.id, `Order #${order.id} could not be auto-refunded: ${contractError.message || 'Unknown error'}`]
+          );
+        } catch (dbError: any) {
+          // If status constraint fails, try without status (let DB use default)
+          console.warn('⚠️ DISPUTE WORKER: Status constraint error, trying without status field:', dbError.message);
+          try {
+            await pool.query(
+              `INSERT INTO admin_notifications (dispute_id, order_id, notification_type, title, message, priority)
+               VALUES ($1, $2, 'AUTO_REFUND_FAILED', 'Auto-Refund Failed', $3, 'MEDIUM')`,
+              [order.dispute_id, order.id, `Order #${order.id} could not be auto-refunded: ${contractError.message || 'Unknown error'}`]
+            );
+          } catch (retryError) {
+            console.error('❌ DISPUTE WORKER: Failed to create notification even without status:', retryError);
+          }
+        }
       }
     }
 

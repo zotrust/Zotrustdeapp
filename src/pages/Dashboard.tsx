@@ -58,7 +58,9 @@ const Dashboard: React.FC = () => {
     updateBalances,
     clearError,
     switchToNetwork,
-    debugWalletDetection
+    debugWalletDetection,
+    connectMetaMask,
+    connectTrustWallet
   } = useWalletStore();
   
   const { user, refreshUserProfile } = useUserStore();
@@ -111,13 +113,70 @@ const Dashboard: React.FC = () => {
     if (isConnected) {
       disconnect();
     } else {
-      setShowWalletModal(true);
+      // Auto-detect and connect to available wallet
+      if ((window as any).ethereum) {
+        const isMetaMask = (window as any).ethereum.isMetaMask;
+        const isTrustWallet = (window as any).ethereum.isTrust || 
+                             (window as any).ethereum.isTrustWallet;
+        
+        try {
+          if (isTrustWallet) {
+            await handleConnectTrustWallet();
+          } else if (isMetaMask) {
+            await handleConnectMetaMask();
+          } else {
+            // Default to MetaMask if available
+            await handleConnectMetaMask();
+          }
+        } catch (error) {
+          console.error('Auto-connect failed:', error);
+          // Fallback to modal if auto-connect fails
+          setShowWalletModal(true);
+        }
+      } else {
+        // No wallet detected, show modal
+        setShowWalletModal(true);
+      }
+    }
+  };
+
+  // Connect Trust Wallet directly
+  const handleConnectTrustWallet = async () => {
+    try {
+      await connectTrustWallet();
+      if (chainId !== 56) {
+        await switchToNetwork(56);
+      }
+      toast.success('Trust Wallet connected successfully!');
+    } catch (error: any) {
+      console.error('Trust Wallet connection error:', error);
+      toast.error(error.message || 'Failed to connect Trust Wallet');
+    }
+  };
+
+  // Connect MetaMask directly
+  const handleConnectMetaMask = async () => {
+    try {
+      await connectMetaMask();
+      if (chainId !== 56) {
+        await switchToNetwork(56);
+      }
+      toast.success('MetaMask connected successfully!');
+    } catch (error: any) {
+      console.error('MetaMask connection error:', error);
+      toast.error(error.message || 'Failed to connect MetaMask');
     }
   };
 
   const handleWalletSelect = async (walletType: 'metamask' | 'trustwallet' | 'walletconnect') => {
     try {
-      await connect(walletType);
+      if (walletType === 'metamask') {
+        await handleConnectMetaMask();
+      } else if (walletType === 'trustwallet') {
+        await handleConnectTrustWallet();
+      } else {
+        await connect(walletType);
+      }
       setShowWalletModal(false);
     } catch (error) {
       console.error('Wallet connection failed:', error);
@@ -384,6 +443,53 @@ const Dashboard: React.FC = () => {
             <p className="text-gray-300 text-sm">
               Connect your wallet to start trading
             </p>
+            
+            {/* Direct wallet connection buttons */}
+            {(window as any).ethereum && (
+              <div className="space-y-2">
+                {((window as any).ethereum.isMetaMask || !(window as any).ethereum.isTrust) && (
+                  <button
+                    onClick={handleConnectMetaMask}
+                    disabled={isConnecting}
+                    className="w-full bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white py-2 px-3 rounded-lg font-medium hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center space-x-2"
+                  >
+                    {isConnecting ? (
+                      <>
+                        <Loader2 className="animate-spin" size={14} />
+                        <span>Connecting...</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>🦊</span>
+                        <span>Connect MetaMask</span>
+                      </>
+                    )}
+                  </button>
+                )}
+                
+                {((window as any).ethereum.isTrust || (window as any).ethereum.isTrustWallet) && (
+                  <button
+                    onClick={handleConnectTrustWallet}
+                    disabled={isConnecting}
+                    className="w-full bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white py-2 px-3 rounded-lg font-medium hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center space-x-2"
+                  >
+                    {isConnecting ? (
+                      <>
+                        <Loader2 className="animate-spin" size={14} />
+                        <span>Connecting...</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>🔷</span>
+                        <span>Connect Trust Wallet</span>
+                      </>
+                    )}
+                  </button>
+                )}
+              </div>
+            )}
+            
+            {/* Fallback: Generic connect button or modal trigger */}
             <button
               onClick={handleConnectWallet}
               disabled={isConnecting}

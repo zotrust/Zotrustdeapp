@@ -9,7 +9,7 @@ import toast from 'react-hot-toast';
 
 const Profile: React.FC = () => {
   const { user, agents, locations, isLoading, updateProfile, fetchAgents, fetchLocations, fetchUserProfile, loginWithWallet, refreshUserProfile } = useUserStore();
-  const { address, isConnected, connect, connectionError, clearError } = useWalletStore();
+  const { address, isConnected, connect, connectionError, clearError, chainId, switchToNetwork, connectMetaMask, connectTrustWallet } = useWalletStore();
   const [isEditing, setIsEditing] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -73,6 +73,56 @@ const Profile: React.FC = () => {
 
   const handleInputChange = (field: keyof ProfileData, value: string | string[]) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  // Connect Trust Wallet directly
+  const handleConnectTrustWallet = async () => {
+    try {
+      setIsConnecting(true);
+      await connectTrustWallet();
+      
+      // Ensure BSC Mainnet
+      if (chainId !== 56) {
+        await switchToNetwork(56);
+      }
+      
+      // Auto-authenticate after connection
+      if (address) {
+        await handleWalletLogin();
+      } else {
+        toast.success('Trust Wallet connected successfully!');
+      }
+    } catch (error: any) {
+      console.error('Trust Wallet connection error:', error);
+      toast.error(error.message || 'Failed to connect Trust Wallet');
+    } finally {
+      setIsConnecting(false);
+    }
+  };
+
+  // Connect MetaMask directly
+  const handleConnectMetaMask = async () => {
+    try {
+      setIsConnecting(true);
+      await connectMetaMask();
+      
+      // Ensure BSC Mainnet
+      if (chainId !== 56) {
+        await switchToNetwork(56);
+      }
+      
+      // Auto-authenticate after connection
+      if (address) {
+        await handleWalletLogin();
+      } else {
+        toast.success('MetaMask connected successfully!');
+      }
+    } catch (error: any) {
+      console.error('MetaMask connection error:', error);
+      toast.error(error.message || 'Failed to connect MetaMask');
+    } finally {
+      setIsConnecting(false);
+    }
   };
 
   const handleWalletLogin = async () => {
@@ -180,23 +230,72 @@ const Profile: React.FC = () => {
                   Connect to access P2P trading
                 </p>
           </div>
-          <button
-                onClick={handleWalletLogin}
-                disabled={isConnecting}
-                className="bg-gradient-to-r from-violet-500 to-purple-500 text-white px-4 py-2 rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2 mx-auto text-sm"
-              >
-                {isConnecting ? (
-                  <>
-                    <Loader2 size={16} className="animate-spin" />
-                    <span>Connecting...</span>
-                  </>
-                ) : (
-                  <>
-                    <Wallet size={16} />
-                    <span>Connect</span>
-                  </>
+          
+          {/* Direct wallet connection buttons */}
+          <div className="space-y-2">
+            {(window as any).ethereum && (
+              <>
+                {((window as any).ethereum.isMetaMask || !(window as any).ethereum.isTrust) && (
+                  <button
+                    onClick={handleConnectMetaMask}
+                    disabled={isConnecting}
+                    className="w-full bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white px-4 py-2 rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2 text-sm"
+                  >
+                    {isConnecting ? (
+                      <>
+                        <Loader2 size={16} className="animate-spin" />
+                        <span>Connecting...</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>🦊</span>
+                        <span>Connect MetaMask</span>
+                      </>
+                    )}
+                  </button>
                 )}
-          </button>
+                
+                {((window as any).ethereum.isTrust || (window as any).ethereum.isTrustWallet) && (
+                  <button
+                    onClick={handleConnectTrustWallet}
+                    disabled={isConnecting}
+                    className="w-full bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white px-4 py-2 rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2 text-sm"
+                  >
+                    {isConnecting ? (
+                      <>
+                        <Loader2 size={16} className="animate-spin" />
+                        <span>Connecting...</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>🔷</span>
+                        <span>Connect Trust Wallet</span>
+                      </>
+                    )}
+                  </button>
+                )}
+              </>
+            )}
+            
+            {/* Fallback: Generic connect button */}
+            <button
+              onClick={handleWalletLogin}
+              disabled={isConnecting}
+              className="w-full bg-gradient-to-r from-violet-500 to-purple-500 text-white px-4 py-2 rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2 text-sm"
+            >
+              {isConnecting ? (
+                <>
+                  <Loader2 size={16} className="animate-spin" />
+                  <span>Connecting...</span>
+                </>
+              ) : (
+                <>
+                  <Wallet size={16} />
+                  <span>Connect Wallet</span>
+                </>
+              )}
+            </button>
+          </div>
             </div>
         </motion.div>
       )}

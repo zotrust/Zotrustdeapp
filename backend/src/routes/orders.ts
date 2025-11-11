@@ -333,8 +333,8 @@ router.post('/:id/prepare-accept', authenticateToken, async (req: any, res) => {
         blockchain: {
           contractAddress: process.env.CONTRACT_ADDRESS || '0x6722FE6DdCe1F7389daa70aD5C65e51f9F375E6e',
           tradeId: parseInt(orderId),
-          network: 'BSC Testnet',
-          chainId: 97
+          network: 'BSC Mainnet',
+          chainId: 56
         },
         
         message: 'OTP generated. Lock funds on blockchain before finalizing.',
@@ -763,8 +763,8 @@ router.post('/:id/prepare-lock', authenticateToken, async (req: any, res) => {
         blockchain: {
           tradeId: tradeId,
           contractAddress: process.env.CONTRACT_ADDRESS || '0x6722FE6DdCe1F7389daa70aD5C65e51f9F375E6e',
-          network: 'BSC Testnet',
-          chainId: 97
+          network: 'BSC Mainnet',
+          chainId: 56
         }
       }
     };
