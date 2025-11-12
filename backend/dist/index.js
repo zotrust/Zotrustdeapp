@@ -49,6 +49,7 @@ const fs = __importStar(require("fs"));
 const ngrok_1 = require("@ngrok/ngrok");
 // Import configurations
 const database_1 = require("./config/database");
+const database_2 = __importDefault(require("./config/database"));
 // Import routes
 const auth_1 = __importDefault(require("./routes/auth"));
 const ads_1 = __importDefault(require("./routes/ads"));
@@ -65,6 +66,8 @@ const admin_disputes_1 = __importDefault(require("./routes/admin-disputes"));
 const reviews_1 = __importDefault(require("./routes/reviews"));
 const admin_reviews_1 = __importDefault(require("./routes/admin-reviews"));
 const videos_1 = __importDefault(require("./routes/videos"));
+const chat_1 = __importDefault(require("./routes/chat"));
+const admin_chat_1 = __importDefault(require("./routes/admin-chat"));
 // Import workers
 const orderWorker_1 = require("./workers/orderWorker");
 const disputeWorker_1 = require("./workers/disputeWorker");
@@ -155,6 +158,8 @@ app.use('/api/admin', admin_disputes_1.default);
 app.use('/api/reviews', reviews_1.default);
 app.use('/api/admin/reviews', admin_reviews_1.default);
 app.use('/api/videos', videos_1.default);
+app.use('/api/chat', chat_1.default);
+app.use('/api/admin/chat', admin_chat_1.default);
 // WebRTC Signaling - Store active users 
 const users = new Map();
 const rooms = new Map();
@@ -496,6 +501,83 @@ io.on('connection', (socket) => {
         const onlineUsers = Array.from(users.keys());
         console.log(`📞 Backend: Sending online users list: ${onlineUsers.length} users`);
         socket.emit('online-users', onlineUsers);
+    });
+    // ============================================
+    // CHAT HANDLERS
+    // ============================================
+    // User sends chat message
+    socket.on('chat-message', async (data) => {
+        try {
+            const { message, userAddress } = data;
+            console.log(`💬 Backend: Chat message from ${userAddress}`);
+            if (!message || !userAddress) {
+                socket.emit('chat-error', { error: 'Missing message or user address' });
+                return;
+            }
+            // Save to database
+            const result = await database_2.default.query(`INSERT INTO chat_messages (user_address, message, sender_type, is_read)
+         VALUES ($1, $2, 'user', false)
+         RETURNING *`, [userAddress.toLowerCase(), message]);
+            const savedMessage = result.rows[0];
+            // Notify all admins (broadcast to admin sockets)
+            const adminSock = adminSocket.get('ADMIN_SUPPORT');
+            if (adminSock) {
+                io.to(adminSock).emit('new-chat-message', {
+                    message: savedMessage,
+                    userAddress: userAddress.toLowerCase()
+                });
+            }
+            // Confirm to sender
+            socket.emit('chat-message-sent', { message: savedMessage });
+        }
+        catch (error) {
+            console.error('Chat message error:', error);
+            socket.emit('chat-error', { error: 'Failed to send message' });
+        }
+    });
+    // Admin sends chat message
+    socket.on('admin-chat-message', async (data) => {
+        try {
+            const { message, userAddress, adminId } = data;
+            console.log(`💬 Backend: Admin chat message to ${userAddress}`);
+            if (!message || !userAddress || !adminId) {
+                socket.emit('chat-error', { error: 'Missing required fields' });
+                return;
+            }
+            // Save to database
+            const result = await database_2.default.query(`INSERT INTO chat_messages (user_address, admin_id, message, sender_type, is_read)
+         VALUES ($1, $2, $3, 'admin', false)
+         RETURNING *`, [userAddress.toLowerCase(), adminId, message]);
+            const savedMessage = result.rows[0];
+            // Send to user
+            const userSock = users.get(userAddress.toLowerCase());
+            if (userSock) {
+                io.to(userSock).emit('new-chat-message', {
+                    message: savedMessage,
+                    fromAdmin: true
+                });
+            }
+            // Confirm to admin
+            socket.emit('admin-chat-message-sent', { message: savedMessage });
+        }
+        catch (error) {
+            console.error('Admin chat message error:', error);
+            socket.emit('chat-error', { error: 'Failed to send message' });
+        }
+    });
+    // User joins chat room
+    socket.on('join-chat', (userAddress) => {
+        if (userAddress) {
+            socket.join(`chat:${userAddress.toLowerCase()}`);
+            console.log(`💬 Backend: User ${userAddress} joined chat`);
+        }
+    });
+    // Admin joins chat room for a user
+    socket.on('admin-join-chat', (userAddress) => {
+        if (userAddress) {
+            socket.join(`chat:${userAddress.toLowerCase()}`);
+            console.log(`💬 Backend: Admin joined chat for user ${userAddress}`);
+        }
     });
     // Handle order updates
     socket.on('subscribe-order-updates', (orderId) => {

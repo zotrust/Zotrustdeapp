@@ -11,6 +11,7 @@ import { connect } from '@ngrok/ngrok';
 
 // Import configurations
 import { connectDB } from './config/database';
+import pool from './config/database';
 
 // Import routes
 import authRoutes from './routes/auth';
@@ -28,6 +29,8 @@ import adminDisputesRoutes from './routes/admin-disputes';
 import reviewsRoutes from './routes/reviews';
 import adminReviewsRoutes from './routes/admin-reviews';
 import videosRoutes from './routes/videos';
+import chatRoutes from './routes/chat';
+import adminChatRoutes from './routes/admin-chat';
 
 // Import workers
 import { scheduleOTPCleanup, scheduleExpiredOrdersCheck } from './workers/orderWorker';
@@ -136,6 +139,8 @@ app.use('/api/admin', adminDisputesRoutes);
 app.use('/api/reviews', reviewsRoutes);
 app.use('/api/admin/reviews', adminReviewsRoutes);
 app.use('/api/videos', videosRoutes);
+app.use('/api/chat', chatRoutes);
+app.use('/api/admin/chat', adminChatRoutes);
 
 // WebRTC Signaling - Store active users 
 const users = new Map(); 
@@ -528,6 +533,120 @@ io.on('connection', (socket) => {
     const onlineUsers = Array.from(users.keys());
     console.log(`📞 Backend: Sending online users list: ${onlineUsers.length} users`);
     socket.emit('online-users', onlineUsers);
+  });
+
+  // ============================================
+  // CHAT HANDLERS
+  // ============================================
+
+  // User sends chat message
+  socket.on('chat-message', async (data: any) => {
+    try {
+      const { message, userAddress } = data;
+      console.log(`💬 Backend: Chat message from ${userAddress}`);
+
+      if (!message || !userAddress) {
+        socket.emit('chat-error', { error: 'Missing message or user address' });
+        return;
+      }
+
+      // Save to database
+      const result = await pool.query(
+        `INSERT INTO chat_messages (user_address, message, sender_type, is_read)
+         VALUES ($1, $2, 'user', false)
+         RETURNING *`,
+        [userAddress.toLowerCase(), message]
+      );
+
+      const savedMessage = result.rows[0];
+
+      // Notify all admins (broadcast to admin sockets)
+      const adminSock = adminSocket.get('ADMIN_SUPPORT');
+      if (adminSock) {
+        io.to(adminSock).emit('new-chat-message', {
+          message: savedMessage,
+          userAddress: userAddress.toLowerCase()
+        });
+      }
+
+      // Also broadcast to user's own chat room (for consistency)
+      io.to(`chat:${userAddress.toLowerCase()}`).emit('new-chat-message', {
+        message: savedMessage,
+        userAddress: userAddress.toLowerCase()
+      });
+
+      // Confirm to sender (only once)
+      socket.emit('chat-message-sent', { message: savedMessage });
+    } catch (error) {
+      console.error('Chat message error:', error);
+      socket.emit('chat-error', { error: 'Failed to send message' });
+    }
+  });
+
+  // Admin sends chat message
+  socket.on('admin-chat-message', async (data: any) => {
+    try {
+      const { message, userAddress, adminId } = data;
+      console.log(`💬 Backend: Admin chat message to ${userAddress}`);
+
+      if (!message || !userAddress || !adminId) {
+        socket.emit('chat-error', { error: 'Missing required fields' });
+        return;
+      }
+
+      // Save to database
+      const result = await pool.query(
+        `INSERT INTO chat_messages (user_address, admin_id, message, sender_type, is_read)
+         VALUES ($1, $2, $3, 'admin', false)
+         RETURNING *`,
+        [userAddress.toLowerCase(), adminId, message]
+      );
+
+      const savedMessage = result.rows[0];
+
+      // Send to user via socket (if connected)
+      const userSock = users.get(userAddress.toLowerCase());
+      if (userSock) {
+        io.to(userSock).emit('new-chat-message', {
+          message: savedMessage,
+          fromAdmin: true
+        });
+      }
+
+      // Also broadcast to user's chat room (for users who might be in the room)
+      io.to(`chat:${userAddress.toLowerCase()}`).emit('new-chat-message', {
+        message: savedMessage,
+        fromAdmin: true
+      });
+
+      // Confirm to admin (only once)
+      socket.emit('admin-chat-message-sent', { message: savedMessage });
+    } catch (error) {
+      console.error('Admin chat message error:', error);
+      socket.emit('chat-error', { error: 'Failed to send message' });
+    }
+  });
+
+  // User joins chat room
+  socket.on('join-chat', (userAddress: string) => {
+    if (userAddress) {
+      const normalizedAddress = userAddress.toLowerCase();
+      socket.join(`chat:${normalizedAddress}`);
+      // Also register user in users map for direct messaging
+      if (extendedSocket.userId !== normalizedAddress) {
+        users.set(normalizedAddress, socket.id);
+        extendedSocket.userId = normalizedAddress;
+      }
+      console.log(`💬 Backend: User ${normalizedAddress} joined chat room`);
+    }
+  });
+
+  // Admin joins chat room for a user
+  socket.on('admin-join-chat', (userAddress: string) => {
+    if (userAddress) {
+      socket.join(`chat:${userAddress.toLowerCase()}`);
+      console.log(`💬 Backend: Admin joined chat for user ${userAddress}`);
+    }
   });
 
   // Handle order updates

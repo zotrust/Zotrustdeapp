@@ -1587,4 +1587,3 @@ export class BlockchainService {
 
 // Export singleton instance
 export const blockchainService = new BlockchainService();
-

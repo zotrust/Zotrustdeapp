@@ -324,6 +324,33 @@ COMMENT ON COLUMN app_settings.key IS 'Unique setting key';
 COMMENT ON COLUMN app_settings.value IS 'Setting value (can be JSON)';
 
 -- =============================================
+-- 13. CHAT MESSAGES TABLE
+-- =============================================
+CREATE TABLE IF NOT EXISTS chat_messages (
+    id SERIAL PRIMARY KEY,
+    user_address VARCHAR(42) NOT NULL,
+    admin_id INTEGER REFERENCES admin_users(id),
+    message TEXT NOT NULL,
+    sender_type VARCHAR(20) NOT NULL CHECK (sender_type IN ('user', 'admin')),
+    is_read BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_address) REFERENCES users(address)
+);
+
+COMMENT ON TABLE chat_messages IS 'Chat messages between users and admin';
+COMMENT ON COLUMN chat_messages.user_address IS 'User wallet address';
+COMMENT ON COLUMN chat_messages.admin_id IS 'Admin user ID (NULL if message from user)';
+COMMENT ON COLUMN chat_messages.sender_type IS 'Who sent the message: user or admin';
+COMMENT ON COLUMN chat_messages.is_read IS 'Whether message has been read';
+
+-- Indexes for chat
+CREATE INDEX IF NOT EXISTS idx_chat_user ON chat_messages(user_address);
+CREATE INDEX IF NOT EXISTS idx_chat_admin ON chat_messages(admin_id);
+CREATE INDEX IF NOT EXISTS idx_chat_created ON chat_messages(created_at);
+CREATE INDEX IF NOT EXISTS idx_chat_read ON chat_messages(is_read);
+CREATE INDEX IF NOT EXISTS idx_chat_user_created ON chat_messages(user_address, created_at);
+
+-- =============================================
 -- INSERT DEFAULT DATA
 -- =============================================
 
@@ -401,6 +428,7 @@ SELECT setval('app_settings_id_seq', COALESCE((SELECT MAX(id) FROM app_settings)
 SELECT setval('locations_id_seq', COALESCE((SELECT MAX(id) FROM locations), 1));
 SELECT setval('transactions_id_seq', COALESCE((SELECT MAX(id) FROM transactions), 1));
 SELECT setval('support_id_seq', COALESCE((SELECT MAX(id) FROM support), 1));
+SELECT setval('chat_messages_id_seq', COALESCE((SELECT MAX(id) FROM chat_messages), 1));
 
 -- =============================================
 -- VERIFY SCHEMA

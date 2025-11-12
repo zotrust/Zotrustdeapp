@@ -42,6 +42,12 @@ const authenticateAdmin = async (req, res, next) => {
             // console.log('Admin auth - Role check failed. Expected: admin, Got:', decoded.role);
             return res.status(403).json({ success: false, error: 'Admin access required' });
         }
+        // Get admin from database
+        const adminResult = await database_1.default.query('SELECT id, username FROM admin_users WHERE username = $1', [decoded.username]);
+        if (adminResult.rows.length === 0) {
+            return res.status(401).json({ success: false, error: 'Admin not found' });
+        }
+        req.admin = adminResult.rows[0];
         next();
     }
     catch (error) {

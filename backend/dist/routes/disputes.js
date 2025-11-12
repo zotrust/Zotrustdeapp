@@ -227,35 +227,34 @@ router.post('/:orderId/confirm-payment-received', auth_1.authenticateToken, asyn
          seller_confirmed_at = $2,
          updated_at = CURRENT_TIMESTAMP
        RETURNING *`, [orderId, new Date()]);
-        // On-chain confirmation must be done by the seller's wallet on the frontend (markReceived)
-        // Check if both parties have confirmed
+        // NEW CONTRACT FLOW: Seller's confirmReceived() on blockchain already released funds
+        // So we immediately update order status to RELEASED
+        // Buyer confirmation is off-chain only, so seller's confirmation is sufficient
+        console.log('✅ CONFIRM PAYMENT RECEIVED: Seller confirmed - updating order status to RELEASED');
+        console.log('💡 NEW FLOW: Seller\'s confirmReceived() already released funds on blockchain');
+        // Update order status to RELEASED immediately
+        await database_1.default.query('UPDATE orders SET state = $1 WHERE id = $2', ['RELEASED', orderId]);
         const confirmation = confirmationResult.rows[0];
-        if (confirmation.buyer_confirmed) {
-            // Both confirmed - release funds
-            // Both on-chain confirmations should auto-release. Record off-chain timeline only.
-            await database_1.default.query('UPDATE orders SET state = $1 WHERE id = $2', ['RELEASED', orderId]);
-            await database_1.default.query(`INSERT INTO dispute_timeline (dispute_id, order_id, event_type, event_description, created_by)
-         VALUES (NULL, $1, 'BOTH_CONFIRMED', 'Both buyer and seller confirmed payment', 'SYSTEM')`, [orderId]);
-            return res.json({
-                success: true,
-                data: {
-                    orderId: parseInt(orderId),
-                    state: 'RELEASED',
-                    message: 'Payment confirmed by both parties. Funds released!'
-                }
-            });
-        }
         // Log timeline event
-        await database_1.default.query(`INSERT INTO dispute_timeline (dispute_id, order_id, event_type, event_description, created_by)
-       VALUES (NULL, $1, 'SELLER_CONFIRMED', 'Seller confirmed payment received', $2)`, [orderId, user.address]);
+        if (confirmation.buyer_confirmed) {
+            // Both confirmed
+            await database_1.default.query(`INSERT INTO dispute_timeline (dispute_id, order_id, event_type, event_description, created_by)
+         VALUES (NULL, $1, 'BOTH_CONFIRMED', 'Both buyer and seller confirmed payment. Funds released on blockchain.', 'SYSTEM')`, [orderId]);
+        }
+        else {
+            // Seller confirmed (buyer confirmation is off-chain only)
+            await database_1.default.query(`INSERT INTO dispute_timeline (dispute_id, order_id, event_type, event_description, created_by)
+         VALUES (NULL, $1, 'SELLER_CONFIRMED', 'Seller confirmed payment received and released funds on blockchain', $2)`, [orderId, user.address]);
+        }
+        console.log('🎉 CONFIRM PAYMENT RECEIVED: Order status updated to RELEASED');
         res.json({
             success: true,
             data: {
                 orderId: parseInt(orderId),
-                buyerConfirmed: confirmation.buyer_confirmed,
+                state: 'RELEASED',
+                buyerConfirmed: confirmation.buyer_confirmed || false,
                 sellerConfirmed: true,
-                timeRemaining: Math.max(0, timeRemaining),
-                message: 'Payment confirmation recorded. Waiting for buyer confirmation.'
+                message: 'Payment confirmed! Funds have been released on blockchain.'
             }
         });
     }

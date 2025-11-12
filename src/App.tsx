@@ -23,6 +23,8 @@ import AdminSettings from './pages/admin/AdminSettings';
 import AdminReviews from './pages/admin/AdminReviews';
 import AdminVideos from './pages/admin/AdminVideos';
 import AdminSupportCalls from './pages/admin/AdminSupportCalls';
+import AdminChat from './pages/admin/AdminChat';
+import Chat from './pages/Chat';
 import CallNotificationProvider from './providers/CallNotificationProvider';
 import './utils/consoleDebugger';
 
@@ -86,6 +88,10 @@ const router = createBrowserRouter([
       {
         path: 'benefits',
         element: <Benefits />
+      },
+      {
+        path: 'chat',
+        element: <Chat />
       }
     ]
   },
@@ -173,6 +179,10 @@ const router = createBrowserRouter([
           {
             path: 'settings',
             element: <AdminSettings />
+          },
+          {
+            path: 'chat',
+            element: <AdminChat />
           }
         ]
       }

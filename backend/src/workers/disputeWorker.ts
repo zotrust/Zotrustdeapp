@@ -162,8 +162,8 @@ const processExpiredAppeal = async (order: any) => {
       // Create admin notification
       const refundNotificationMessage = `Order #${order.id} automatically refunded due to no appeals`;
       try {
-        await pool.query(
-          `INSERT INTO admin_notifications (dispute_id, order_id, notification_type, title, message, priority, status)
+      await pool.query(
+        `INSERT INTO admin_notifications (dispute_id, order_id, notification_type, title, message, priority, status)
            VALUES ($1, $2, 'AUTO_REFUND', 'Auto-Refund Executed', $3, 'MEDIUM', 'READ')`,
           [order.dispute_id, order.id, refundNotificationMessage]
         );
@@ -174,8 +174,8 @@ const processExpiredAppeal = async (order: any) => {
           await pool.query(
             `INSERT INTO admin_notifications (dispute_id, order_id, notification_type, title, message, priority)
              VALUES ($1, $2, 'AUTO_REFUND', 'Auto-Refund Executed', $3, 'MEDIUM')`,
-            [order.dispute_id, order.id, refundNotificationMessage]
-          );
+        [order.dispute_id, order.id, refundNotificationMessage]
+      );
         } catch (retryError) {
           console.error('❌ DISPUTE WORKER: Failed to create notification even without status:', retryError);
         }

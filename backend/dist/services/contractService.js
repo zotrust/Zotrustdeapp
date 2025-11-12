@@ -181,6 +181,32 @@ class ContractService {
             throw new Error('Contract or relayer wallet not configured. Please check .env file.');
         }
         try {
+            // Check relayer wallet balance before attempting transaction
+            const balance = await this.provider.getBalance(this.relayerWallet.address);
+            const balanceBNB = ethers_1.ethers.formatEther(balance);
+            console.log(`💰 ContractService: Relayer wallet balance: ${balanceBNB} BNB`);
+            // Estimate gas cost
+            let gasEstimate;
+            try {
+                gasEstimate = await this.contract.redeemAfterAppealWindow.estimateGas(orderId);
+                const gasPrice = await this.provider.getFeeData();
+                const estimatedCost = gasEstimate * (gasPrice.gasPrice || 0n);
+                const estimatedCostBNB = ethers_1.ethers.formatEther(estimatedCost);
+                console.log(`⛽ ContractService: Estimated gas cost: ${estimatedCostBNB} BNB`);
+                if (balance < estimatedCost) {
+                    const shortfall = estimatedCost - balance;
+                    const shortfallBNB = ethers_1.ethers.formatEther(shortfall);
+                    throw new Error(`INSUFFICIENT_FUNDS: Relayer wallet has insufficient BNB for gas fees. ` +
+                        `Balance: ${balanceBNB} BNB, Required: ${estimatedCostBNB} BNB, Shortfall: ${shortfallBNB} BNB. ` +
+                        `Please fund the relayer wallet address: ${this.relayerWallet.address}`);
+                }
+            }
+            catch (gasError) {
+                if (gasError.message?.includes('INSUFFICIENT_FUNDS')) {
+                    throw gasError;
+                }
+                console.warn('⚠️ ContractService: Could not estimate gas, proceeding anyway:', gasError.message);
+            }
             console.log('⛓️ ContractService: Refunding trade on blockchain');
             console.log('📝 ContractService: Trade ID (Order ID):', orderId);
             console.log('🔙 ContractService: Calling redeemAfterAppealWindow() - This will REFUND seller');
@@ -198,6 +224,18 @@ class ContractService {
         catch (error) {
             console.error('💥 ContractService: Error refunding trade:', error);
             console.error('💥 ContractService: Error message:', error.message);
+            // Check for insufficient funds error
+            if (error.code === 'INSUFFICIENT_FUNDS' ||
+                error.message?.includes('insufficient funds') ||
+                error.info?.error?.message?.includes('insufficient funds')) {
+                const balance = await this.provider.getBalance(this.relayerWallet.address).catch(() => 0n);
+                const balanceBNB = ethers_1.ethers.formatEther(balance);
+                const errorMessage = `INSUFFICIENT_FUNDS: Relayer wallet has insufficient BNB for gas fees. ` +
+                    `Current balance: ${balanceBNB} BNB. ` +
+                    `Please fund the relayer wallet address: ${this.relayerWallet.address}`;
+                console.error('💥 ContractService:', errorMessage);
+                throw new Error(errorMessage);
+            }
             if (error.reason) {
                 console.error('💥 ContractService: Revert reason:', error.reason);
             }

@@ -55,6 +55,10 @@ const Orders: React.FC = () => {
   const [showDisputeModal, setShowDisputeModal] = useState<{isOpen: boolean, orderId: string}>({isOpen: false, orderId: ''});
   const [userInfoMap, setUserInfoMap] = useState<Record<string, { name?: string; mobile?: string }>>({});
   const [showFundLockedPopover, setShowFundLockedPopover] = useState<{isOpen: boolean, orderId: string}>({isOpen: false, orderId: ''});
+  const [viewedLockedOrders, setViewedLockedOrders] = useState<Set<string>>(new Set()); // Track which locked orders have been viewed
+  const [showPaymentDetailsModal, setShowPaymentDetailsModal] = useState<{isOpen: boolean, orderId: string}>({isOpen: false, orderId: ''});
+  const [showPhoneCallModal, setShowPhoneCallModal] = useState<{isOpen: boolean, phoneNumber: string, userName: string}>({isOpen: false, phoneNumber: '', userName: ''});
+  const [showAppealRedirectModal, setShowAppealRedirectModal] = useState<{isOpen: boolean, appealUrl: string, orderId: string}>({isOpen: false, appealUrl: '', orderId: ''});
   const { address, connectionError, clearError } = useWalletStore();
   const { user } = useUserStore();
   const { setUnreadOrdersCount, clearUnreadOrdersCount } = useNotificationStore();
@@ -598,8 +602,18 @@ const Orders: React.FC = () => {
             // Check if current user is the buyer
             const isBuyer = newOrder.buyerAddress.toLowerCase() === address?.toLowerCase();
             if (isBuyer) {
-              console.log('🔒 Funds locked! Showing popover to buyer for order:', newOrder.id);
-              setShowFundLockedPopover({ isOpen: true, orderId: newOrder.id });
+              // Only show popover if not already viewed
+              if (!viewedLockedOrders.has(newOrder.id)) {
+                console.log('🔒 Funds locked! Showing popover to buyer for order:', newOrder.id);
+                setShowFundLockedPopover({ isOpen: true, orderId: newOrder.id });
+              }
+            }
+          }
+          // Auto-close popover if order status changes from LOCKED
+          if (previousOrder && previousOrder.state === 'LOCKED' && newOrder.state !== 'LOCKED') {
+            if (showFundLockedPopover.isOpen && showFundLockedPopover.orderId === newOrder.id) {
+              console.log('🔄 Order status changed, closing popover for order:', newOrder.id);
+              setShowFundLockedPopover({ isOpen: false, orderId: '' });
             }
           }
         });
@@ -704,7 +718,7 @@ const Orders: React.FC = () => {
   };
 
   const handleAcceptOrder = async (orderId: string) => {
-    console.log('✅ handleAcceptOrder: Accepting order and auto-locking funds:', orderId);
+    console.log('✅ handleAcceptOrder: Accepting order:', orderId);
     
     const order = orders.find(o => o.id === orderId);
     if (!order) {
@@ -729,7 +743,7 @@ const Orders: React.FC = () => {
     try {
       const token = localStorage.getItem('authToken') || '';
       
-      // Step 1: Accept the order
+      // Accept the order (only database update, no blockchain)
       toast.loading('Accepting order...', { id: 'accept-flow' });
       
       const acceptResponse = await fetch(`/api/orders/${orderId}/accept-simple`, {
@@ -749,14 +763,13 @@ const Orders: React.FC = () => {
       const acceptData = await acceptResponse.json();
       console.log('✅ Order accepted:', acceptData);
       
-      toast.success('Order accepted! Starting automatic fund lock...', { 
+      toast.success('Order accepted! Seller will now lock funds on blockchain.', { 
         id: 'accept-flow', 
-        duration: 3000 
+        duration: 4000 
       });
 
-      // Step 2: Automatically trigger fund lock process
-      console.log('🔒 Auto-triggering fund lock process...');
-      await handleLockFunds(orderId);
+      // Refresh orders to show updated state
+      fetchOrders();
       
     } catch (error) {
       console.error('💥 handleAcceptOrder Error:', error);
@@ -1132,7 +1145,7 @@ const Orders: React.FC = () => {
       console.log(order);
       
       // Check if order is in a state that requires blockchain trade id
-      if (order.state !== 'LOCKED' && order.state !== 'UNDER_DISPUTE' && order.state !== 'APPEALED') {
+      if (order.state !== 'LOCKED' && order.state !== 'UNDER_DISPUTE' && (order.state as string) !== 'APPEALED') {
         toast.error(`Order must be LOCKED, UNDER_DISPUTE, or APPEALED to confirm payment. Current state: ${order.state}`);
         return;
       }
@@ -1243,57 +1256,34 @@ const Orders: React.FC = () => {
     return dappBrowsers.some(browser => userAgent.includes(browser));
   };
 
-  // Handle file appeal redirect to external browser
+  // Handle file appeal - always show modal (no redirect)
   const handleFileAppealRedirect = (orderId: string) => {
-    if (isDAppBrowser()) {
-      // Get current URL and construct external browser URL with wallet address
-      const currentUrl = window.location.href;
-      const baseUrl = currentUrl.split('/#')[0]; // Remove hash routing
-      const walletAddress = address || 'unknown';
-      
-      // Check if current URL already contains /orders to avoid duplication
-      let appealUrl;
-      if (baseUrl.includes('/orders')) {
-        // If already in orders, just add the appeal path
-        appealUrl = `${baseUrl}/appeal/${walletAddress}/${orderId}`;
-      } else {
-        // If not in orders, add the full path
-        appealUrl = `${baseUrl}/orders/appeal/${walletAddress}/${orderId}`;
-      }
-      
-      // Show confirmation dialog
-      const shouldRedirect = window.confirm(
-        `📱 DApp Browser Detected!\n\n` +
-        `To access camera and recording features for your appeal, you need to open this in your default browser (Chrome, Safari, etc.).\n\n` +
-        `Click OK to open in external browser.\n\n` +
-        `This will redirect you to: ${appealUrl}\n\n` +
-        `Wallet: ${walletAddress}\n` +
-        `Order: ${orderId}`
-      );
-      
-      if (shouldRedirect) {
-        // Try to open in external browser
-        try {
-          // Method 1: Direct window.open (works on some DApp browsers)
-          window.open(appealUrl, '_blank');
-          
-          // Method 2: Copy to clipboard as fallback
-          navigator.clipboard.writeText(appealUrl).then(() => {
-            toast.success('URL copied to clipboard! Paste it in your browser.');
-          }).catch(() => {
-            // Method 3: Show URL for manual copy
-            toast.error('Please copy this URL and open in your browser: ' + appealUrl);
-          });
-          
-        } catch (error) {
-          console.error('Error opening external browser:', error);
-          toast.error('Please copy this URL and open in your browser: ' + appealUrl);
-        }
-      }
-    } else {
-      // Not in DApp browser, proceed normally with new URL format
-      navigate(`/orders/${orderId}/appeal`);
+    if (!address) {
+      toast.error('Please connect your wallet first');
+      return;
     }
+    
+    // Get current URL and construct external browser URL with wallet address
+    const currentUrl = window.location.href;
+    const baseUrl = currentUrl.split('/#')[0]; // Remove hash routing
+    const walletAddress = address; // Use connected wallet address
+    
+    // Check if current URL already contains /orders to avoid duplication
+    let appealUrl;
+    if (baseUrl.includes('/orders')) {
+      // If already in orders, just add the appeal path
+      appealUrl = `${baseUrl}/appeal/${walletAddress}/${orderId}`;
+    } else {
+      // If not in orders, add the full path
+      appealUrl = `${baseUrl}/orders/appeal/${walletAddress}/${orderId}`;
+    }
+    
+    // Always show modal (no redirect)
+    setShowAppealRedirectModal({
+      isOpen: true,
+      appealUrl: appealUrl,
+      orderId: orderId
+    });
   };
 
   const handleFileAppeal = async (orderId: string, appealData: any) => {
@@ -1447,57 +1437,48 @@ const Orders: React.FC = () => {
     }
   }, []);
 
-  // Handle call to other party - redirect to call page
-  const handleCallUser = useCallback(async (_targetAddress: string, order: Order) => {
-    try {
-      if (!address) {
-        toast.error('Please connect your wallet first');
-        return;
-      }
-      
-      // Check if DApp browser
-      if (isDAppBrowser()) {
-        // Get current URL and construct external browser URL
-        const currentUrl = window.location.href;
-        const baseUrl = currentUrl.split('/#')[0]; // Remove hash routing
-        const callUrl = `${baseUrl}/call/${order.id}/${address}`;
-        
-        // Show confirmation dialog
-        const shouldRedirect = window.confirm(
-          `📱 DApp Browser Detected!\n\n` +
-          `To make voice calls, you need to open this in your default browser (Chrome, Safari, etc.).\n\n` +
-          `Click OK to open in external browser.\n\n` +
-          `This will redirect you to: ${callUrl}\n\n` +
-          `Wallet: ${address}\n` +
-          `Order: ${order.id}`
-        );
-        
-        if (shouldRedirect) {
-          try {
-            // Try to open in external browser
-            window.open(callUrl, '_blank');
-            
-            // Copy to clipboard as fallback
-            navigator.clipboard.writeText(callUrl).then(() => {
-              toast.success('URL copied to clipboard! Paste it in your browser.');
-            }).catch(() => {
-              toast.error('Please copy this URL and open in your browser: ' + callUrl);
-            });
-          } catch (error) {
-            console.error('Error opening external browser:', error);
-            toast.error('Please copy this URL and open in your browser: ' + callUrl);
-          }
-        }
-      } else {
-        // Normal browser, navigate to call page
-        navigate(`/call/${order.id}/${address}`);
-      }
-      
-    } catch (error) {
-      console.error('Error redirecting to call page:', error);
-      toast.error('Failed to open call page');
+  // Detect if device is mobile
+  const isMobileDevice = useCallback(() => {
+    return /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+  }, []);
+
+  // Check microphone permission to determine if it's mobile app or browser
+  const checkMicrophonePermission = useCallback(async (): Promise<'mobile-app' | 'mobile-browser' | 'desktop'> => {
+    const isMobile = isMobileDevice();
+    
+    if (!isMobile) {
+      return 'desktop';
     }
-  }, [address, navigate]);
+    
+    try {
+      // Check if microphone permission is available
+      if (navigator.permissions && navigator.permissions.query) {
+        const micPermission = await navigator.permissions.query({ name: 'microphone' as PermissionName });
+        console.log('🎤 Microphone permission status:', micPermission.state);
+        
+        // If permission is granted or prompt, it's likely a browser
+        // If permission is denied or not available, it might be a mobile app
+        if (micPermission.state === 'granted' || micPermission.state === 'prompt') {
+          return 'mobile-browser';
+        }
+      }
+      
+      // Try to get microphone access to determine if it's browser
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        stream.getTracks().forEach(track => track.stop()); // Stop immediately
+        return 'mobile-browser';
+      } catch (error) {
+        console.log('🎤 Microphone access check:', error);
+        // If getUserMedia fails, it might be a mobile app
+        return 'mobile-app';
+      }
+    } catch (error) {
+      console.log('🎤 Permission check error:', error);
+      // Default to mobile-browser if we can't determine
+      return 'mobile-browser';
+    }
+  }, [isMobileDevice]);
 
   const fetchUserInfo = useCallback(async (addr: string) => {
     const key = addr?.toLowerCase();
@@ -1541,6 +1522,48 @@ const Orders: React.FC = () => {
     }
     return undefined;
   }, [userInfoMap]);
+
+  // Handle call to other party - always show modal
+  const handleCallUser = useCallback(async (_targetAddress: string, order: Order) => {
+    try {
+      if (!address) {
+        toast.error('Please connect your wallet first');
+        return;
+      }
+      
+      // Determine if buyer or seller
+      const isSeller = order.sellerAddress.toLowerCase() === address?.toLowerCase();
+      const targetAddress = isSeller ? order.buyerAddress : order.sellerAddress;
+      const targetInfo = userInfoMap[targetAddress.toLowerCase()] || {};
+      const targetPhone = targetInfo.mobile;
+      const targetName = (isSeller ? (order as any).buyerName : (order as any).sellerName) || 'User';
+      
+      // If no phone number, fetch it first
+      if (!targetPhone) {
+        toast.loading('Fetching contact number...', { id: 'fetch-phone' });
+        const info = await fetchUserInfo(targetAddress);
+        if (info && typeof info === 'object' && 'mobile' in info && info.mobile) {
+          toast.dismiss('fetch-phone');
+          // Retry with phone number
+          return handleCallUser(targetAddress, order);
+        } else {
+          toast.error('Phone number not available for this user', { id: 'fetch-phone' });
+          return;
+        }
+      }
+      
+      // Always show modal (no redirect)
+      setShowPhoneCallModal({
+        isOpen: true,
+        phoneNumber: targetPhone,
+        userName: targetName
+      });
+      
+    } catch (error) {
+      console.error('Error handling call:', error);
+      toast.error('Failed to initiate call');
+    }
+  }, [address, userInfoMap, fetchUserInfo]);
 
   const filteredOrders = useMemo(() => {
     return statusFilter === 'ALL' ? orders : orders.filter(o => o.state === statusFilter);
@@ -1590,6 +1613,23 @@ const Orders: React.FC = () => {
       }
     };
   }, [orders, fetchUserInfo]); // Fixed dependencies - removed userInfoMap to prevent infinite loop
+
+  // Fetch seller info when fund locked popover opens
+  useEffect(() => {
+    if (showFundLockedPopover.isOpen && showFundLockedPopover.orderId) {
+      const lockedOrder = orders.find(o => o.id === showFundLockedPopover.orderId);
+      if (lockedOrder) {
+        const isBuyer = lockedOrder.buyerAddress.toLowerCase() === address?.toLowerCase();
+        const sellerAddress = lockedOrder.sellerAddress.toLowerCase();
+        const sellerInfo = userInfoMap[sellerAddress] || {};
+        
+        // Fetch seller mobile if buyer and not already fetched
+        if (isBuyer && !sellerInfo.mobile && sellerAddress) {
+          fetchUserInfo(sellerAddress);
+        }
+      }
+    }
+  }, [showFundLockedPopover.isOpen, showFundLockedPopover.orderId, orders, address, userInfoMap, fetchUserInfo]);
 
   const canShowRedeem = (order: Order) => {
     if (order.state !== 'LOCKED') return false;
@@ -2239,6 +2279,42 @@ const Orders: React.FC = () => {
                           </span>
                         </div>
                       )}
+
+                      {/* LOCKED State - Show View Details Button */}
+                      {order.state === 'LOCKED' && (() => {
+                        const hasViewed = viewedLockedOrders.has(order.id);
+
+                        return (
+                          <div className="space-y-3">
+                            <div className="flex items-center space-x-2 text-purple-400 bg-purple-500/20 p-3 rounded-lg">
+                              <Lock size={16} />
+                              <span className="text-sm font-medium">
+                                ⏰ Funds locked - Proceed to agent for payment
+                              </span>
+                            </div>
+
+                            {/* View Payment Details Button */}
+                            <motion.button
+                              onClick={() => {
+                                setShowPaymentDetailsModal({ isOpen: true, orderId: order.id });
+                                // Mark as viewed when opening modal
+                                setViewedLockedOrders(prev => new Set(prev).add(order.id));
+                              }}
+                              className="w-full bg-gradient-to-r from-purple-500 to-blue-500 text-white py-3 px-4 rounded-lg font-medium flex items-center justify-center space-x-2 shadow-lg hover:from-purple-600 hover:to-blue-600 transition-all"
+                              whileTap={{ scale: 0.98 }}
+                              whileHover={{ scale: 1.02 }}
+                            >
+                              <FileText size={18} />
+                              <span>📋 View Payment Details</span>
+                              {!hasViewed && (
+                                <span className="ml-2 bg-yellow-400 text-yellow-900 text-xs px-2 py-0.5 rounded-full font-bold">
+                                  New
+                                </span>
+                              )}
+                            </motion.button>
+                          </div>
+                        );
+                      })()}
                       
                       {order.state === 'RELEASED' && (
                         <div className="space-y-2">
@@ -2742,53 +2818,655 @@ const Orders: React.FC = () => {
       )}
 
       {/* Fund Locked Popover for Buyers */}
-      {showFundLockedPopover.isOpen && (
-        <motion.div
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          exit={{ opacity: 0, scale: 0.9 }}
-          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-          onClick={() => setShowFundLockedPopover({ isOpen: false, orderId: '' })}
-        >
+      {showFundLockedPopover.isOpen && (() => {
+        const lockedOrder = orders.find(o => o.id === showFundLockedPopover.orderId);
+        if (!lockedOrder) return null;
+        
+        const isBuyer = lockedOrder.buyerAddress.toLowerCase() === address?.toLowerCase();
+        const sellerAddress = lockedOrder.sellerAddress.toLowerCase();
+        const sellerInfo = userInfoMap[sellerAddress] || {};
+        const sellerName = (lockedOrder as any)?.sellerName || 'Seller';
+        const sellerMobile = sellerInfo.mobile || 'Not available';
+        
+        // Calculate payment amount: rate × quantity
+        const rate = Number((lockedOrder as any)?.priceInr || 0);
+        const quantity = Number(lockedOrder.amount || 0);
+        const totalAmount = (rate * quantity).toFixed(2);
+        
+        return (
           <motion.div
-            initial={{ scale: 0.9, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0.9, opacity: 0 }}
-            className="bg-gradient-to-br from-green-500 to-blue-500 rounded-xl p-6 w-full max-w-md border border-white/20 text-white"
-            onClick={(e) => e.stopPropagation()}
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            onClick={() => {
+              setShowFundLockedPopover({ isOpen: false, orderId: '' });
+              // Mark this order as viewed when closing
+              if (lockedOrder) {
+                setViewedLockedOrders(prev => new Set(prev).add(lockedOrder.id));
+              }
+            }}
           >
-            <div className="text-center space-y-4">
-              <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto">
-                <Lock size={32} className="text-white" />
-              </div>
-              
-              <div>
-                <h3 className="text-xl font-bold mb-2">🔒 Funds Locked Successfully!</h3>
-                <p className="text-white/90 text-sm mb-4">
-                  The seller has locked their funds for 2 hours. You can now proceed with payment.
-                </p>
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-gradient-to-br from-green-500 to-blue-500 rounded-xl p-6 w-full max-w-lg border border-white/20 text-white overflow-y-auto max-h-[90vh] relative"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Close Button */}
+              <button
+                onClick={() => {
+                  setShowFundLockedPopover({ isOpen: false, orderId: '' });
+                  // Mark this order as viewed
+                  if (lockedOrder) {
+                    setViewedLockedOrders(prev => new Set(prev).add(lockedOrder.id));
+                  }
+                }}
+                className="absolute top-4 right-4 p-2 rounded-full bg-white/20 hover:bg-white/30 text-white transition-colors z-10"
+                title="Close"
+              >
+                <X size={20} />
+              </button>
+
+              <div className="space-y-4">
+                {/* Header */}
+                <div className="text-center">
+                  <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <Lock size={32} className="text-white" />
+                  </div>
+                  <h3 className="text-xl font-bold mb-2">🔒 Funds Locked Successfully!</h3>
+                  <p className="text-white/90 text-sm">
+                    The seller has locked their funds for 2 hours. You can now proceed with payment.
+                  </p>
+                </div>
+
+                {/* Agent Details */}
+                <div className="bg-white/20 rounded-lg p-4 space-y-3">
+                  <div className="flex items-center space-x-2 mb-2">
+                    <Phone size={18} className="text-white" />
+                    <h4 className="font-semibold text-base">Agent Details</h4>
+                  </div>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex items-start space-x-2">
+                      <span className="font-medium min-w-[80px]">Name:</span>
+                      <span className="text-white/90">{lockedOrder.agentBranch}</span>
+                    </div>
+                    <div className="flex items-start space-x-2">
+                      <span className="font-medium min-w-[80px]">Location:</span>
+                      <span className="text-white/90">{lockedOrder.agentAddress}</span>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <span className="font-medium min-w-[80px]">Mobile:</span>
+                      <a 
+                        href={`tel:${lockedOrder.agentNumber}`}
+                        className="text-white/90 hover:text-white underline flex items-center space-x-1"
+                      >
+                        <Phone size={14} />
+                        <span>{lockedOrder.agentNumber}</span>
+                      </a>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Seller Details (if buyer) */}
+                {isBuyer && (
+                  <div className="bg-white/20 rounded-lg p-4 space-y-3">
+                    <div className="flex items-center space-x-2 mb-2">
+                      <span className="text-lg">👤</span>
+                      <h4 className="font-semibold text-base">Seller Details</h4>
+                    </div>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex items-start space-x-2">
+                        <span className="font-medium min-w-[80px]">Name:</span>
+                        <span className="text-white/90">{sellerName}</span>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <span className="font-medium min-w-[80px]">Mobile:</span>
+                        {sellerMobile !== 'Not available' ? (
+                          <a 
+                            href={`tel:${sellerMobile}`}
+                            className="text-white/90 hover:text-white underline flex items-center space-x-1"
+                          >
+                            <Phone size={14} />
+                            <span>{sellerMobile}</span>
+                          </a>
+                        ) : (
+                          <span className="text-white/70 italic">Fetching...</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Payment Amount */}
+                <div className="bg-white/20 rounded-lg p-4 space-y-3">
+                  <div className="flex items-center space-x-2 mb-2">
+                    <span className="text-lg">💰</span>
+                    <h4 className="font-semibold text-base">Payment Amount</h4>
+                  </div>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between items-center">
+                      <span className="text-white/80">Rate (per {lockedOrder.token}):</span>
+                      <span className="font-semibold">₹{rate.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-white/80">Quantity ({lockedOrder.token}):</span>
+                      <span className="font-semibold">{quantity.toFixed(6)}</span>
+                    </div>
+                    <div className="border-t border-white/30 pt-2 mt-2">
+                      <div className="flex justify-between items-center">
+                        <span className="font-semibold text-base">Total Amount to Pay:</span>
+                        <span className="font-bold text-lg text-yellow-300">₹{totalAmount}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Next Steps */}
                 <div className="bg-white/20 rounded-lg p-4 space-y-2">
-                  <p className="font-semibold text-sm">📋 Next Steps:</p>
-                  <p className="text-xs text-white/90">
-                    • Go to Aagnya Branch within 2 hours
-                  </p>
-                  <p className="text-xs text-white/90">
-                    • Deposit the payment amount
-                  </p>
-                  <p className="text-xs text-white/90">
-                    • Contact the agent to complete transaction
-                  </p>
+                  <p className="font-semibold text-sm mb-2">📋 Next Steps:</p>
+                  <ul className="text-xs text-white/90 space-y-1 list-disc list-inside">
+                    <li>Go to <strong>{lockedOrder.agentBranch}</strong> within 2 hours</li>
+                    <li>Pay <strong>₹{totalAmount}</strong> to the agent</li>
+                    <li>Contact agent at <strong>{lockedOrder.agentNumber}</strong></li>
+                    <li>Complete the transaction with the agent</li>
+                  </ul>
+                </div>
+
+                {/* Action Button */}
+                <div className="flex space-x-3 pt-2">
+                  <motion.button
+                    onClick={() => {
+                      setShowFundLockedPopover({ isOpen: false, orderId: '' });
+                      // Mark this order as viewed and open payment details modal
+                      setViewedLockedOrders(prev => new Set(prev).add(lockedOrder.id));
+                      setShowPaymentDetailsModal({ isOpen: true, orderId: lockedOrder.id });
+                    }}
+                    className="flex-1 bg-white/20 hover:bg-white/30 text-white py-3 px-4 rounded-lg font-medium transition-colors"
+                    whileTap={{ scale: 0.95 }}
+                  >
+                    Got It - View Details
+                  </motion.button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        );
+      })()}
+
+      {/* Payment Details Modal - Mobile Friendly */}
+      {showPaymentDetailsModal.isOpen && (() => {
+        const order = orders.find(o => o.id === showPaymentDetailsModal.orderId);
+        if (!order) return null;
+        
+        const isBuyer = order.buyerAddress.toLowerCase() === address?.toLowerCase();
+        const sellerAddress = order.sellerAddress.toLowerCase();
+        const sellerInfo = userInfoMap[sellerAddress] || {};
+        const sellerName = (order as any)?.sellerName || 'Seller';
+        const sellerMobile = sellerInfo.mobile || 'Not available';
+        
+        // Calculate payment amount: rate × quantity
+        const rate = Number((order as any)?.priceInr || 0);
+        const quantity = Number(order.amount || 0);
+        const totalAmount = (rate * quantity).toFixed(2);
+        
+        return (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4"
+            onClick={() => setShowPaymentDetailsModal({ isOpen: false, orderId: '' })}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 20 }}
+              className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-xl w-full max-w-md sm:max-w-lg border border-white/20 text-white overflow-hidden shadow-2xl flex flex-col max-h-[95vh] sm:max-h-[90vh]"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Header with Close Button */}
+              <div className="flex items-center justify-between p-4 sm:p-6 border-b border-white/10 flex-shrink-0">
+                <div className="flex items-center space-x-3">
+                  <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-purple-500 to-blue-500 rounded-full flex items-center justify-center flex-shrink-0">
+                    <FileText size={20} className="text-white" />
+                  </div>
+                  <h3 className="text-lg sm:text-xl font-bold text-white">📋 Payment Details</h3>
+                </div>
+                <button
+                  onClick={() => setShowPaymentDetailsModal({ isOpen: false, orderId: '' })}
+                  className="p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors flex-shrink-0"
+                  title="Close"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              {/* Scrollable Content */}
+              <div className="overflow-y-auto flex-1 p-4 sm:p-6 space-y-4">
+                {/* Agent Details */}
+                <div className="bg-white/10 rounded-lg p-4 sm:p-5 space-y-3 border border-white/10">
+                  <div className="flex items-center space-x-2 mb-3">
+                    <Phone size={18} className="text-blue-400 flex-shrink-0" />
+                    <h4 className="font-semibold text-base sm:text-lg text-blue-300">Agent Details</h4>
+                  </div>
+                  <div className="space-y-2.5 text-sm sm:text-base">
+                    <div className="flex flex-col sm:flex-row sm:items-start space-y-1 sm:space-y-0 sm:space-x-3">
+                      <span className="font-semibold min-w-[90px] sm:min-w-[100px] text-gray-300 flex-shrink-0">Name:</span>
+                      <span className="text-white break-words">{order.agentBranch}</span>
+                    </div>
+                    <div className="flex flex-col sm:flex-row sm:items-start space-y-1 sm:space-y-0 sm:space-x-3">
+                      <span className="font-semibold min-w-[90px] sm:min-w-[100px] text-gray-300 flex-shrink-0">Location:</span>
+                      <span className="text-white break-words">{order.agentAddress}</span>
+                    </div>
+                    <div className="flex flex-col sm:flex-row sm:items-center space-y-1 sm:space-y-0 sm:space-x-3">
+                      <span className="font-semibold min-w-[90px] sm:min-w-[100px] text-gray-300 flex-shrink-0">Mobile:</span>
+                      <a 
+                        href={`tel:${order.agentNumber}`}
+                        className="text-blue-300 hover:text-blue-200 underline flex items-center space-x-2 text-base sm:text-lg font-medium"
+                      >
+                        <Phone size={16} />
+                        <span>{order.agentNumber}</span>
+                      </a>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Seller Details (if buyer) */}
+                {isBuyer && (
+                  <div className="bg-white/10 rounded-lg p-4 sm:p-5 space-y-3 border border-white/10">
+                    <div className="flex items-center space-x-2 mb-3">
+                      <span className="text-lg sm:text-xl">👤</span>
+                      <h4 className="font-semibold text-base sm:text-lg text-purple-300">Seller Details</h4>
+                    </div>
+                    <div className="space-y-2.5 text-sm sm:text-base">
+                      <div className="flex flex-col sm:flex-row sm:items-start space-y-1 sm:space-y-0 sm:space-x-3">
+                        <span className="font-semibold min-w-[90px] sm:min-w-[100px] text-gray-300 flex-shrink-0">Name:</span>
+                        <span className="text-white break-words">{sellerName}</span>
+                      </div>
+                      <div className="flex flex-col sm:flex-row sm:items-center space-y-1 sm:space-y-0 sm:space-x-3">
+                        <span className="font-semibold min-w-[90px] sm:min-w-[100px] text-gray-300 flex-shrink-0">Mobile:</span>
+                        {sellerMobile !== 'Not available' ? (
+                          <a 
+                            href={`tel:${sellerMobile}`}
+                            className="text-purple-300 hover:text-purple-200 underline flex items-center space-x-2 text-base sm:text-lg font-medium"
+                          >
+                            <Phone size={16} />
+                            <span>{sellerMobile}</span>
+                          </a>
+                        ) : (
+                          <span className="text-gray-400 italic text-sm">Fetching...</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Payment Amount */}
+                <div className="bg-white/10 rounded-lg p-4 sm:p-5 space-y-3 border border-white/10">
+                  <div className="flex items-center space-x-2 mb-3">
+                    <span className="text-lg sm:text-xl">💰</span>
+                    <h4 className="font-semibold text-base sm:text-lg text-green-300">Payment Amount</h4>
+                  </div>
+                  <div className="space-y-3 text-sm sm:text-base">
+                    <div className="flex justify-between items-center py-2">
+                      <span className="text-gray-300">Rate (per {order.token}):</span>
+                      <span className="font-semibold text-white text-base sm:text-lg">₹{rate.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between items-center py-2">
+                      <span className="text-gray-300">Quantity ({order.token}):</span>
+                      <span className="font-semibold text-white text-base sm:text-lg">{quantity.toFixed(6)}</span>
+                    </div>
+                    <div className="border-t border-white/20 pt-3 mt-3">
+                      <div className="flex justify-between items-center">
+                        <span className="font-semibold text-base sm:text-lg text-white">Total Amount to Pay:</span>
+                        <span className="font-bold text-xl sm:text-2xl text-yellow-300">₹{totalAmount}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Next Steps */}
+                <div className="bg-white/10 rounded-lg p-4 sm:p-5 space-y-3 border border-white/10">
+                  <div className="flex items-center space-x-2 mb-3">
+                    <span className="text-lg sm:text-xl">📋</span>
+                    <h4 className="font-semibold text-base sm:text-lg text-yellow-300">Next Steps</h4>
+                  </div>
+                  <ul className="text-sm sm:text-base text-gray-300 space-y-2 list-disc list-inside">
+                    <li>Go to <strong className="text-white">{order.agentBranch}</strong> within 2 hours</li>
+                    <li>Pay <strong className="text-yellow-300">₹{totalAmount}</strong> to the agent</li>
+                    <li>Contact agent at <strong className="text-white">{order.agentNumber}</strong></li>
+                    <li>Complete the transaction with the agent</li>
+                  </ul>
                 </div>
               </div>
 
-              <div className="flex space-x-3">
+              {/* Footer */}
+              <div className="p-4 sm:p-6 border-t border-white/10 bg-white/5 flex-shrink-0">
                 <motion.button
-                  onClick={() => setShowFundLockedPopover({ isOpen: false, orderId: '' })}
-                  className="flex-1 bg-white/20 hover:bg-white/30 text-white py-3 px-4 rounded-lg font-medium transition-colors"
-                  whileTap={{ scale: 0.95 }}
+                  onClick={() => setShowPaymentDetailsModal({ isOpen: false, orderId: '' })}
+                  className="w-full bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 text-white py-3 px-4 rounded-lg font-medium transition-all text-base sm:text-lg"
+                  whileTap={{ scale: 0.98 }}
                 >
                   Got It
                 </motion.button>
+              </div>
+            </motion.div>
+          </motion.div>
+        );
+      })()}
+
+      {/* Phone Call Modal - Shows phone number with copy and call buttons */}
+      {showPhoneCallModal.isOpen && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          onClick={() => setShowPhoneCallModal({ isOpen: false, phoneNumber: '', userName: '' })}
+        >
+          <motion.div
+            initial={{ scale: 0.9, opacity: 0, y: 20 }}
+            animate={{ scale: 1, opacity: 1, y: 0 }}
+            exit={{ scale: 0.9, opacity: 0, y: 20 }}
+            className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-xl w-full max-w-md border border-white/20 text-white overflow-hidden shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between p-6 border-b border-white/10">
+              <div className="flex items-center space-x-3">
+                <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-blue-500 rounded-full flex items-center justify-center">
+                  <Phone size={24} className="text-white" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-white">Call {showPhoneCallModal.userName}</h3>
+                  <p className="text-sm text-gray-400">Phone Number</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowPhoneCallModal({ isOpen: false, phoneNumber: '', userName: '' })}
+                className="p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors"
+                title="Close"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="p-6 space-y-6">
+              {/* Phone Number Display - Selectable */}
+              <div className="bg-white/10 rounded-lg p-6 text-center border border-white/10">
+                <p className="text-sm text-gray-400 mb-2">Phone Number</p>
+                <p 
+                  id="phone-number-display"
+                  className="text-3xl font-bold text-white break-all select-all cursor-text"
+                  style={{ userSelect: 'all', WebkitUserSelect: 'all' }}
+                  onClick={(e) => {
+                    // Select all text when clicked
+                    const range = document.createRange();
+                    range.selectNodeContents(e.currentTarget);
+                    const selection = window.getSelection();
+                    selection?.removeAllRanges();
+                    selection?.addRange(range);
+                  }}
+                >
+                  {showPhoneCallModal.phoneNumber}
+                </p>
+                <p className="text-xs text-gray-400 mt-2">Tap to select, then copy manually</p>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="space-y-3">
+                {/* Copy Button with Fallback */}
+                <motion.button
+                  onClick={async () => {
+                    try {
+                      // Try modern clipboard API first
+                      if (navigator.clipboard && navigator.clipboard.writeText) {
+                        await navigator.clipboard.writeText(showPhoneCallModal.phoneNumber);
+                        toast.success('Phone number copied to clipboard!');
+                      } else {
+                        // Fallback: Select text manually
+                        const phoneElement = document.getElementById('phone-number-display');
+                        if (phoneElement) {
+                          const range = document.createRange();
+                          range.selectNodeContents(phoneElement);
+                          const selection = window.getSelection();
+                          selection?.removeAllRanges();
+                          selection?.addRange(range);
+                          toast('Number selected! Long press to copy', { 
+                            icon: '📋',
+                            duration: 3000
+                          });
+                        }
+                      }
+                    } catch (error) {
+                      console.error('Failed to copy:', error);
+                      // Fallback: Select text manually
+                      const phoneElement = document.getElementById('phone-number-display');
+                      if (phoneElement) {
+                        const range = document.createRange();
+                        range.selectNodeContents(phoneElement);
+                        const selection = window.getSelection();
+                        selection?.removeAllRanges();
+                        selection?.addRange(range);
+                        toast('Number selected! Long press to copy', { 
+                          icon: '📋',
+                          duration: 4000
+                        });
+                      } else {
+                        toast.error('Please manually select and copy the number');
+                      }
+                    }
+                  }}
+                  className="w-full bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white py-4 px-6 rounded-lg font-semibold text-lg flex items-center justify-center space-x-3 transition-all shadow-lg"
+                  whileTap={{ scale: 0.98 }}
+                >
+                  <FileText size={24} />
+                  <span>Copy Number</span>
+                </motion.button>
+
+                {/* Select All Button for Manual Copy */}
+                <motion.button
+                  onClick={() => {
+                    const phoneElement = document.getElementById('phone-number-display');
+                    if (phoneElement) {
+                      const range = document.createRange();
+                      range.selectNodeContents(phoneElement);
+                      const selection = window.getSelection();
+                      selection?.removeAllRanges();
+                      selection?.addRange(range);
+                      toast('Number selected! Long press to copy', { 
+                        icon: '📋',
+                        duration: 3000
+                      });
+                    }
+                  }}
+                  className="w-full bg-white/10 hover:bg-white/20 text-white py-4 px-6 rounded-lg font-medium flex items-center justify-center space-x-3 transition-all border border-white/20"
+                  whileTap={{ scale: 0.98 }}
+                >
+                  <span>Select Number (Manual Copy)</span>
+                </motion.button>
+              </div>
+
+              {/* Info Message */}
+              <div className="bg-blue-500/20 border border-blue-500/30 rounded-lg p-4 space-y-2">
+                <p className="text-sm text-blue-300 text-center">
+                  💡 Dialog me jakar call kar lo
+                </p>
+                <p className="text-xs text-blue-400 text-center">
+                  If copy fails, tap the number above to select it, then long press to copy
+                </p>
+              </div>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+
+      {/* Appeal Redirect Modal - Shows appeal URL with copy option */}
+      {showAppealRedirectModal.isOpen && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          onClick={() => setShowAppealRedirectModal({ isOpen: false, appealUrl: '', orderId: '' })}
+        >
+          <motion.div
+            initial={{ scale: 0.9, opacity: 0, y: 20 }}
+            animate={{ scale: 1, opacity: 1, y: 0 }}
+            exit={{ scale: 0.9, opacity: 0, y: 20 }}
+            className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-xl w-full max-w-md border border-white/20 text-white overflow-hidden shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between p-6 border-b border-white/10">
+              <div className="flex items-center space-x-3">
+                <div className="w-12 h-12 bg-gradient-to-br from-orange-500 to-red-500 rounded-full flex items-center justify-center">
+                  <FileText size={24} className="text-white" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-white">File Appeal</h3>
+                  <p className="text-sm text-gray-400">Chrome Browser Required</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowAppealRedirectModal({ isOpen: false, appealUrl: '', orderId: '' })}
+                className="p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors"
+                title="Close"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="p-6 space-y-6">
+              {/* Message */}
+              <div className="bg-blue-500/20 border border-blue-500/30 rounded-lg p-4">
+                <p className="text-sm text-blue-300 text-center">
+                  Ye link copy karke browser me open karo
+                </p>
+              </div>
+
+              {/* URL Display - Selectable */}
+              <div className="bg-white/10 rounded-lg p-4 border border-white/10">
+                <p className="text-sm text-gray-400 mb-2">Appeal URL</p>
+                <p 
+                  id="appeal-url-display"
+                  className="text-sm font-mono text-white break-all bg-black/20 p-3 rounded border border-white/10 select-all cursor-text"
+                  style={{ userSelect: 'all', WebkitUserSelect: 'all' }}
+                  onClick={(e) => {
+                    // Select all text when clicked
+                    const range = document.createRange();
+                    range.selectNodeContents(e.currentTarget);
+                    const selection = window.getSelection();
+                    selection?.removeAllRanges();
+                    selection?.addRange(range);
+                  }}
+                >
+                  {showAppealRedirectModal.appealUrl}
+                </p>
+                <p className="text-xs text-gray-400 mt-2">Tap to select, then copy manually</p>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="space-y-3">
+                {/* Copy Button with Fallback */}
+                <motion.button
+                  onClick={async () => {
+                    try {
+                      // Try modern clipboard API first
+                      if (navigator.clipboard && navigator.clipboard.writeText) {
+                        await navigator.clipboard.writeText(showAppealRedirectModal.appealUrl);
+                        toast.success('URL copied to clipboard! Copy and paste in browser.');
+                      } else {
+                        // Fallback: Select text manually
+                        const urlElement = document.getElementById('appeal-url-display');
+                        if (urlElement) {
+                          const range = document.createRange();
+                          range.selectNodeContents(urlElement);
+                          const selection = window.getSelection();
+                          selection?.removeAllRanges();
+                          selection?.addRange(range);
+                          toast('URL selected! Long press to copy', { 
+                            icon: '📋',
+                            duration: 3000
+                          });
+                        }
+                      }
+                    } catch (error) {
+                      console.error('Failed to copy:', error);
+                      // Fallback: Select text manually
+                      const urlElement = document.getElementById('appeal-url-display');
+                      if (urlElement) {
+                        const range = document.createRange();
+                        range.selectNodeContents(urlElement);
+                        const selection = window.getSelection();
+                        selection?.removeAllRanges();
+                        selection?.addRange(range);
+                        toast('URL selected! Long press to copy', { 
+                          icon: '📋',
+                          duration: 4000
+                        });
+                      } else {
+                        toast.error('Please manually select and copy the URL');
+                      }
+                    }
+                  }}
+                  className="w-full bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white py-4 px-6 rounded-lg font-semibold text-lg flex items-center justify-center space-x-3 transition-all shadow-lg"
+                  whileTap={{ scale: 0.98 }}
+                >
+                  <FileText size={24} />
+                  <span>Copy Link</span>
+                </motion.button>
+
+                {/* Select All Button for Manual Copy */}
+                <motion.button
+                  onClick={() => {
+                    const urlElement = document.getElementById('appeal-url-display');
+                    if (urlElement) {
+                      const range = document.createRange();
+                      range.selectNodeContents(urlElement);
+                      const selection = window.getSelection();
+                      selection?.removeAllRanges();
+                      selection?.addRange(range);
+                      toast('URL selected! Long press to copy', { 
+                        icon: '📋',
+                        duration: 3000
+                      });
+                    }
+                  }}
+                  className="w-full bg-white/10 hover:bg-white/20 text-white py-4 px-6 rounded-lg font-medium flex items-center justify-center space-x-3 transition-all border border-white/20"
+                  whileTap={{ scale: 0.98 }}
+                >
+                  <span>Select URL (Manual Copy)</span>
+                </motion.button>
+
+                {/* Open in Browser Button */}
+                {/* <motion.a
+                  href={showAppealRedirectModal.appealUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full bg-white/10 hover:bg-white/20 text-white py-4 px-6 rounded-lg font-medium flex items-center justify-center space-x-3 transition-all border border-white/20"
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => {
+                    // Try to open in new tab
+                    window.open(showAppealRedirectModal.appealUrl, '_blank');
+                  }}
+                >
+                  <span>Open in Browser</span>
+                </motion.a> */}
+              </div>
+
+              {/* Instructions */}
+              <div className="bg-yellow-500/20 border border-yellow-500/30 rounded-lg p-4 space-y-2">
+                <p className="text-sm text-yellow-300 text-center">
+                  Ye link copy karke browser me open karo
+                </p>
+                <p className="text-xs text-yellow-400 text-center">
+                  If copy fails, tap the URL above to select it, then long press to copy
+                </p>
               </div>
             </div>
           </motion.div>

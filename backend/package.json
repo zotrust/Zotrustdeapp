@@ -11,6 +11,8 @@
     "migrate:dev": "ts-node src/scripts/migrate.ts",
     "seed": "node dist/scripts/seed.js",
     "seed:dev": "ts-node src/scripts/seed.ts",
+    "insert-reviews": "ts-node scripts/insert-sample-reviews.ts",
+    "delete-reviews": "ts-node scripts/delete-reviews-from-db.ts",
     "test": "jest",
     "lint": "eslint src/**/*.ts"
   },

@@ -116,22 +116,79 @@ const processExpiredAppeal = async (order) => {
             ]);
             // Create admin notification
             const refundNotificationMessage = `Order #${order.id} automatically refunded due to no appeals`;
-            await database_1.default.query(`INSERT INTO admin_notifications (dispute_id, order_id, notification_type, title, message, priority, status)
-         VALUES ($1, $2, 'AUTO_REFUND', 'Auto-Refund Executed', $3, 'MEDIUM', 'ACTED_UPON')`, [order.dispute_id, order.id, refundNotificationMessage]);
+            try {
+                await database_1.default.query(`INSERT INTO admin_notifications (dispute_id, order_id, notification_type, title, message, priority, status)
+           VALUES ($1, $2, 'AUTO_REFUND', 'Auto-Refund Executed', $3, 'MEDIUM', 'READ')`, [order.dispute_id, order.id, refundNotificationMessage]);
+            }
+            catch (dbError) {
+                // If status constraint fails, try without status (let DB use default)
+                console.warn('⚠️ DISPUTE WORKER: Status constraint error, trying without status field:', dbError.message);
+                try {
+                    await database_1.default.query(`INSERT INTO admin_notifications (dispute_id, order_id, notification_type, title, message, priority)
+             VALUES ($1, $2, 'AUTO_REFUND', 'Auto-Refund Executed', $3, 'MEDIUM')`, [order.dispute_id, order.id, refundNotificationMessage]);
+                }
+                catch (retryError) {
+                    console.error('❌ DISPUTE WORKER: Failed to create notification even without status:', retryError);
+                }
+            }
             console.log(`✅ DISPUTE WORKER: Order ${order.id} automatically refunded`);
         }
         catch (contractError) {
             console.error(`❌ DISPUTE WORKER: Contract error for order ${order.id}:`, contractError);
-            // Log the error but don't fail the process
+            // Check if it's an insufficient funds error
+            const isInsufficientFunds = contractError.message?.includes('INSUFFICIENT_FUNDS') ||
+                contractError.code === 'INSUFFICIENT_FUNDS' ||
+                contractError.message?.includes('insufficient funds');
+            // Log the error
             await database_1.default.query(`INSERT INTO dispute_timeline (dispute_id, order_id, event_type, event_description, created_by, metadata)
          VALUES ($1, $2, 'AUTO_REFUND_FAILED', 'Automatic refund failed', 'SYSTEM', $3)`, [
                 order.dispute_id,
                 order.id,
                 JSON.stringify({
-                    error: contractError.message,
-                    reason: 'Contract execution failed'
+                    error: contractError.message || 'Unknown error',
+                    reason: isInsufficientFunds ? 'Insufficient BNB in relayer wallet for gas fees' : 'Contract execution failed',
+                    errorCode: contractError.code,
+                    isInsufficientFunds
                 })
             ]);
+            // Create high-priority admin notification for insufficient funds
+            if (isInsufficientFunds) {
+                const errorMessage = contractError.message || 'Insufficient funds in relayer wallet';
+                try {
+                    await database_1.default.query(`INSERT INTO admin_notifications (dispute_id, order_id, notification_type, title, message, priority, status)
+             VALUES ($1, $2, 'AUTO_REFUND_FAILED', '⚠️ Auto-Refund Failed: Insufficient Funds', $3, 'HIGH', 'UNREAD')`, [order.dispute_id, order.id, `Order #${order.id} could not be auto-refunded: ${errorMessage}. Please fund the relayer wallet and manually process this refund.`]);
+                    console.error(`🚨 DISPUTE WORKER: HIGH PRIORITY - Relayer wallet needs funding for order ${order.id}`);
+                }
+                catch (dbError) {
+                    // If status constraint fails, try without status (let DB use default)
+                    console.warn('⚠️ DISPUTE WORKER: Status constraint error, trying without status field:', dbError.message);
+                    try {
+                        await database_1.default.query(`INSERT INTO admin_notifications (dispute_id, order_id, notification_type, title, message, priority)
+               VALUES ($1, $2, 'AUTO_REFUND_FAILED', '⚠️ Auto-Refund Failed: Insufficient Funds', $3, 'HIGH')`, [order.dispute_id, order.id, `Order #${order.id} could not be auto-refunded: ${errorMessage}. Please fund the relayer wallet and manually process this refund.`]);
+                    }
+                    catch (retryError) {
+                        console.error('❌ DISPUTE WORKER: Failed to create notification even without status:', retryError);
+                    }
+                }
+            }
+            else {
+                // Regular error notification
+                try {
+                    await database_1.default.query(`INSERT INTO admin_notifications (dispute_id, order_id, notification_type, title, message, priority, status)
+             VALUES ($1, $2, 'AUTO_REFUND_FAILED', 'Auto-Refund Failed', $3, 'MEDIUM', 'UNREAD')`, [order.dispute_id, order.id, `Order #${order.id} could not be auto-refunded: ${contractError.message || 'Unknown error'}`]);
+                }
+                catch (dbError) {
+                    // If status constraint fails, try without status (let DB use default)
+                    console.warn('⚠️ DISPUTE WORKER: Status constraint error, trying without status field:', dbError.message);
+                    try {
+                        await database_1.default.query(`INSERT INTO admin_notifications (dispute_id, order_id, notification_type, title, message, priority)
+               VALUES ($1, $2, 'AUTO_REFUND_FAILED', 'Auto-Refund Failed', $3, 'MEDIUM')`, [order.dispute_id, order.id, `Order #${order.id} could not be auto-refunded: ${contractError.message || 'Unknown error'}`]);
+                    }
+                    catch (retryError) {
+                        console.error('❌ DISPUTE WORKER: Failed to create notification even without status:', retryError);
+                    }
+                }
+            }
         }
     }
     catch (error) {

@@ -18,7 +18,8 @@ import {
   Phone,
   PhoneOff,
   Mic,
-  MicOff
+  MicOff,
+  MessageSquare
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { checkAdminAuth, clearExpiredToken } from '../utils/adminAuth';
@@ -39,6 +40,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
   const [isCallActive, setIsCallActive] = useState(false); // Track if call is active (inline controls)
   const [callDuration, setCallDuration] = useState(0); // Call duration in seconds
   const [isMuted, setIsMuted] = useState(false); // Mute state
+  const [chatUnreadCount, setChatUnreadCount] = useState(0); // Unread chat messages count
   const navigate = useNavigate();
   const location = useLocation();
   const socketRef = useRef<Socket | null>(null);
@@ -317,7 +319,91 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
       startCallTimer();
     });
 
+    // ============================================
+    // CHAT NOTIFICATIONS
+    // ============================================
+    
+    // Listen for new chat messages from users
+    newSocket.on('new-chat-message', (data: any) => {
+      console.log('💬 AdminLayout: New chat message notification:', data);
+      if (data.message && data.message.sender_type === 'user') {
+        // Increment unread count
+        setChatUnreadCount(prev => prev + 1);
+        
+        // Show notification toast only if not on chat page
+        if (location.pathname !== '/admin/chat') {
+          const userName = data.userAddress 
+            ? `${data.userAddress.slice(0, 6)}...${data.userAddress.slice(-4)}`
+            : 'User';
+          
+          toast(
+            (t) => (
+              <div className="flex items-center space-x-3">
+                <div className="flex-1">
+                  <p className="font-semibold text-white">💬 New Chat Message</p>
+                  <p className="text-sm text-gray-200">
+                    From: <span className="font-medium">{userName}</span>
+                  </p>
+                  <p className="text-xs text-gray-300 mt-1 truncate max-w-xs">
+                    {data.message.message && data.message.message.length > 50 
+                      ? data.message.message.substring(0, 50) + '...' 
+                      : data.message.message || 'New message'}
+                  </p>
+                </div>
+                <button
+                  onClick={() => {
+                    navigate('/admin/chat');
+                    toast.dismiss(t.id);
+                  }}
+                  className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded-lg transition-colors"
+                >
+                  View
+                </button>
+              </div>
+            ),
+            {
+              duration: 5000,
+              icon: '💬',
+              position: 'top-right',
+              style: {
+                background: '#1e293b',
+                color: '#fff',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                minWidth: '300px',
+              },
+            }
+          );
+        }
+      }
+    });
+
+    // Fetch initial unread count
+    const fetchUnreadCount = async () => {
+      try {
+        const token = localStorage.getItem('adminToken') || '';
+        const response = await fetch('/api/admin/chat/unread-count', {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        if (response.ok) {
+          const data = await response.json();
+          setChatUnreadCount(data.data?.unread_count || 0);
+        }
+      } catch (error) {
+        console.error('Error fetching unread count:', error);
+      }
+    };
+
     socketRef.current = newSocket;
+
+    // Fetch initial unread count and set up periodic refresh
+    let unreadInterval: NodeJS.Timeout | null = null;
+    if (!isLoginPage) {
+      fetchUnreadCount();
+      // Refresh unread count periodically
+      unreadInterval = setInterval(fetchUnreadCount, 30000); // Every 30 seconds
+    }
 
     // Cleanup on unmount
     return () => {
@@ -335,6 +421,9 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
       if (statusCheckInterval) {
         clearInterval(statusCheckInterval);
       }
+      if (unreadInterval) {
+        clearInterval(unreadInterval);
+      }
       
       // Disconnect socket
       if (socketRef.current) {
@@ -342,7 +431,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
         socketRef.current = null;
       }
     };
-  }, [isLoginPage]);
+  }, [isLoginPage, location.pathname, navigate]);
 
   const handleLogout = () => {
     // Disconnect socket before logout
@@ -620,6 +709,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
     { name: 'Transactions', href: '/admin/transactions', icon: CreditCard },
     { name: 'Disputes', href: '/admin/disputes', icon: Gavel },
     { name: 'Support Calls', href: '/admin/support-calls', icon: Phone },
+    { name: 'Chat Support', href: '/admin/chat', icon: MessageSquare },
     { name: 'Agents', href: '/admin/agents', icon: Users },
     { name: 'Locations', href: '/admin/locations', icon: MapPin },
     { name: 'Reviews', href: '/admin/reviews', icon: Star },
@@ -675,23 +765,35 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
           <nav className="flex-1 overflow-y-auto px-4 py-6 space-y-2">
             {navigation.map((item) => {
               const isActive = isCurrentPath(item.href);
+              const isChatSupport = item.name === 'Chat Support';
               return (
                 <motion.button
                   key={item.name}
                   onClick={() => {
                     navigate(item.href);
                     setSidebarOpen(false);
+                    // Clear unread count when navigating to chat
+                    if (isChatSupport) {
+                      setChatUnreadCount(0);
+                    }
                   }}
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
-                  className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-left transition-all duration-200 ${
+                  className={`w-full flex items-center justify-between px-4 py-3 rounded-lg text-left transition-all duration-200 relative ${
                     isActive
                       ? 'bg-gradient-to-r from-purple-500 to-blue-500 text-white shadow-lg'
                       : 'text-gray-300 hover:bg-white/10 hover:text-white'
                   }`}
                 >
-                  <item.icon size={20} />
-                  <span className="font-medium">{item.name}</span>
+                  <div className="flex items-center space-x-3">
+                    <item.icon size={20} />
+                    <span className="font-medium">{item.name}</span>
+                  </div>
+                  {isChatSupport && chatUnreadCount > 0 && (
+                    <span className="bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full animate-pulse min-w-[20px] text-center">
+                      {chatUnreadCount > 99 ? '99+' : chatUnreadCount}
+                    </span>
+                  )}
                 </motion.button>
               );
             })}

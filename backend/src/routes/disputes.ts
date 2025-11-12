@@ -251,10 +251,10 @@ router.post('/:orderId/confirm-payment-received', authenticateToken, async (req:
     console.log('💡 NEW FLOW: Seller\'s confirmReceived() already released funds on blockchain');
     
     // Update order status to RELEASED immediately
-    await pool.query(
-      'UPDATE orders SET state = $1 WHERE id = $2',
-      ['RELEASED', orderId]
-    );
+      await pool.query(
+        'UPDATE orders SET state = $1 WHERE id = $2',
+        ['RELEASED', orderId]
+      );
 
     const confirmation = confirmationResult.rows[0];
     
@@ -268,15 +268,15 @@ router.post('/:orderId/confirm-payment-received', authenticateToken, async (req:
       );
     } else {
       // Seller confirmed (buyer confirmation is off-chain only)
-      await pool.query(
-        `INSERT INTO dispute_timeline (dispute_id, order_id, event_type, event_description, created_by)
+    await pool.query(
+      `INSERT INTO dispute_timeline (dispute_id, order_id, event_type, event_description, created_by)
          VALUES (NULL, $1, 'SELLER_CONFIRMED', 'Seller confirmed payment received and released funds on blockchain', $2)`,
-        [orderId, user.address]
-      );
+      [orderId, user.address]
+    );
     }
 
     console.log('🎉 CONFIRM PAYMENT RECEIVED: Order status updated to RELEASED');
-    
+
     res.json({
       success: true,
       data: {

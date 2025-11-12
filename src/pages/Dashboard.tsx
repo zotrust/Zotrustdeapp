@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import {ArrowUpRight, ArrowDownLeft, RefreshCw, CheckCircle, Loader2, AlertCircle, X, Star, MessageSquare, Plus, VideoIcon, Phone} from 'lucide-react';
+import {ArrowUpRight, ArrowDownLeft, RefreshCw, CheckCircle, Loader2, AlertCircle, X, Star, MessageSquare, Plus, VideoIcon, Phone, FileText} from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useWalletStore } from '../stores/walletStore';
 import { useUserStore } from '../stores/userStore';
@@ -44,6 +44,7 @@ const Dashboard: React.FC = () => {
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [showOnlyApproved, setShowOnlyApproved] = useState(false);
   const [showDemoVideo, setShowDemoVideo] = useState(false);
+  const [showSupportCallModal, setShowSupportCallModal] = useState<{isOpen: boolean, supportUrl: string}>({isOpen: false, supportUrl: ''});
   
   const { 
     address, 
@@ -218,10 +219,10 @@ const Dashboard: React.FC = () => {
   }
 
   return (
-    <div className="p-4 space-y-4 max-w-sm mx-auto">
+    <div className=" space-y-4 max-w-sm mx-auto">
       {/* Header */}
       <div className="text-center">
-        <h1 className="text-2xl font-bold text-white">Zotrust</h1>
+        <h1 className="text-2xl mt-3 font-bold text-white">Zotrust</h1>
         {user && (
           <div className="bg-violet-500/20 backdrop-blur-lg rounded-lg p-2 border border-violet-500/30 mt-2">
             <p className="text-xs text-violet-200">
@@ -267,7 +268,12 @@ const Dashboard: React.FC = () => {
             <ul className="mt-1 text-[11px] text-violet-200 space-y-1 list-disc list-inside">
               <li>No bank freeze risk, no middlemen</li>
               <li>Smart‑contract escrow, low fees</li>
-              <li>Cash ↔ USDT, global access</li>
+              <li>
+                <span className="font-bold underline px-2 py-0.5 rounded-md ">Cash to USDT</span>
+                {' '}↔{' '}
+                <span className=" underline font-bold px-2 py-0.5 rounded-md">USDT to Cash</span>
+                , global access
+              </li>
             </ul>
           </div>
           <div className="flex flex-col items-end space-y-2">
@@ -575,19 +581,19 @@ const Dashboard: React.FC = () => {
  
       {/* Reviews Section */}
       {isConnected && (
-        <div className="space-y-3">
+        <div className="bg-white rounded-xl p-4 shadow-lg space-y-4">
           <div className="flex items-center justify-between">
-            <h3 className="text-base font-semibold text-white flex items-center space-x-2">
-              <Star className="w-4 h-4 text-violet-400" />
+            <h3 className="text-lg font-bold text-gray-800 flex items-center space-x-2">
+              <Star className="w-5 h-5 text-yellow-500 fill-yellow-500" />
               <span>Reviews</span>
             </h3>
             <div className="flex items-center space-x-2">
               <button
                 onClick={() => setShowOnlyApproved(!showOnlyApproved)}
-                className={`px-2 py-1 rounded text-xs transition-colors ${
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
                   showOnlyApproved 
-                    ? 'bg-violet-500/20 text-violet-400' 
-                    : 'bg-gray-500/20 text-gray-400'
+                    ? 'bg-violet-600 text-white' 
+                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                 }`}
               >
                 {showOnlyApproved ? 'Approved' : 'All'}
@@ -600,86 +606,115 @@ const Dashboard: React.FC = () => {
                   }
                   setShowReviewModal(true);
                 }}
-                className="bg-violet-600 hover:bg-violet-700 text-white px-2 py-1 rounded text-xs transition-colors flex items-center space-x-1"
+                className="bg-violet-600 hover:bg-violet-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center space-x-1.5"
               >
-                <Plus size={12} />
-                <span>Review</span>
+                <Plus size={14} />
+                <span>Add Review</span>
               </button>
             </div>
           </div>
 
           {/* Review Stats */}
           {reviewStats && (
-            <div className="bg-violet-500/10 backdrop-blur-lg rounded-lg p-3 border border-violet-500/20">
-              <div className="grid grid-cols-2 gap-3">
+            <div className="bg-gradient-to-r from-violet-50 to-purple-50 rounded-lg p-4 border border-violet-200">
+              <div className="grid grid-cols-2 gap-4">
                 <div className="text-center">
-                  <div className="text-lg font-bold text-white">{reviewStats.total_reviews}</div>
-                  <div className="text-xs text-violet-300">Reviews</div>
+                  <div className="text-2xl font-bold text-gray-800">{reviewStats.total_reviews}</div>
+                  <div className="text-xs text-gray-600 font-medium">Total Reviews</div>
                 </div>
                 <div className="text-center">
                   <div className="flex justify-center items-center space-x-1 mb-1">
                     {Array.from({ length: 5 }, (_, i) => (
                       <Star
                         key={i}
-                        size={14}
-                        className={i < Math.round(parseFloat(reviewStats.average_rating)) ? 'text-yellow-400 fill-current' : 'text-gray-400'}
+                        size={16}
+                        className={i < Math.round(parseFloat(reviewStats.average_rating)) ? 'text-yellow-500 fill-yellow-500' : 'text-gray-300'}
                       />
                     ))}
                   </div>
-                  <div className="text-xs text-violet-300">
-                    {reviewStats.average_rating} avg
+                  <div className="text-sm font-semibold text-gray-800">
+                    {reviewStats.average_rating} / 5.0
                   </div>
+                  <div className="text-xs text-gray-600">Average Rating</div>
                 </div>
               </div>
             </div>
           )}
 
           {/* Reviews List */}
-          <div className="max-h-64 overflow-y-auto space-y-2 scrollbar-thin scrollbar-thumb-violet-500/30 scrollbar-track-transparent">
+          <div className="max-h-96 overflow-y-auto space-y-3 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
             {isLoadingReviews ? (
-              <div className="text-center py-3">
-                <Loader2 className="w-5 h-5 animate-spin mx-auto mb-2 text-violet-500" />
-                <p className="text-violet-300 text-xs">Loading...</p>
+              <div className="text-center py-8">
+                <Loader2 className="w-6 h-6 animate-spin mx-auto mb-3 text-violet-600" />
+                <p className="text-gray-600 text-sm">Loading reviews...</p>
               </div>
             ) : reviews.length > 0 ? (
               reviews
                 .filter(review => showOnlyApproved ? review.is_approved : true)
+                .filter((review, index, self) => {
+                  // Remove duplicates based on reviewer_name (case-insensitive)
+                  const reviewerName = (review.reviewer_name || 'Anonymous User').toLowerCase().trim();
+                  return index === self.findIndex(r => 
+                    (r.reviewer_name || 'Anonymous User').toLowerCase().trim() === reviewerName
+                  );
+                })
                 .map((review) => (
-                <div key={review.id} className="bg-violet-500/10 backdrop-blur-lg rounded-lg p-3 border border-violet-500/20">
-                  <div className="flex items-start justify-between mb-1">
-                    <div className="flex items-center space-x-1">
-                      <div className="flex">
-                        {Array.from({ length: 5 }, (_, i) => (
-                          <Star
-                            key={i}
-                            size={12}
-                            className={i < review.rating ? 'text-yellow-400 fill-current' : 'text-gray-400'}
-                          />
-                        ))}
+                <motion.div 
+                  key={review.id} 
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow"
+                >
+                  <div className="flex items-start justify-between mb-2">
+                    <div className="flex-1">
+                      <div className="flex items-center space-x-2 mb-1">
+                        <div className="flex items-center space-x-0.5">
+                          {Array.from({ length: 5 }, (_, i) => (
+                            <Star
+                              key={i}
+                              size={14}
+                              className={i < review.rating ? 'text-yellow-500 fill-yellow-500' : 'text-gray-300'}
+                            />
+                          ))}
+                        </div>
+                        <span className="text-xs font-semibold text-gray-700">
+                          {review.rating}.0
+                        </span>
                       </div>
-                      <span className="text-xs text-violet-300">
-                        by {review.reviewer_name || 'Unknown'}
-                      </span>
+                      <div className="flex items-center space-x-2">
+                        <span className="text-sm font-medium text-gray-800">
+                          {review.reviewer_name || 'Anonymous User'}
+                        </span>
+                        {review.is_approved && (
+                          <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">
+                            ✓ Verified
+                          </span>
+                        )}
+                      </div>
                     </div>
-                    <span className="text-xs text-violet-400">
-                      {new Date(review.created_at).toLocaleDateString()}
+                    <span className="text-xs text-gray-500 whitespace-nowrap ml-2">
+                      {new Date(review.created_at).toLocaleDateString('en-US', { 
+                        month: 'short', 
+                        day: 'numeric',
+                        year: 'numeric'
+                      })}
                     </span>
                   </div>
                   {review.message && (
-                    <p className="text-xs text-violet-200">{review.message}</p>
+                    <p className="text-sm text-gray-700 leading-relaxed mt-2">{review.message}</p>
                   )}
-                </div>
+                </motion.div>
               ))
             ) : (
-              <div className="text-center py-4">
-                <MessageSquare className="w-8 h-8 text-violet-400 mx-auto mb-2" />
-                <p className="text-violet-300 text-sm">
-                  {showOnlyApproved ? 'No approved reviews' : 'No reviews yet'}
+              <div className="text-center py-8">
+                <MessageSquare className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                <p className="text-gray-700 font-medium text-sm">
+                  {showOnlyApproved ? 'No approved reviews yet' : 'No reviews yet'}
                 </p>
-                <p className="text-violet-400 text-xs mt-1">
+                <p className="text-gray-500 text-xs mt-1">
                   {showOnlyApproved 
-                    ? 'Pending approval' 
-                    : 'Share your experience'
+                    ? 'Reviews are pending admin approval' 
+                    : 'Be the first to share your experience!'
                   }
                 </p>
               </div>
@@ -699,7 +734,7 @@ const Dashboard: React.FC = () => {
 
       {/* Support Call Button */}
       <button
-        onClick={async () => {
+        onClick={() => {
           // First check if wallet is connected
           if (!isConnected || !address) {
             toast.error('Please connect your wallet first', {
@@ -720,67 +755,15 @@ const Dashboard: React.FC = () => {
             return;
           }
 
-          // Check microphone permission
-          try {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            // Permission granted, stop the stream immediately (we just needed to check)
-            stream.getTracks().forEach(track => track.stop());
-            
-            // Check if running in wallet browser
-            const userAgent = navigator.userAgent.toLowerCase();
-            const isWalletBrowser = userAgent.includes('metamask') || 
-                                   userAgent.includes('trustwallet') ||
-                                   userAgent.includes('tokenpocket') ||
-                                   userAgent.includes('coinbase') ||
-                                   (window.ethereum && (window.ethereum as any).isMetaMask && userAgent.includes('mobile'));
-            
-            if (isWalletBrowser) {
-              // If in wallet browser, try to open in Chrome
-              const currentUrl = window.location.origin + `/support-call/${address}`;
-              
-              // Try to open in Chrome
-              if (navigator.userAgent.includes('Android')) {
-                // Android: Try Chrome intent
-                const chromeUrl = `intent://${currentUrl.replace(/^https?:\/\//, '')}#Intent;scheme=https;package=com.android.chrome;end`;
-                window.location.href = chromeUrl;
-              } else if (navigator.userAgent.includes('iPhone') || navigator.userAgent.includes('iPad')) {
-                // iOS: Show instructions
-                toast.error('Please copy the link and open in Chrome/Safari browser for best call experience', {
-                  duration: 5000,
-                  icon: '🌐'
-                });
-                // Copy URL to clipboard
-                navigator.clipboard.writeText(currentUrl).then(() => {
-                  toast.success('Link copied to clipboard!');
-                });
-              } else {
-                // Desktop: Open in new window (might open default browser)
-                toast('Opening in browser...', { icon: '🌐' });
-                window.open(currentUrl, '_blank');
-              }
-            } else {
-              // Normal browser, navigate normally with wallet address
-              navigate(`/support-call/${address}`);
-            }
-          } catch (error: any) {
-            // Microphone permission denied or not available
-            console.error('Microphone permission error:', error);
-            
-            // Redirect to support call page where permission will be requested
-            if (address) {
-              toast('Microphone permission required. Redirecting to call page...', {
-                duration: 3000,
-                icon: '🎤'
-              });
-              navigate(`/support-call/${address}`);
-            } else {
-              toast.error('Please connect your wallet first', {
-                duration: 3000,
-                icon: '🔐'
-              });
-              setShowWalletModal(true);
-            }
-          }
+          // Construct support call URL with wallet address
+          const currentUrl = window.location.origin;
+          const supportUrl = `${currentUrl}/support-call/${address}`;
+          
+          // Always show modal (no redirect)
+          setShowSupportCallModal({
+            isOpen: true,
+            supportUrl: supportUrl
+          });
         }}
         className="w-full bg-gradient-to-r from-green-500/20 to-emerald-500/20 border border-green-500/30 rounded-lg p-4 flex items-center justify-between hover:from-green-500/30 hover:to-emerald-500/30 transition-all group"
       >
@@ -802,6 +785,37 @@ const Dashboard: React.FC = () => {
         <ArrowUpRight size={16} className="text-green-400 group-hover:text-green-300 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
       </button>
 
+      {/* Chat Support Button */}
+      <button
+        onClick={() => {
+          if (!isConnected || !address) {
+            toast.error('Please connect your wallet first', {
+              duration: 3000,
+              icon: '🔐'
+            });
+            setShowWalletModal(true);
+            return;
+          }
+          navigate('/chat');
+        }}
+        className="w-full bg-gradient-to-r from-blue-500/20 to-cyan-500/20 border border-blue-500/30 rounded-lg p-4 flex items-center justify-between hover:from-blue-500/30 hover:to-cyan-500/30 transition-all group"
+      >
+        <div className="flex items-center space-x-3">
+          <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-full flex items-center justify-center">
+            <MessageSquare size={20} className="text-white" />
+          </div>
+          <div>
+            <p className="text-white font-semibold text-sm">Chat Support</p>
+            <p className="text-blue-300 text-xs">
+              {!isConnected || !address 
+                ? 'Connect wallet to chat' 
+                : 'Chat with admin support'}
+            </p>
+          </div>
+        </div>
+        <ArrowUpRight size={16} className="text-blue-400 group-hover:text-blue-300 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
+      </button>
+
     
       
       {/* Wallet Selection Modal */}
@@ -819,6 +833,175 @@ const Dashboard: React.FC = () => {
           onReviewSubmitted={fetchReviews}
           userAddress={address} // Connected wallet address is the reviewer
         />
+      )}
+
+      {/* Support Call Modal - Shows support URL with copy option */}
+      {showSupportCallModal.isOpen && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          onClick={() => setShowSupportCallModal({ isOpen: false, supportUrl: '' })}
+        >
+          <motion.div
+            initial={{ scale: 0.9, opacity: 0, y: 20 }}
+            animate={{ scale: 1, opacity: 1, y: 0 }}
+            exit={{ scale: 0.9, opacity: 0, y: 20 }}
+            className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-xl w-full max-w-md border border-white/20 text-white overflow-hidden shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between p-6 border-b border-white/10">
+              <div className="flex items-center space-x-3">
+                <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-emerald-500 rounded-full flex items-center justify-center">
+                  <Phone size={24} className="text-white" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-white">Support Call</h3>
+                  <p className="text-sm text-gray-400">Copy URL to Browser</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowSupportCallModal({ isOpen: false, supportUrl: '' })}
+                className="p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors"
+                title="Close"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="p-6 space-y-6">
+              {/* Message */}
+              <div className="bg-blue-500/20 border border-blue-500/30 rounded-lg p-4">
+                <p className="text-sm text-blue-300 text-center">
+                  Copy and paste in browser to make support call
+                </p>
+              </div>
+
+              {/* URL Display - Selectable */}
+              <div className="bg-white/10 rounded-lg p-4 border border-white/10">
+                <p className="text-sm text-gray-400 mb-2">Support Call URL</p>
+                <p 
+                  id="support-url-display"
+                  className="text-sm font-mono text-white break-all bg-black/20 p-3 rounded border border-white/10 select-all cursor-text"
+                  style={{ userSelect: 'all', WebkitUserSelect: 'all' }}
+                  onClick={(e) => {
+                    // Select all text when clicked
+                    const range = document.createRange();
+                    range.selectNodeContents(e.currentTarget);
+                    const selection = window.getSelection();
+                    selection?.removeAllRanges();
+                    selection?.addRange(range);
+                  }}
+                >
+                  {showSupportCallModal.supportUrl}
+                </p>
+                <p className="text-xs text-gray-400 mt-2">Tap to select, then copy manually</p>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="space-y-3">
+                {/* Copy Button with Fallback */}
+                <motion.button
+                  onClick={async () => {
+                    try {
+                      // Try modern clipboard API first
+                      if (navigator.clipboard && navigator.clipboard.writeText) {
+                        await navigator.clipboard.writeText(showSupportCallModal.supportUrl);
+                        toast.success('URL copied to clipboard! Copy and paste in browser.');
+                      } else {
+                        // Fallback: Select text manually
+                        const urlElement = document.getElementById('support-url-display');
+                        if (urlElement) {
+                          const range = document.createRange();
+                          range.selectNodeContents(urlElement);
+                          const selection = window.getSelection();
+                          selection?.removeAllRanges();
+                          selection?.addRange(range);
+                          toast('URL selected! Long press to copy', { 
+                            icon: '📋',
+                            duration: 3000
+                          });
+                        }
+                      }
+                    } catch (error) {
+                      console.error('Failed to copy:', error);
+                      // Fallback: Select text manually
+                      const urlElement = document.getElementById('support-url-display');
+                      if (urlElement) {
+                        const range = document.createRange();
+                        range.selectNodeContents(urlElement);
+                        const selection = window.getSelection();
+                        selection?.removeAllRanges();
+                        selection?.addRange(range);
+                        toast('URL selected! Long press to copy', { 
+                          icon: '📋',
+                          duration: 4000
+                        });
+                      } else {
+                        toast.error('Please manually select and copy the URL');
+                      }
+                    }
+                  }}
+                  className="w-full bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white py-4 px-6 rounded-lg font-semibold text-lg flex items-center justify-center space-x-3 transition-all shadow-lg"
+                  whileTap={{ scale: 0.98 }}
+                >
+                  <FileText size={24} />
+                  <span>Copy URL</span>
+                </motion.button>
+
+                {/* Select All Button for Manual Copy */}
+                <motion.button
+                  onClick={() => {
+                    const urlElement = document.getElementById('support-url-display');
+                    if (urlElement) {
+                      const range = document.createRange();
+                      range.selectNodeContents(urlElement);
+                      const selection = window.getSelection();
+                      selection?.removeAllRanges();
+                      selection?.addRange(range);
+                      toast('URL selected! Long press to copy', { 
+                        icon: '📋',
+                        duration: 3000
+                      });
+                    }
+                  }}
+                  className="w-full bg-white/10 hover:bg-white/20 text-white py-4 px-6 rounded-lg font-medium flex items-center justify-center space-x-3 transition-all border border-white/20"
+                  whileTap={{ scale: 0.98 }}
+                >
+                  <span>Select URL (Manual Copy)</span>
+                </motion.button>
+
+                {/* Open in Browser Button */}
+                <motion.a
+                  href={showSupportCallModal.supportUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full bg-white/10 hover:bg-white/20 text-white py-4 px-6 rounded-lg font-medium flex items-center justify-center space-x-3 transition-all border border-white/20"
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => {
+                    // Try to open in new tab
+                    window.open(showSupportCallModal.supportUrl, '_blank');
+                  }}
+                >
+                  <span>Open in Browser</span>
+                </motion.a>
+              </div>
+
+              {/* Instructions */}
+              <div className="bg-yellow-500/20 border border-yellow-500/30 rounded-lg p-4 space-y-2">
+                <p className="text-sm text-yellow-300 text-center">
+                  💡 Copy the URL and paste it in your browser to make a support call
+                </p>
+                <p className="text-xs text-yellow-400 text-center">
+                  If copy fails, tap the URL above to select it, then long press to copy
+                </p>
+              </div>
+            </div>
+          </motion.div>
+        </motion.div>
       )}
     </div>
   );
