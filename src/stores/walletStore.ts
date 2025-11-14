@@ -32,7 +32,7 @@ interface WalletStore extends WalletState {
   connectWalletConnect: () => Promise<void>;
   authenticateUser: (address: string) => Promise<void>;
   disconnect: () => void;
-  updateBalances: () => Promise<void>;
+  updateBalances: (showToast?: boolean) => Promise<void>;
   switchToNetwork: (chainId: number) => Promise<void>;
   clearError: () => void;
   restoreWalletState: () => Promise<void>;
@@ -634,8 +634,15 @@ export const useWalletStore = create<WalletStore>((set, get) => ({
     }
   },
 
-  updateBalances: async () => {
-    const { address, isConnected, chainId, walletType } = get();
+  updateBalances: async (showToast: boolean = false) => {
+    const { address, isConnected, chainId, walletType, isUpdatingBalances } = get();
+    
+    // Prevent multiple simultaneous balance updates
+    if (isUpdatingBalances) {
+      console.log('⏸️ Balance update already in progress, skipping duplicate call');
+      return;
+    }
+    
     if (!address || !isConnected || !chainId) return;
 
     set({ isUpdatingBalances: true });
@@ -647,8 +654,13 @@ export const useWalletStore = create<WalletStore>((set, get) => ({
         let provider: ethers.BrowserProvider;
 
         // Get provider based on wallet type
-        if (walletType === 'metamask') {
+        if (walletType === 'metamask' || walletType === 'trustwallet') {
+          // Both MetaMask and Trust Wallet use window.ethereum
+          if (!window.ethereum) {
+            throw new Error(`${walletType === 'metamask' ? 'MetaMask' : 'Trust Wallet'} provider not available`);
+          }
           provider = new ethers.BrowserProvider(window.ethereum! as any);
+          console.log(`✅ Using ${walletType === 'metamask' ? 'MetaMask' : 'Trust Wallet'} provider for balance fetch`);
         } else {
           // For WalletConnect, ensure service is initialized
           let wcProvider = walletConnectService.getProvider();
@@ -816,8 +828,8 @@ export const useWalletStore = create<WalletStore>((set, get) => ({
         console.log('💰 USDT balance updated:', usdtBalance);
         console.log('💰 USDC balance updated:', usdcBalance);
         
-        // Show success toast if balances are non-zero
-        if (parseFloat(bnbBalance) > 0 || parseFloat(usdtBalance) > 0 || parseFloat(usdcBalance) > 0) {
+        // Show success toast only if explicitly requested (e.g., manual refresh)
+        if (showToast && (parseFloat(bnbBalance) > 0 || parseFloat(usdtBalance) > 0 || parseFloat(usdcBalance) > 0)) {
           toast.success(`Balances: BNB ${parseFloat(bnbBalance).toFixed(4)}, USDT ${parseFloat(usdtBalance).toFixed(2)}, USDC ${parseFloat(usdcBalance).toFixed(2)}`, {
             duration: 3000,
             icon: '💰'
@@ -833,8 +845,9 @@ export const useWalletStore = create<WalletStore>((set, get) => ({
             usdc: '0.00'
           }
         });
+      } finally {
+        set({ isUpdatingBalances: false });
       }
-      set({ isUpdatingBalances: false });
       return;
     }
 
@@ -843,7 +856,11 @@ export const useWalletStore = create<WalletStore>((set, get) => ({
     try {
       let provider: ethers.BrowserProvider;
 
-      if (walletType === 'metamask') {
+      if (walletType === 'metamask' || walletType === 'trustwallet') {
+        // Both MetaMask and Trust Wallet use window.ethereum
+        if (!window.ethereum) {
+          throw new Error(`${walletType === 'metamask' ? 'MetaMask' : 'Trust Wallet'} provider not available`);
+        }
         provider = new ethers.BrowserProvider(window.ethereum! as any);
       } else {
         const wcProvider = walletConnectService.getProvider();

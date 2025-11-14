@@ -331,7 +331,7 @@ router.post('/:id/prepare-accept', authenticateToken, async (req: any, res) => {
         otpHash: otpHash,
         
         blockchain: {
-          contractAddress: process.env.CONTRACT_ADDRESS || '0x6722FE6DdCe1F7389daa70aD5C65e51f9F375E6e',
+          contractAddress: process.env.CONTRACT_ADDRESS || '0x03AE241B01220D9b9698650e5ed012EE72171fCD',
           tradeId: parseInt(orderId),
           network: 'BSC Mainnet',
           chainId: 56
@@ -762,7 +762,7 @@ router.post('/:id/prepare-lock', authenticateToken, async (req: any, res) => {
         otpHash: otpHash,
         blockchain: {
           tradeId: tradeId,
-          contractAddress: process.env.CONTRACT_ADDRESS || '0x6722FE6DdCe1F7389daa70aD5C65e51f9F375E6e',
+          contractAddress: process.env.CONTRACT_ADDRESS || '0x03AE241B01220D9b9698650e5ed012EE72171fCD',
           network: 'BSC Mainnet',
           chainId: 56
         }

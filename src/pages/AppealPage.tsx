@@ -318,14 +318,11 @@ const AppealPage = () => {
       }
 
       const result = await response.json();
-      console.log('✅ Appeal submitted successfully:', result);
+      console.log('✅ Appeal submitted successfully to backend:', result);
       
+      // ⭐ Note: Appeal is saved in database only. Buyer/Seller do NOT file appeal on smart contract.
+      // Only admin can resolve disputes on-chain via adminDecision().
       setSubmitStatus({ type: 'success', message: '✅ Appeal submitted successfully! Admin will review within 48 hours.' });
-      
-      // Navigate back to orders page after 3 seconds
-      // setTimeout(() => {
-      //   window.location.href = '/orders';
-      // }, 3000);
       
     } catch (error: any) {
       console.error('❌ Error submitting appeal:', error);

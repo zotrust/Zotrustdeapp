@@ -71,11 +71,21 @@ const Dashboard: React.FC = () => {
     // Check if wallet is being restored
     if (isConnected && address) {
       setIsRestoringWallet(false);
-      updateBalances();
+      // Add a small delay to ensure wallet is fully initialized before fetching balances
+      // Also check if balance update is already in progress to avoid duplicate calls
+      const balanceTimer = setTimeout(() => {
+        if (!isUpdatingBalances) {
+          console.log('🔄 Dashboard: Fetching balances for connected wallet...');
+          updateBalances();
+        } else {
+          console.log('⏸️ Dashboard: Balance update already in progress, skipping...');
+        }
+      }, 500);
       fetchReviews();
       // Refresh user profile to get latest verification status
       console.log('🔄 Dashboard: Wallet connected, refreshing user profile...');
       refreshUserProfile();
+      return () => clearTimeout(balanceTimer);
     } else {
       // Wait a bit for wallet restoration to complete
       const timer = setTimeout(() => {
@@ -83,7 +93,7 @@ const Dashboard: React.FC = () => {
       }, 2000);
       return () => clearTimeout(timer);
     }
-  }, [isConnected, address, updateBalances, refreshUserProfile]);
+  }, [isConnected, address, updateBalances, refreshUserProfile, isUpdatingBalances]);
 
   const fetchReviews = async () => {
     if (!isConnected || !address) return;
@@ -186,7 +196,8 @@ const Dashboard: React.FC = () => {
 
   const handleRefreshBalances = () => {
     if (isConnected) {
-      updateBalances();
+      // Show toast only on manual refresh
+      updateBalances(true);
     }
   };
 

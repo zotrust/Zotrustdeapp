@@ -8,7 +8,7 @@ export const BSC_MAINNET_CHAIN_ID = 56;
 export { ZOTRUST_CONTRACT_ABI };
 
 // Mainnet Contract Address
-export const ZOTRUST_CONTRACT_ADDRESS = '0x6722FE6DdCe1F7389daa70aD5C65e51f9F375E6e';
+export const ZOTRUST_CONTRACT_ADDRESS = '0x03AE241B01220D9b9698650e5ed012EE72171fCD';
 
 // Mainnet Token Addresses (BSC Mainnet - BNB Primary)
 export const TOKENS = {

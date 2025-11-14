@@ -55,31 +55,10 @@ const AdminDisputes: React.FC = () => {
   const [confirmResolution, setConfirmResolution] = useState<{type: 'buyer' | 'seller' | null, appealId: string, reason: string}>({
     type: null, 
     appealId: '', 
-    reason: 'This is Testing1'
+    reason: ''
   });
   const [showWalletModal, setShowWalletModal] = useState(false);
-  const [showRpcHelp, setShowRpcHelp] = useState(false);
-  const [rpcHelpMessage, setRpcHelpMessage] = useState<string>('');
-  const [testingRpc, setTestingRpc] = useState<string | null>(null);
-  const [syncingStatus, setSyncingStatus] = useState(false);
-
-  const isRpcIndexingError = (e: any) => {
-    const msg = String(e?.message || '').toLowerCase();
-    const code = e?.code;
-    const reason = String(e?.reason || '').toLowerCase();
-    return (
-      code === -32000 ||
-      code === 'CALL_EXCEPTION' ||
-      msg.includes('state histories') ||
-      msg.includes('internal json-rpc error') ||
-      msg.includes('missing revert data') ||
-      msg.includes('timeout') ||
-      msg.includes('network error') ||
-      msg.includes('connection') ||
-      reason.includes('missing revert data') ||
-      (e?.data === null && e?.reason === null && code === 'CALL_EXCEPTION')
-    );
-  };
+  const [estimatedGasFee, setEstimatedGasFee] = useState<string | null>(null);
 
   // Retry contract call with exponential backoff
   const retryContractCall = async (
@@ -98,9 +77,8 @@ const AdminDisputes: React.FC = () => {
         ]);
       } catch (error: any) {
         lastError = error;
-        if (isRpcIndexingError(error) && attempt < maxRetries - 1) {
+        if (attempt < maxRetries - 1) {
           const delay = baseDelay * Math.pow(2, attempt);
-          console.log(`⚠️ RPC call failed (attempt ${attempt + 1}/${maxRetries}), retrying in ${delay}ms...`);
           await new Promise(resolve => setTimeout(resolve, delay));
           continue;
         }
@@ -108,55 +86,6 @@ const AdminDisputes: React.FC = () => {
       }
     }
     throw lastError;
-  };
-
-  // Check RPC health before critical operations
-  const checkRpcHealth = async (provider: ethers.BrowserProvider): Promise<{ healthy: boolean; error?: string }> => {
-    try {
-      const blockNumber = await Promise.race([
-        provider.getBlockNumber(),
-        new Promise<never>((_, reject) => 
-          setTimeout(() => reject(new Error('RPC health check timeout')), 5000)
-        )
-      ]);
-      
-      if (blockNumber > 0) {
-        return { healthy: true };
-      }
-      return { healthy: false, error: 'RPC returned invalid block number' };
-    } catch (error: any) {
-      console.error('❌ RPC health check failed:', error);
-      return { 
-        healthy: false, 
-        error: error.message || 'RPC node is unresponsive or timing out' 
-      };
-    }
-  };
-
-  // Test RPC endpoint
-  const testRpcEndpoint = async (rpcUrl: string): Promise<{ success: boolean; message: string }> => {
-    setTestingRpc(rpcUrl);
-    try {
-      const provider = new ethers.JsonRpcProvider(rpcUrl);
-      const blockNumber = await Promise.race([
-        provider.getBlockNumber(),
-        new Promise<never>((_, reject) => 
-          setTimeout(() => reject(new Error('Timeout after 5 seconds')), 5000)
-        )
-      ]);
-      
-      if (blockNumber > 0) {
-        return { success: true, message: `✅ Connected! Latest block: ${blockNumber}` };
-      }
-      return { success: false, message: '❌ Invalid response: block number is 0' };
-    } catch (error: any) {
-      return { 
-        success: false, 
-        message: `❌ Failed: ${error.message || 'Connection error'}` 
-      };
-    } finally {
-      setTestingRpc(null);
-    }
   };
   const navigate = useNavigate();
 
@@ -240,123 +169,9 @@ const AdminDisputes: React.FC = () => {
     }
   };
 
-  // Check and sync on-chain status with database
-  const checkAndSyncStatus = async (appeal: Appeal, showLoading: boolean = false) => {
-    if (showLoading) {
-      setSyncingStatus(true);
-    }
-    try {
-      // Get trade ID
-      const preferredTradeId = (appeal as any)?.order?.blockchain_trade_id ?? 
-                              (appeal as any)?.blockchain_trade_id ?? 
-                              appeal?.order_id;
-      const tradeId = Number(preferredTradeId);
-
-      if (!tradeId || Number.isNaN(tradeId) || tradeId <= 0) {
-        return; // Can't check without valid trade ID
-      }
-
-      // Check if wallet is connected
-      if (!isConnected || !window.ethereum) {
-        return; // Can't check without wallet
-      }
-
-      // Connect to contract
-      const provider = new ethers.BrowserProvider(window.ethereum as any);
-      const network = await provider.getNetwork();
-      if (Number(network.chainId) !== BSC_MAINNET_CHAIN_ID) {
-        return; // Wrong network
-      }
-
-      const contract = new ethers.Contract(ZOTRUST_CONTRACT_ADDRESS, ZOTRUST_CONTRACT_ABI, provider);
-      
-      // Get trade status
-      let trade: any;
-      try {
-        trade = await retryContractCall(
-          () => contract.trades(tradeId),
-          2,
-          1000
-        );
-      } catch (error) {
-        console.log('Could not fetch trade status for sync check:', error);
-        return; // Silently fail - don't block UI
-      }
-
-      const tradeStatus = Number(trade.status);
-      // Complete status mapping (matches P2PEscrowV2 contract enum)
-      const STATUS = {
-        CREATED: 0,
-        LOCKED: 1,
-        APPEAL_WINDOW_OPEN: 2,
-        UNDER_DISPUTE: 3,
-        RELEASED: 4,
-        REFUNDED: 5,
-        COMPLETED: 6
-      };
-
-      // Helper to get status name
-      const getStatusName = (statusNum: number): string => {
-        const statusKey = Object.keys(STATUS).find(k => STATUS[k as keyof typeof STATUS] === statusNum);
-        return statusKey || `UNKNOWN(${statusNum})`;
-      };
-
-      const statusName = getStatusName(tradeStatus);
-      console.log(`🔍 Trade ${tradeId} status: ${tradeStatus} (${statusName})`);
-
-      // If trade is already finalized on-chain but dispute is still pending, update database
-      if ((tradeStatus === STATUS.RELEASED || tradeStatus === STATUS.REFUNDED || tradeStatus === STATUS.COMPLETED) 
-          && appeal.dispute_status === 'PENDING') {
-        console.log(`🔄 Syncing status: Trade ${tradeId} is ${statusName} on-chain, but dispute is PENDING. Updating...`);
-        
-        const token = localStorage.getItem('adminToken');
-        if (!token) return;
-
-        const resolution = tradeStatus === STATUS.RELEASED || tradeStatus === STATUS.COMPLETED 
-          ? 'TRANSFER_TO_BUYER' 
-          : 'REFUND_TO_SELLER';
-        const resolutionReason = `Trade was already ${statusName.toLowerCase()} on-chain. Status synced automatically.`;
-
-        const response = await fetch(`/api/admin/appeals/${appeal.id}/resolve`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ 
-            resolution,
-            resolution_reason: resolutionReason
-          })
-        });
-
-        if (response.ok) {
-          console.log('✅ Status synced successfully');
-          toast.success(`Status updated: Trade was already ${statusName.toLowerCase()} on-chain`, { duration: 3000 });
-          fetchAppeals(); // Refresh the list
-        } else if (showLoading) {
-          const errorData = await response.json();
-          toast.error(errorData.error || 'Failed to sync status');
-        }
-      }
-    } catch (error) {
-      console.error('Error syncing status:', error);
-      if (showLoading) {
-        toast.error('Failed to sync status. Please check your connection.');
-      }
-      // Silently fail for background sync, show error for manual sync
-    } finally {
-      if (showLoading) {
-        setSyncingStatus(false);
-      }
-    }
-  };
-
-  const handleViewAppeal = async (appeal: Appeal) => {
+  const handleViewAppeal = (appeal: Appeal) => {
     setSelectedAppeal(appeal);
     setShowModal(true);
-    
-    // Check and sync status in background
-    await checkAndSyncStatus(appeal);
   };
 
   // Connect Trust Wallet
@@ -440,25 +255,20 @@ const AdminDisputes: React.FC = () => {
     }
   };
 /**
- * handleResolveAppeal - Resolves a dispute appeal on-chain and updates database
+ * handleResolveAppeal - Simplified admin dispute resolution flow
+ * 
+ * Simple Flow:
+ * 1. Admin opens appeal (changes status to UNDER_DISPUTE)
+ * 2. Admin releases funds via adminDecision()
  * 
  * Status Flow (P2PEscrowV2 Contract):
  * 0 = CREATED          → Trade created, not locked yet
  * 1 = LOCKED           → Funds locked, waiting for payment confirmation
- * 2 = APPEAL_WINDOW_OPEN → Appeal window is open (2-48 hours after lock)
- * 3 = UNDER_DISPUTE    → Appeal filed, trade in dispute (admin can resolve) ✅
+ * 2 = APPEAL_WINDOW_OPEN → Appeal window is open (auto-opens 2 hours after lock)
+ * 3 = UNDER_DISPUTE    → Appeal filed, trade in dispute ✅ Admin resolves from here
  * 4 = RELEASED         → Funds released to buyer
- * 5 = REFUNDED         → Funds refunded to 
- * seller
+ * 5 = REFUNDED         → Funds refunded to seller
  * 6 = COMPLETED        → Trade completed (final state)
- * 
- * This function:
- * 1. Verifies wallet connection and admin permissions
- * 2. Checks current trade status on-chain
- * 3. Handles already-finalized trades (RELEASED/REFUNDED/COMPLETED)
- * 4. Transitions trade to UNDER_DISPUTE if needed (LOCKED → APPEAL_WINDOW_OPEN → UNDER_DISPUTE)
- * 5. Calls adminDecision() to resolve on-chain (only if status is UNDER_DISPUTE)
- * 6. Updates database with resolution
  * 
  * @param appealId - Database appeal ID
  * @param releaseToBuyer - true = release to buyer, false = refund to seller
@@ -468,39 +278,30 @@ const handleResolveAppeal = async (appealId: string, releaseToBuyer: boolean, re
   try {
     setIsResolving(true);
 
-    // ✅ CORRECT Status mapping from P2PEscrowV2 contract
-    // This matches the smart contract enum exactly - DO NOT CHANGE
     const STATUS = {
-      CREATED: 0,              // Trade created, not locked yet
-      LOCKED: 1,              // Funds locked, waiting for payment confirmation
-      APPEAL_WINDOW_OPEN: 2,  // Appeal window is open (2-48 hours after lock)
-      UNDER_DISPUTE: 3,      // Appeal filed, trade in dispute (admin can resolve)
-      RELEASED: 4,           // Funds released to buyer
-      REFUNDED: 5,           // Funds refunded to seller
-      COMPLETED: 6           // Trade completed (final state)
+      CREATED: 0,
+      LOCKED: 1,
+      APPEAL_WINDOW_OPEN: 2,
+      UNDER_DISPUTE: 3,
+      RELEASED: 4,
+      REFUNDED: 5,
+      COMPLETED: 6
     };
 
-    // Helper to get status name for logging
-    const getStatusName = (statusNum: number): string => {
-      const statusKey = Object.keys(STATUS).find(k => STATUS[k as keyof typeof STATUS] === statusNum);
-      return statusKey || `UNKNOWN(${statusNum})`;
-    };
-
-    // 1) Check wallet connection
+    // 1) Basic checks
     if (!isConnected || !address) {
       toast.error('Please connect your wallet first');
       setIsResolving(false);
       return;
     }
 
-    // 2) Ensure correct network
     if (chainId !== BSC_MAINNET_CHAIN_ID) {
-      toast.loading('Switching to BSC Mainnet...', { id: 'switch-network' });
+      toast.loading('Switching to BSC Mainnet...', { id: 'resolve-chain' });
       await switchToNetwork(BSC_MAINNET_CHAIN_ID);
       toast.success('Switched to BSC Mainnet', { id: 'switch-network' });
     }
 
-    // 3) Get appeal and trade ID
+    // 2) Get appeal and trade ID
     const appeal = appeals.find(a => String(a.id) === String(appealId));
     if (!appeal) {
       toast.error('Appeal not found');
@@ -515,17 +316,11 @@ const handleResolveAppeal = async (appealId: string, releaseToBuyer: boolean, re
 
     if (!tradeId || Number.isNaN(tradeId) || tradeId <= 0) {
       toast.error('Invalid Blockchain Trade ID');
-      console.error('Trade ID validation failed:', {
-        nested_order_trade_id: (appeal as any)?.order?.blockchain_trade_id,
-        appeal_trade_id: (appeal as any)?.blockchain_trade_id,
-        order_id_fallback: appeal?.order_id,
-        computed: tradeId
-      });
       setIsResolving(false);
       return;
     }
 
-    // 4) Connect to contract
+    // 3) Connect to contract
     if (!window.ethereum) {
       toast.error('Wallet not available');
       setIsResolving(false);
@@ -535,470 +330,132 @@ const handleResolveAppeal = async (appealId: string, releaseToBuyer: boolean, re
     toast.loading('Connecting to contract...', { id: 'resolve-chain' });
     const provider = new ethers.BrowserProvider(window.ethereum as any);
     const signer = await provider.getSigner();
-
-    // Verify network
     const network = await provider.getNetwork();
+
     if (Number(network.chainId) !== BSC_MAINNET_CHAIN_ID) {
       throw new Error(`Wrong network! Expected BSC Mainnet (56), got chain ${network.chainId}`);
     }
 
-    // Health check before proceeding
-    toast.loading('Checking RPC connection health...', { id: 'resolve-chain' });
-    const healthCheck = await checkRpcHealth(provider);
-    if (!healthCheck.healthy) {
-      setRpcHelpMessage(`RPC health check failed: ${healthCheck.error}. Please switch to a reliable BSC Mainnet RPC endpoint.`);
-      setShowRpcHelp(true);
-      throw new Error(`RPC node is unhealthy: ${healthCheck.error}. Please switch RPC and retry.`);
-    }
-
     const contract = new ethers.Contract(ZOTRUST_CONTRACT_ADDRESS, ZOTRUST_CONTRACT_ABI, signer);
 
-    // 5) Verify admin permissions with retry logic
-    toast.loading('Verifying admin permissions...', { id: 'resolve-chain' });
+    // 4) Verify admin
     const connectedAddress = (await signer.getAddress()).toLowerCase();
-    
-    let contractAdmin: string;
-    try {
-      contractAdmin = (await retryContractCall(
-        () => contract.admin(),
-        3,
-        1000
-      )).toLowerCase();
-    } catch (adminError: any) {
-      console.error('❌ Failed to fetch contract admin after retries:', adminError);
-      if (isRpcIndexingError(adminError)) {
-        setRpcHelpMessage('RPC node cannot execute admin() call even after retries. The RPC endpoint may be overloaded, rate-limited, or missing state history. Please switch to a reliable BSC Mainnet RPC endpoint.');
-        setShowRpcHelp(true);
-        throw new Error('RPC node error: Cannot verify admin permissions after multiple attempts. Please switch RPC and retry.');
-      }
-      throw new Error(`Contract admin() function failed: ${adminError.message}`);
-    }
+    const contractAdmin = (await retryContractCall(() => contract.admin(), 2, 1000)).toLowerCase();
     
     if (connectedAddress !== contractAdmin) {
-      throw new Error(`You are not the contract admin. Connected: ${connectedAddress.slice(0,10)}..., Admin: ${contractAdmin.slice(0,10)}...`);
+      throw new Error(`You are not the contract admin`);
     }
 
-    // 6) Check current trade status with retry
+    // 5) Check trade status
     toast.loading('Checking trade status...', { id: 'resolve-chain' });
-
-    let trade: any;
-    try {
-      trade = await retryContractCall(
-        () => contract.trades(tradeId),
-        3,
-        1000
-      );
-    } catch (error: any) {
-      if (isRpcIndexingError(error)) {
-        setRpcHelpMessage('RPC node cannot fetch trade data. Please switch to a reliable BSC Mainnet RPC endpoint.');
-        setShowRpcHelp(true);
-        throw new Error('RPC node error: Cannot fetch trade status. Please switch RPC and retry.');
-      }
-      throw new Error(`Failed to fetch trade ${tradeId}. Does this trade exist on-chain?`);
-    }
-    
+    const trade = await retryContractCall(() => contract.trades(tradeId), 2, 1000);
     let tradeStatus = Number(trade.status);
-    const statusName = getStatusName(tradeStatus);
-    
-    console.log('🔍 Current trade status:', tradeStatus, '→', statusName);
-    console.log('📊 Trade details:', {
-      tradeId,
-      buyer: trade.buyer,
-      seller: trade.seller,
-      amount: trade.amount?.toString(),
-      status: tradeStatus,
-      statusName,
-      appealFiled: trade.appealFiled || false,
-      lockedAt: trade.lockedAt?.toString(),
-      appealStartAt: trade.appealStartAt?.toString()
-    });
-    
-    // Log important info for debugging
-    if (tradeStatus === STATUS.LOCKED) {
-      console.log('⚠️ Trade is LOCKED. Admin can open appeal window after 2 hours, then resolve directly.');
-    } else if (tradeStatus === STATUS.APPEAL_WINDOW_OPEN) {
-      console.log('✅ Trade is in APPEAL_WINDOW_OPEN status. Admin can resolve directly without appeal filing.');
-    } else if (tradeStatus === STATUS.UNDER_DISPUTE) {
-      console.log('✅ Trade is in UNDER_DISPUTE status. Admin can resolve (appeal filed by participant).');
-    }
 
-    // 7) Handle trades that are already finalized (RELEASED, REFUNDED, or COMPLETED)
-    // COMPLETED (6) and RELEASED (4) both mean funds were released to buyer
-    if (tradeStatus === STATUS.COMPLETED || tradeStatus === STATUS.RELEASED) {
-      const statusName = tradeStatus === STATUS.COMPLETED ? 'completed' : 'released';
-      toast.loading(`Trade already ${statusName} on-chain. Updating database...`, { id: 'resolve-chain' });
-      const token = localStorage.getItem('adminToken');
-      
-      // Both COMPLETED and RELEASED mean funds were released to buyer
-      const response = await fetch(`/api/admin/appeals/${appealId}/resolve`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ 
-          resolution: 'TRANSFER_TO_BUYER',
-          resolution_reason: reason || `Trade was already ${statusName} on-chain before appeal resolution`
-        })
-      });
-      
-      if (response.ok) {
-        toast.success(`✅ Appeal marked as resolved (funds already ${statusName} to buyer)`, { id: 'resolve-chain' });
-        fetchAppeals();
-        setShowModal(false);
-        setConfirmResolution({ type: null, appealId: '', reason: '' });
-        setIsResolving(false);
-        return;
-      } else {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to update backend');
-      }
+    // 6) Handle already finalized trades
+    if (tradeStatus === STATUS.RELEASED || tradeStatus === STATUS.COMPLETED) {
+      await markAppealResolvedDB(appealId, 'TRANSFER_TO_BUYER', reason || 'Trade already released');
+      toast.success('✅ Appeal marked as resolved (funds already released)', { id: 'resolve-chain' });
+      fetchAppeals();
+      setShowModal(false);
+      setConfirmResolution({ type: null, appealId: '', reason: '' });
+      setIsResolving(false);
+      return;
     }
 
     if (tradeStatus === STATUS.REFUNDED) {
-      toast.loading('Trade already refunded on-chain. Updating database...', { id: 'resolve-chain' });
-      const token = localStorage.getItem('adminToken');
-      const response = await fetch(`/api/admin/appeals/${appealId}/resolve`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ 
-          resolution: 'REFUND_TO_SELLER',
-          resolution_reason: reason || 'Trade was already refunded on-chain before appeal resolution'
-        })
-      });
-      
-      if (response.ok) {
-        toast.success('✅ Appeal marked as resolved (funds already refunded to seller)', { id: 'resolve-chain' });
-        fetchAppeals();
-        setShowModal(false);
-        setConfirmResolution({ type: null, appealId: '', reason: '' });
-        setIsResolving(false);
-        return;
-      } else {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to update backend');
-      }
+      await markAppealResolvedDB(appealId, 'REFUND_TO_SELLER', reason || 'Trade already refunded');
+      toast.success('✅ Appeal marked as resolved (funds already refunded)', { id: 'resolve-chain' });
+      fetchAppeals();
+      setShowModal(false);
+      setConfirmResolution({ type: null, appealId: '', reason: '' });
+      setIsResolving(false);
+      return;
     }
 
-    // 8) Block invalid statuses
-    if (tradeStatus === STATUS.CREATED) {
-      throw new Error('Trade not locked yet - cannot resolve dispute');
-    }
-
-    // 9) Handle LOCKED status - Admin can open appeal window if needed
-    if (tradeStatus === STATUS.LOCKED) {
-      // Check if 2 hours have passed since lock
-      const lockTime = trade.lockedAt ? Number(trade.lockedAt) : 0;
-      const currentTime = Math.floor(Date.now() / 1000);
-      const twoHoursInSeconds = 2 * 60 * 60;
-      const timeSinceLock = currentTime - lockTime;
-      
-      if (timeSinceLock < twoHoursInSeconds) {
-        const remainingTime = twoHoursInSeconds - timeSinceLock;
-        const remainingMinutes = Math.ceil(remainingTime / 60);
-        const errorMsg = `Trade is LOCKED (${tradeStatus}). Appeal window opens after 2 hours.\n\n` +
-          `Time remaining: ${remainingMinutes} minutes\n\n` +
-          `Admin can resolve once appeal window opens (APPEAL_WINDOW_OPEN status).`;
-        throw new Error(errorMsg);
-      }
-      
-      // 2 hours have passed, admin can open appeal window
-      console.log('⏰ 2 hours have passed since lock, opening appeal window...');
-      toast.loading('Opening appeal window on-chain...', { id: 'resolve-chain' });
-      
-      try {
-        let gasEstimate: bigint;
+    // 7) Open appeal if needed (change to UNDER_DISPUTE)
+    if (tradeStatus === STATUS.LOCKED || tradeStatus === STATUS.APPEAL_WINDOW_OPEN) {
+      // First open appeal window if LOCKED
+      if (tradeStatus === STATUS.LOCKED) {
+        toast.loading('Opening appeal window...', { id: 'resolve-chain' });
         try {
-          gasEstimate = await retryContractCall(
-            () => contract.openAppealWindow.estimateGas(tradeId),
-            3,
-            1000
-          );
-          gasEstimate = gasEstimate * BigInt(120) / BigInt(100);
-          console.log('✅ openAppealWindow gas estimation successful:', gasEstimate.toString());
-        } catch (gasErr: any) {
-          if (isRpcIndexingError(gasErr)) {
-            console.warn('⚠️ Using fallback gas limit for openAppealWindow due to RPC estimation failure');
-            // Use safe default for openAppealWindow (typically needs ~50k-100k, using 200k as safe buffer)
-            gasEstimate = BigInt(200000);
-            toast.loading('⚠️ Using fallback gas limit for opening appeal window...', { id: 'resolve-chain' });
-          } else {
-            throw gasErr;
-          }
-        }
-        
-        const openWindowTx = await contract.openAppealWindow(tradeId, {
-          gasLimit: gasEstimate
-        });
-        await openWindowTx.wait();
-        toast.success('Appeal window opened', { id: 'resolve-chain' });
-        
-        // Re-check status with retry
-        const updatedTrade = await retryContractCall(
-          () => contract.trades(tradeId),
-          3,
-          1000
-        );
-        tradeStatus = Number(updatedTrade.status);
-        console.log('✅ Status after opening appeal window:', tradeStatus, '→', getStatusName(tradeStatus));
-      } catch (error: any) {
-        console.error('Error opening appeal window:', error);
-        if (isRpcIndexingError(error)) {
-          setRpcHelpMessage('RPC node error while opening appeal window. Please switch to a reliable BSC Mainnet RPC endpoint.');
-          setShowRpcHelp(true);
-        }
-        // Might already be open, continue
-        try {
-          const updatedTrade = await retryContractCall(
-            () => contract.trades(tradeId),
-            2,
-            1000
-          );
+          const openTx = await contract.openAppealWindow(tradeId);
+          await openTx.wait();
+          toast.success('Appeal window opened', { id: 'resolve-chain' });
+          
+          // Re-check status
+          const updatedTrade = await retryContractCall(() => contract.trades(tradeId), 2, 1000);
           tradeStatus = Number(updatedTrade.status);
-          console.log('⚠️ Status after openAppealWindow attempt:', tradeStatus, '→', getStatusName(tradeStatus));
-        } catch (statusError: any) {
-          throw new Error(`Failed to check trade status after opening appeal window: ${statusError.message}`);
-        }
-        
-        if (tradeStatus !== STATUS.APPEAL_WINDOW_OPEN && tradeStatus !== STATUS.UNDER_DISPUTE) {
-          throw new Error(`Failed to open appeal window. Current status: ${tradeStatus} (${getStatusName(tradeStatus)}). Error: ${error.message}`);
+        } catch (error: any) {
+          console.error('Error opening appeal window:', error);
+          // Continue - maybe already open
         }
       }
-    }
 
-    // 10) Final status check before adminDecision with retry
-    // Admin can resolve from APPEAL_WINDOW_OPEN or UNDER_DISPUTE statuses
-    const finalTrade = await retryContractCall(
-      () => contract.trades(tradeId),
-      3,
-      1000
-    );
-    let finalStatus = Number(finalTrade.status);
-    let finalStatusName = getStatusName(finalStatus);
-    
-    console.log('🎯 Final status check before adminDecision:', finalStatus, '→', finalStatusName);
-    console.log('✅ Ready to call adminDecision:', {
-      tradeId,
-      finalStatus,
-      finalStatusName,
-      releaseToBuyer,
-      reason: reason.substring(0, 50) + '...'
-    });
-
-    // One last defensive check
-    if (finalStatus === STATUS.RELEASED) {
-      await markAppealResolvedDB(appealId, 'TRANSFER_TO_BUYER', 'Trade released during resolution process');
-      toast.success('Trade was released during process - database updated');
-      setIsResolving(false);
-      return;
-    }
-    
-    if (finalStatus === STATUS.REFUNDED) {
-      await markAppealResolvedDB(appealId, 'REFUND_TO_SELLER', 'Trade refunded during resolution process');
-      toast.success('Trade was refunded during process - database updated');
-      setIsResolving(false);
-      return;
-    }
-
-    // Admin can resolve from APPEAL_WINDOW_OPEN (2) or UNDER_DISPUTE (3)
-    if (finalStatus !== STATUS.APPEAL_WINDOW_OPEN && finalStatus !== STATUS.UNDER_DISPUTE) {
-      const currentStatusName = getStatusName(finalStatus);
-      const errorMsg = `Admin can only resolve from APPEAL_WINDOW_OPEN (${STATUS.APPEAL_WINDOW_OPEN}) or UNDER_DISPUTE (${STATUS.UNDER_DISPUTE}) statuses.\n\n` +
-        `Current status: ${finalStatus} (${currentStatusName})\n\n` +
-        `Required actions:\n` +
-        `- If LOCKED: Wait 2 hours for appeal window to open, or open it manually\n` +
-        `- If APPEAL_WINDOW_OPEN: Admin will file appeal first, then resolve\n` +
-        `- If UNDER_DISPUTE: Admin can resolve (appeal already filed)`;
-      throw new Error(errorMsg);
-    }
-
-    // 11) If status is APPEAL_WINDOW_OPEN, file appeal first to transition to UNDER_DISPUTE
-    if (finalStatus === STATUS.APPEAL_WINDOW_OPEN) {
-      console.log('📝 Trade is in APPEAL_WINDOW_OPEN status. Filing admin appeal to transition to UNDER_DISPUTE...');
-      toast.loading('Filing admin appeal to enable resolution...', { id: 'resolve-chain' });
-      
-      try {
-        // File appeal with admin intervention reason
-        // Using placeholder IPFS CID for admin-initiated appeals
-        const adminEvidenceCid = `QmAdminIntervention_${tradeId}_${Date.now()}`;
-        
-        let fileAppealGasEstimate: bigint;
+      // File appeal to change to UNDER_DISPUTE
+      if (tradeStatus === STATUS.APPEAL_WINDOW_OPEN || tradeStatus === STATUS.LOCKED) {
+        toast.loading('Opening appeal (changing to UNDER_DISPUTE)...', { id: 'resolve-chain' });
         try {
-          fileAppealGasEstimate = await retryContractCall(
-            () => contract.fileAppeal.estimateGas(tradeId, adminEvidenceCid),
-            3,
-            1000
-          );
-          fileAppealGasEstimate = fileAppealGasEstimate * BigInt(120) / BigInt(100);
-        } catch (gasErr: any) {
-          if (isRpcIndexingError(gasErr)) {
-            console.warn('⚠️ Using fallback gas limit for fileAppeal due to RPC estimation failure');
-            fileAppealGasEstimate = BigInt(200000); // Safe default for fileAppeal
-          } else {
-            throw gasErr;
-          }
+          const fileTx = await contract.fileAppeal(tradeId, ''); // Empty CID for admin
+          await fileTx.wait();
+          toast.success('Appeal opened - Status changed to UNDER_DISPUTE', { id: 'resolve-chain' });
+          
+          // Re-check status
+          const updatedTrade = await retryContractCall(() => contract.trades(tradeId), 2, 1000);
+          tradeStatus = Number(updatedTrade.status);
+        } catch (error: any) {
+          console.error('Error filing appeal:', error);
+          // Continue - maybe already in dispute
         }
-        
-        const fileAppealTx = await contract.fileAppeal(tradeId, adminEvidenceCid, {
-          gasLimit: fileAppealGasEstimate
-        });
-        const fileAppealReceipt = await fileAppealTx.wait();
-        console.log('✅ Admin appeal filed successfully:', {
-          hash: fileAppealReceipt.hash,
-          blockNumber: fileAppealReceipt.blockNumber
-        });
-        
-        // Re-check status - should now be UNDER_DISPUTE (3)
-        const afterAppealTrade = await retryContractCall(
-          () => contract.trades(tradeId),
-          3,
-          1000
-        );
-        const afterAppealStatus = Number(afterAppealTrade.status);
-        const afterAppealStatusName = getStatusName(afterAppealStatus);
-        
-        console.log('✅ Status after filing appeal:', afterAppealStatus, '→', afterAppealStatusName);
-        
-        if (afterAppealStatus !== STATUS.UNDER_DISPUTE) {
-          throw new Error(
-            `Expected status UNDER_DISPUTE (${STATUS.UNDER_DISPUTE}) after filing appeal, ` +
-            `but got ${afterAppealStatus} (${afterAppealStatusName})`
-          );
-        }
-        
-        toast.success('✅ Appeal filed. Trade is now in dispute. Proceeding with resolution...', { id: 'resolve-chain' });
-        
-        // Update finalStatus and finalStatusName for adminDecision
-        finalStatus = afterAppealStatus;
-        finalStatusName = afterAppealStatusName;
-        
-      } catch (appealError: any) {
-        console.error('❌ Failed to file admin appeal:', appealError);
-        if (isRpcIndexingError(appealError)) {
-          setRpcHelpMessage('RPC node error while filing appeal. Please switch to a reliable BSC Mainnet RPC endpoint.');
-          setShowRpcHelp(true);
-        }
-        throw new Error(`Failed to file admin appeal: ${appealError.message || appealError.reason || 'Unknown error'}`);
       }
     }
 
-    // 12) Execute adminDecision with gas estimation (with fallback)
+    // 8) Verify we're in UNDER_DISPUTE status
+    if (tradeStatus !== STATUS.UNDER_DISPUTE) {
+      throw new Error(`Cannot resolve from status ${tradeStatus}. Trade must be in UNDER_DISPUTE (3)`);
+    }
+
+    // 9) Estimate gas
+    toast.loading('Estimating gas...', { id: 'resolve-chain' });
+    let gasEstimate: bigint;
+    try {
+      gasEstimate = await contract.adminDecision.estimateGas(tradeId, releaseToBuyer);
+      gasEstimate = gasEstimate * BigInt(110) / BigInt(100); // 110% buffer
+    } catch (error: any) {
+      gasEstimate = BigInt(300000); // Fallback
+    }
+
+    // 10) Execute adminDecision
     toast.loading(
-      releaseToBuyer 
-        ? 'Releasing full amount to buyer on-chain...' 
-        : 'Refunding full amount to seller on-chain...', 
+      releaseToBuyer ? 'Releasing funds to buyer...' : 'Refunding to seller...',
       { id: 'resolve-chain' }
     );
-    
-    let gasEstimateDecision: bigint;
-    let usingFallbackGas = false;
-    
-    try {
-      gasEstimateDecision = await retryContractCall(
-        () => contract.adminDecision.estimateGas(tradeId, releaseToBuyer),
-        3,
-        1000
-      );
-      // Add 20% buffer to estimated gas
-      gasEstimateDecision = gasEstimateDecision * BigInt(120) / BigInt(100);
-      console.log('✅ Gas estimation successful:', gasEstimateDecision.toString());
-    } catch (gasErr: any) {
-      console.error('❌ adminDecision estimateGas failed after retries:', gasErr);
-      
-      // Check if it's a revert (actual contract error, not RPC issue)
-      if (String(gasErr?.message || '').includes('execution reverted') || gasErr?.reason) {
-        throw new Error(`adminDecision reverted: ${gasErr.reason || gasErr.message}`);
-      }
-      
-      // If it's an RPC error, use fallback gas limit
-      if (isRpcIndexingError(gasErr)) {
-        console.warn('⚠️ Using fallback gas limit due to RPC estimation failure');
-        // Use a safe default gas limit for adminDecision (typically needs ~100k-150k, using 300k as safe buffer)
-        gasEstimateDecision = BigInt(300000);
-        usingFallbackGas = true;
-        
-        toast.loading(
-          '⚠️ RPC cannot estimate gas. Using safe default gas limit. This may take longer...', 
-          { id: 'resolve-chain' }
-        );
-        
-        // Show RPC help but don't block the transaction
-        setRpcHelpMessage(
-          'RPC node cannot estimate gas, but transaction will proceed with a safe default gas limit. ' +
-          'For better reliability, consider switching to a more reliable BSC Mainnet RPC endpoint.'
-        );
-        setShowRpcHelp(true);
-      } else {
-        // Unknown error - could be a contract state issue
-        throw new Error(`adminDecision gas estimation failed: ${gasErr.message || 'Unknown error'}`);
-      }
-    }
+
+    const feeData = await provider.getFeeData();
+    const gasPrice = feeData.gasPrice || feeData.maxFeePerGas || ethers.parseUnits('3', 'gwei');
 
     const tx = await contract.adminDecision(tradeId, releaseToBuyer, {
-      gasLimit: gasEstimateDecision
+      gasLimit: gasEstimate,
+      gasPrice: gasPrice
     });
-    const receipt = await tx.wait();
-    const gasUsed = receipt.gasUsed?.toString() || 'unknown';
-    const gasLimit = gasEstimateDecision.toString();
-    
-    console.log('✅ Transaction receipt:', {
-      hash: receipt.hash,
-      blockNumber: receipt.blockNumber,
-      gasUsed,
-      gasLimit,
-      gasLimitUsed: usingFallbackGas ? 'fallback' : 'estimated',
-      status: receipt.status
-    });
-    
-    // Verify final on-chain status after transaction with retry
-    const postTxTrade = await retryContractCall(
-      () => contract.trades(tradeId),
-      3,
-      1000
-    );
-    const postTxStatus = Number(postTxTrade.status);
-    const postTxStatusName = getStatusName(postTxStatus);
-    console.log('✅ Post-transaction status:', postTxStatus, '→', postTxStatusName);
-    
-    // Check if funds were actually released/refunded
-    const isReleased = postTxStatus === STATUS.RELEASED || postTxStatus === STATUS.COMPLETED;
-    const isRefunded = postTxStatus === STATUS.REFUNDED;
-    
-    if (releaseToBuyer && !isReleased) {
-      console.warn(`⚠️ Expected RELEASED/COMPLETED but got ${postTxStatusName}. Transaction may have failed.`);
-      toast.error(`⚠️ Transaction completed but status is ${postTxStatusName}. Please verify on BSCScan.`, { 
-        id: 'resolve-chain', 
-        duration: 10000 
-      });
-    } else if (!releaseToBuyer && !isRefunded) {
-      console.warn(`⚠️ Expected REFUNDED but got ${postTxStatusName}. Transaction may have failed.`);
-      toast.error(`⚠️ Transaction completed but status is ${postTxStatusName}. Please verify on BSCScan.`, { 
-        id: 'resolve-chain', 
-        duration: 10000 
-      });
-    }
-    
-    const successMessage = releaseToBuyer 
-      ? `✅ On-chain: Full amount released to buyer (Status: ${postTxStatusName})` 
-      : `✅ On-chain: Full amount refunded to seller (Status: ${postTxStatusName})`;
-    
-    const gasInfo = usingFallbackGas 
-      ? ` (Used fallback gas: ${gasUsed}/${gasLimit})`
-      : ` (Gas used: ${gasUsed})`;
-    
-    toast.success(successMessage + gasInfo, { id: 'resolve-chain', duration: 6000 });
 
-    // 13) Update backend
+    toast.loading('Waiting for confirmation...', { id: 'resolve-chain' });
+    await tx.wait();
+
+
+    const successMessage = releaseToBuyer 
+      ? '✅ Funds released to buyer' 
+      : '✅ Funds refunded to seller';
+    
+    toast.success(successMessage, { id: 'resolve-chain', duration: 5000 });
+
+    // 11) Update backend
     await markAppealResolvedDB(
-      appealId, 
+      appealId,
       releaseToBuyer ? 'TRANSFER_TO_BUYER' : 'REFUND_TO_SELLER',
       reason
     );
-    
-    toast.success('✅ Appeal resolved successfully - both on-chain and in database');
+
+    toast.success('✅ Appeal resolved successfully');
     fetchAppeals();
     setShowModal(false);
     setConfirmResolution({ type: null, appealId: '', reason: '' });
@@ -1006,18 +463,23 @@ const handleResolveAppeal = async (appealId: string, releaseToBuyer: boolean, re
   } catch (error: any) {
     console.error('❌ Error resolving appeal:', error);
     toast.dismiss('resolve-chain');
+    setEstimatedGasFee(null);
     
     if (error.code === 'ACTION_REJECTED' || error.message?.includes('User rejected')) {
       toast.error('Transaction rejected by user');
     } else if (error.code === 'CALL_EXCEPTION') {
-      toast.error(`Smart contract call failed: ${error.message || 'Invalid trade state or permissions'}`);
+      toast.error(`Contract error: ${error.message || 'Invalid state or permissions'}`);
     } else if (error.reason) {
-      toast.error(`Smart contract error: ${error.reason}`);
+      toast.error(`Contract error: ${error.reason}`);
     } else {
       toast.error(error.message || 'Failed to resolve appeal');
     }
   } finally {
     setIsResolving(false);
+    // Clear gas fee estimates after a delay
+    setTimeout(() => {
+      setEstimatedGasFee(null);
+    }, 10000);
   }
 };
 
@@ -1040,12 +502,59 @@ const markAppealResolvedDB = async (appealId: string, resolution: string, reason
   
   return response;
 };
-  const handleInitiateResolution = (appealId: string, releaseToBuyer: boolean) => {
+  const handleInitiateResolution = async (appealId: string, releaseToBuyer: boolean) => {
     setConfirmResolution({ 
       type: releaseToBuyer ? 'buyer' : 'seller', 
       appealId, 
       reason: '' 
     });
+    
+    // Estimate gas fee before showing confirmation
+    setEstimatedGasFee(null);
+    if (isConnected && window.ethereum) {
+      try {
+        const provider = new ethers.BrowserProvider(window.ethereum as any);
+        const network = await provider.getNetwork();
+        if (Number(network.chainId) === BSC_MAINNET_CHAIN_ID) {
+          const signer = await provider.getSigner();
+          const contract = new ethers.Contract(ZOTRUST_CONTRACT_ADDRESS, ZOTRUST_CONTRACT_ABI, signer);
+          
+          const appeal = appeals.find(a => String(a.id) === String(appealId));
+          if (appeal) {
+            const preferredTradeId = (appeal as any)?.order?.blockchain_trade_id ?? 
+                                    (appeal as any)?.blockchain_trade_id ?? 
+                                    appeal?.order_id;
+            const tradeId = Number(preferredTradeId);
+            
+            if (tradeId && !Number.isNaN(tradeId) && tradeId > 0) {
+              try {
+                const gasEstimate = await contract.adminDecision.estimateGas(tradeId, releaseToBuyer);
+                // Use 110% buffer to reduce gas fees
+                const gasLimit = gasEstimate * BigInt(110) / BigInt(100);
+                const feeData = await provider.getFeeData();
+                let gasPrice = feeData.gasPrice;
+                if (!gasPrice && feeData.maxFeePerGas) {
+                  gasPrice = feeData.maxFeePerGas;
+                }
+                if (!gasPrice) {
+                  gasPrice = ethers.parseUnits('3', 'gwei'); // Fallback: 3 gwei
+                }
+                const estimatedCost = gasLimit * gasPrice;
+                const estimatedCostBNB = ethers.formatEther(estimatedCost);
+                setEstimatedGasFee(estimatedCostBNB);
+                console.log('⛽ Pre-estimated gas fee:', estimatedCostBNB, 'BNB');
+              } catch (error) {
+                console.warn('Could not pre-estimate gas fee:', error);
+                setEstimatedGasFee(null);
+              }
+            }
+          }
+        }
+      } catch (error) {
+        console.warn('Could not estimate gas fee:', error);
+        setEstimatedGasFee(null);
+      }
+    }
   };
 
   const handleConfirmResolution = () => {
@@ -1112,13 +621,6 @@ const markAppealResolvedDB = async (appealId: string, resolution: string, reason
             <RefreshCw size={16} />
             <span>Refresh</span>
           </button>
-            <button
-              onClick={() => setShowRpcHelp(true)}
-              className="bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-lg transition-colors"
-              title="Get help configuring a reliable RPC"
-            >
-              RPC Help
-            </button>
           </div>
         </div>
         {/* Filters */}
@@ -1159,9 +661,10 @@ const markAppealResolvedDB = async (appealId: string, resolution: string, reason
           </div>
         </div>
 
-        {/* Appeals Table */}
+        {/* Appeals - Desktop Table / Mobile Cards */}
         <div className="bg-white/10 backdrop-blur-lg rounded-xl border border-white/20 overflow-hidden">
-          <div className="overflow-x-auto">
+          {/* Desktop Table View */}
+          <div className="hidden md:block overflow-x-auto">
             <table className="w-full">
               <thead className="bg-white/5">
                 <tr>
@@ -1217,42 +720,89 @@ const markAppealResolvedDB = async (appealId: string, resolution: string, reason
               </tbody>
             </table>
           </div>
+
+          {/* Mobile Card View */}
+          <div className="md:hidden p-4 space-y-4">
+            {filteredAppeals.map((appeal, index) => (
+              <motion.div
+                key={appeal.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.05 }}
+                className="bg-white/5 rounded-lg p-4 border border-white/10 hover:bg-white/10 transition-colors"
+              >
+                <div className="flex justify-between items-start mb-3">
+                  <div>
+                    <div className="text-sm text-gray-400 mb-1">Appeal ID</div>
+                    <div className="text-white font-mono font-semibold">#{appeal.id}</div>
+                  </div>
+                  <button
+                    onClick={() => handleViewAppeal(appeal)}
+                    className="text-blue-400 hover:text-blue-300 transition-colors p-2"
+                  >
+                    <Eye size={20} />
+                  </button>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-3 mb-3">
+                  <div>
+                    <div className="text-xs text-gray-400 mb-1">Order ID</div>
+                    <div className="text-white font-mono text-sm">#{appeal.order_id}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-gray-400 mb-1">Type</div>
+                    <div className="text-white text-sm">{appeal.dispute_type}</div>
+                  </div>
+                </div>
+
+                <div className="mb-3">
+                  <div className="text-xs text-gray-400 mb-1">Status</div>
+                  <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(appeal.dispute_status)}`}>
+                    {getStatusIcon(appeal.dispute_status)}
+                    <span className="ml-1">{appeal.dispute_status}</span>
+                  </span>
+                </div>
+
+                <div className="mb-3">
+                  <div className="text-xs text-gray-400 mb-1">Appellant</div>
+                  <div className="text-white font-mono text-sm break-all">{appeal.appellant_address}</div>
+                </div>
+
+                <div>
+                  <div className="text-xs text-gray-400 mb-1">Created</div>
+                  <div className="text-gray-300 text-sm">{new Date(appeal.created_at).toLocaleDateString()}</div>
+                </div>
+              </motion.div>
+            ))}
+          </div>
         </div>
 
         {/* Appeal Details Modal */}
         {showModal && selectedAppeal && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div 
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-y-auto"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) {
+                setShowModal(false);
+              }
+            }}
+          >
             <motion.div
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
-              className="bg-white/10 backdrop-blur-lg rounded-xl border border-white/20 p-6 w-full max-w-5xl max-h-[90vh] overflow-y-auto"
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white/10 backdrop-blur-lg rounded-xl border border-white/20 p-6 w-full max-w-5xl my-8"
+              style={{ maxHeight: 'calc(100vh - 4rem)' }}
             >
+              <div className="overflow-y-auto" style={{ maxHeight: 'calc(100vh - 8rem)' }}>
               <div className="flex justify-between items-center mb-6">
                 <h2 className="text-2xl font-bold text-white">Appeal Details</h2>
-                <div className="flex items-center space-x-2">
-                  {selectedAppeal.dispute_status === 'PENDING' && isConnected && (
-                    <motion.button
-                      onClick={async () => {
-                        if (selectedAppeal) {
-                          await checkAndSyncStatus(selectedAppeal, true);
-                        }
-                      }}
-                      disabled={syncingStatus}
-                      className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg transition-colors flex items-center space-x-2 text-sm"
-                      whileTap={{ scale: 0.98 }}
-                      title="Sync with on-chain status"
-                    >
-                      <RefreshCw size={16} className={syncingStatus ? 'animate-spin' : ''} />
-                      <span>{syncingStatus ? 'Syncing...' : 'Sync Status'}</span>
-                    </motion.button>
-                  )}
-                  <button
-                    onClick={() => setShowModal(false)}
-                    className="text-gray-400 hover:text-white transition-colors"
-                  >
-                    <XCircle size={24} />
-                  </button>
-                </div>
+                <button
+                  onClick={() => setShowModal(false)}
+                  className="text-gray-400 hover:text-white transition-colors"
+                >
+                  <XCircle size={24} />
+                </button>
               </div>
 
               <div className="space-y-6">
@@ -1476,18 +1026,29 @@ const markAppealResolvedDB = async (appealId: string, resolution: string, reason
                   </div>
                 )}
               </div>
+              </div>
             </motion.div>
           </div>
         )}
 
         {/* Confirmation Dialog */}
         {confirmResolution.type && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div 
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-y-auto"
+            onClick={(e) => {
+              if (e.target === e.currentTarget && !isResolving) {
+                setConfirmResolution({ type: null, appealId: '', reason: '' });
+              }
+            }}
+          >
             <motion.div
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
-              className="bg-white/10 backdrop-blur-lg rounded-xl border border-white/20 p-6 w-full max-w-md"
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white/10 backdrop-blur-lg rounded-xl border border-white/20 p-6 w-full max-w-md my-8"
+              style={{ maxHeight: 'calc(100vh - 4rem)' }}
             >
+              <div className="overflow-y-auto" style={{ maxHeight: 'calc(100vh - 8rem)' }}>
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-xl font-bold text-white">
                   {confirmResolution.type === 'buyer' ? 'Release Funds to Buyer' : 'Refund Funds to Seller'}
@@ -1522,6 +1083,39 @@ const markAppealResolvedDB = async (appealId: string, resolution: string, reason
                   </div>
                 )}
 
+                {/* Contract Limitation Warning */}
+                {selectedAppeal && (() => {
+                  const amount = parseFloat(selectedAppeal.amount);
+                  const sellerExtra = amount * 0.01; // 1% of amount
+                  const totalLocked = amount + sellerExtra;
+                  return (
+                    <div className="bg-red-500/20 border border-red-500/30 rounded-lg p-4">
+                      <div className="flex items-start space-x-2 mb-2">
+                        <AlertTriangle size={20} className="text-red-400 flex-shrink-0 mt-0.5" />
+                        <div className="flex-1">
+                          <p className="text-red-200 font-semibold text-sm mb-2">
+                            ⚠️ Contract Limitation Warning
+                          </p>
+                          <div className="space-y-2 text-xs text-red-300">
+                            <p>
+                              <strong>Amount to transfer:</strong> {selectedAppeal.amount} {selectedAppeal.token}
+                            </p>
+                            <p>
+                              <strong>Amount that will remain stuck:</strong> {sellerExtra.toFixed(6)} {selectedAppeal.token} (1% seller extra)
+                            </p>
+                            <p>
+                              <strong>Total locked in contract:</strong> {totalLocked.toFixed(6)} {selectedAppeal.token}
+                            </p>
+                            <p className="text-red-200 mt-2">
+                              <strong>Note:</strong> The smart contract's <code className="bg-red-600/30 px-1 rounded">adminDecision()</code> function only transfers the base <code className="bg-red-600/30 px-1 rounded">amount</code>, leaving the <code className="bg-red-600/30 px-1 rounded">sellerExtra</code> (1% security deposit) permanently stuck in the contract. This is a known contract limitation.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
+
                 {/* Reason Input */}
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-2">
@@ -1537,7 +1131,23 @@ const markAppealResolvedDB = async (appealId: string, resolution: string, reason
                   />
                 </div>
 
-                {/* Warning */}
+                {/* Gas Fee Estimate */}
+                {estimatedGasFee && (
+                  <div className="bg-blue-500/20 border border-blue-500/30 rounded-lg p-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-xs text-blue-300 mb-1">Estimated Network Fee</p>
+                        <p className="text-lg font-bold text-blue-100">{estimatedGasFee} BNB</p>
+                      </div>
+                      <div className="text-2xl">⛽</div>
+                    </div>
+                    <p className="text-xs text-blue-400 mt-2">
+                      This fee will be deducted from your wallet balance
+                    </p>
+                  </div>
+                )}
+
+                {/* Action Warning */}
                 <div className={`rounded-lg p-3 ${
                   confirmResolution.type === 'buyer' 
                     ? 'bg-green-500/20 border border-green-500/30' 
@@ -1548,7 +1158,14 @@ const markAppealResolvedDB = async (appealId: string, resolution: string, reason
                       ? 'text-green-200' 
                       : 'text-orange-200'
                   }`}>
-                    ⚠️ This action will transfer the <strong>full amount</strong> on-chain. This cannot be undone.
+                    ⚠️ This action will transfer <strong>{selectedAppeal?.amount} {selectedAppeal?.token}</strong> on-chain. This cannot be undone.
+                  </p>
+                  <p className={`text-xs mt-1 ${
+                    confirmResolution.type === 'buyer' 
+                      ? 'text-green-300' 
+                      : 'text-orange-300'
+                  }`}>
+                    Note: 1% seller extra ({selectedAppeal ? (parseFloat(selectedAppeal.amount) * 0.01).toFixed(6) : '0'} {selectedAppeal?.token}) will remain in contract due to contract limitation.
                   </p>
                 </div>
 
@@ -1574,6 +1191,7 @@ const markAppealResolvedDB = async (appealId: string, resolution: string, reason
                     {isResolving ? 'Processing...' : 'Confirm & Execute'}
                   </motion.button>
                 </div>
+              </div>
               </div>
             </motion.div>
           </div>
@@ -1670,108 +1288,6 @@ const markAppealResolvedDB = async (appealId: string, resolution: string, reason
           </div>
         )}
 
-        {/* RPC Help Modal */}
-        {showRpcHelp && (
-          <div 
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-            onClick={() => setShowRpcHelp(false)}
-          >
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              onClick={(e) => e.stopPropagation()}
-              className="bg-white/10 backdrop-blur-lg rounded-xl border border-white/20 p-6 max-w-lg w-full"
-            >
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-2xl font-bold text-white">RPC Configuration Help</h2>
-                <button
-                  onClick={() => setShowRpcHelp(false)}
-                  className="text-gray-400 hover:text-white transition-colors"
-                >
-                  <XCircle size={24} />
-                </button>
-              </div>
-
-              {rpcHelpMessage && (
-                <div className="mb-4 text-sm text-orange-200 bg-orange-500/10 border border-orange-500/20 rounded p-3">
-                  {rpcHelpMessage}
-                </div>
-              )}
-
-              <p className="text-gray-300 text-sm mb-3">
-                <strong className="text-white">Recommended BSC Mainnet RPC endpoints</strong> (try in this order):
-              </p>
-              <div className="space-y-2 mb-4">
-                {[
-                  { url: 'https://bsc-dataseed.binance.org/', label: 'Binance Official #1' },
-                  { url: 'https://bsc-dataseed1.defibit.io/', label: 'DeFiBit #1' },
-                  { url: 'https://bsc-dataseed1.nodereal.io', label: 'NodeReal #1' },
-                  { url: 'https://bsc.publicnode.com', label: 'PublicNode' },
-                  { url: 'https://bsc-mainnet-rpc.publicnode.com', label: 'PublicNode Alt' }
-                ].map(({ url, label }) => (
-                  <div key={url} className="bg-white/5 rounded p-3 border border-white/10">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs text-gray-400">{label}</span>
-                      <div className="flex space-x-2">
-                        <button
-                          onClick={async () => {
-                            const result = await testRpcEndpoint(url);
-                            toast[result.success ? 'success' : 'error'](result.message);
-                          }}
-                          disabled={testingRpc === url}
-                          className="text-xs bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed px-3 py-1 rounded text-white"
-                        >
-                          {testingRpc === url ? 'Testing...' : 'Test'}
-                        </button>
-                        <button
-                          onClick={() => {
-                            navigator.clipboard.writeText(url);
-                            toast.success('RPC URL copied to clipboard!');
-                          }}
-                          className="text-xs bg-white/10 hover:bg-white/20 px-3 py-1 rounded text-white"
-                        >
-                          Copy
-                        </button>
-                      </div>
-                    </div>
-                    <code className="text-xs break-all text-white/80 block">{url}</code>
-                  </div>
-                ))}
-              </div>
-
-              <div className="bg-blue-500/10 border border-blue-500/20 rounded p-3 mb-4">
-                <p className="text-sm text-blue-200">
-                  <strong>💡 Tip:</strong> Test each RPC endpoint before switching. Use the "Test" button to verify connectivity.
-                </p>
-              </div>
-
-              <div className="mt-4">
-                <p className="text-white font-semibold mb-2">How to change RPC in MetaMask:</p>
-                <ol className="list-decimal list-inside text-sm text-gray-300 space-y-1">
-                  <li>Open MetaMask ➜ Settings ➜ Networks ➜ BSC Mainnet.</li>
-                  <li>Change RPC URL to one of the above and Save.</li>
-                  <li>Reconnect wallet and retry the action.</li>
-                </ol>
-              </div>
-
-              <div className="mt-3">
-                <p className="text-white font-semibold mb-2">How to change RPC in Trust Wallet:</p>
-                <ol className="list-decimal list-inside text-sm text-gray-300 space-y-1">
-                  <li>Open DApp Browser ➜ Network selector.</li>
-                  <li>Edit or add BSC Mainnet with the new RPC URL.</li>
-                  <li>Reload page and reconnect wallet.</li>
-                </ol>
-              </div>
-
-              <div className="mt-5 text-right">
-                <button
-                  onClick={() => setShowRpcHelp(false)}
-                  className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded"
-                >Got it</button>
-              </div>
-            </motion.div>
-          </div>
-        )}
     </div>
   );
 };
