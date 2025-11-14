@@ -527,7 +527,12 @@ io.on('connection', (socket) => {
                     userAddress: userAddress.toLowerCase()
                 });
             }
-            // Confirm to sender
+            // Also broadcast to user's own chat room (for consistency)
+            io.to(`chat:${userAddress.toLowerCase()}`).emit('new-chat-message', {
+                message: savedMessage,
+                userAddress: userAddress.toLowerCase()
+            });
+            // Confirm to sender (only once)
             socket.emit('chat-message-sent', { message: savedMessage });
         }
         catch (error) {
@@ -549,7 +554,7 @@ io.on('connection', (socket) => {
          VALUES ($1, $2, $3, 'admin', false)
          RETURNING *`, [userAddress.toLowerCase(), adminId, message]);
             const savedMessage = result.rows[0];
-            // Send to user
+            // Send to user via socket (if connected)
             const userSock = users.get(userAddress.toLowerCase());
             if (userSock) {
                 io.to(userSock).emit('new-chat-message', {
@@ -557,7 +562,12 @@ io.on('connection', (socket) => {
                     fromAdmin: true
                 });
             }
-            // Confirm to admin
+            // Also broadcast to user's chat room (for users who might be in the room)
+            io.to(`chat:${userAddress.toLowerCase()}`).emit('new-chat-message', {
+                message: savedMessage,
+                fromAdmin: true
+            });
+            // Confirm to admin (only once)
             socket.emit('admin-chat-message-sent', { message: savedMessage });
         }
         catch (error) {
@@ -568,8 +578,14 @@ io.on('connection', (socket) => {
     // User joins chat room
     socket.on('join-chat', (userAddress) => {
         if (userAddress) {
-            socket.join(`chat:${userAddress.toLowerCase()}`);
-            console.log(`💬 Backend: User ${userAddress} joined chat`);
+            const normalizedAddress = userAddress.toLowerCase();
+            socket.join(`chat:${normalizedAddress}`);
+            // Also register user in users map for direct messaging
+            if (extendedSocket.userId !== normalizedAddress) {
+                users.set(normalizedAddress, socket.id);
+                extendedSocket.userId = normalizedAddress;
+            }
+            console.log(`💬 Backend: User ${normalizedAddress} joined chat room`);
         }
     });
     // Admin joins chat room for a user

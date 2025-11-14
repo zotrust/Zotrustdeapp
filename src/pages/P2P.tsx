@@ -30,6 +30,8 @@ const P2P: React.FC = () => {
   const [selectedAgentId, setSelectedAgentId] = useState<string>('');
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [orderError, setOrderError] = useState<string | null>(null);
+  const [isBusinessHours, setIsBusinessHours] = useState(true);
+  const [currentTimeIST, setCurrentTimeIST] = useState<Date>(new Date());
 
   const { user, refreshUserProfile } = useUserStore();
   const { isConnected, address, connectionError, clearError } = useWalletStore();
@@ -61,6 +63,53 @@ const P2P: React.FC = () => {
       refreshUserProfile();
     }
   }, [isConnected, address, refreshUserProfile]);
+
+  // Check business hours (9 AM - 6 PM IST)
+  const checkBusinessHours = () => {
+    const now = new Date();
+    
+    // Get IST time using Intl.DateTimeFormat
+    const istFormatter = new Intl.DateTimeFormat('en-IN', {
+      timeZone: 'Asia/Kolkata',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    });
+    
+    const istParts = istFormatter.formatToParts(now);
+    const hours = parseInt(istParts.find(p => p.type === 'hour')?.value || '0', 10);
+    const minutes = parseInt(istParts.find(p => p.type === 'minute')?.value || '0', 10);
+    const currentTimeMinutes = hours * 60 + minutes;
+    
+    // Business hours: 9 AM (540 minutes) to 6 PM (1080 minutes)
+    const openTime = 9 * 60; // 9 AM = 540 minutes
+    const closeTime = 18 * 60; // 6 PM = 1080 minutes
+    
+    const isOpen = currentTimeMinutes >= openTime && currentTimeMinutes < closeTime;
+    setIsBusinessHours(isOpen);
+    
+    // Store IST time for display
+    const istTimeString = now.toLocaleString('en-IN', { 
+      timeZone: 'Asia/Kolkata',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true
+    });
+    // Create date object for display (just for formatting)
+    setCurrentTimeIST(new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Kolkata' })));
+    
+    return isOpen;
+  };
+
+  // Update business hours status every minute
+  useEffect(() => {
+    checkBusinessHours(); // Initial check
+    const interval = setInterval(() => {
+      checkBusinessHours();
+    }, 60000); // Check every minute
+
+    return () => clearInterval(interval);
+  }, []);
 
   const fetchAds = async () => {
     setIsLoading(true);
@@ -222,6 +271,13 @@ const P2P: React.FC = () => {
     setCreatingOrder(ad.id);
     setOrderError(null);
 
+    // Check business hours before creating order
+    if (!isBusinessHours) {
+      setOrderError('Trading is only available from 9 AM to 6 PM IST. Aagnya branch is closed.');
+      setCreatingOrder(null);
+      return;
+    }
+
     try {
       const token = localStorage.getItem('authToken');
       if (!token) {
@@ -352,6 +408,26 @@ const P2P: React.FC = () => {
         <h2 className="text-xl sm:text-2xl font-bold text-white">P2P Trading</h2>
         <p className="text-gray-300 text-xs sm:text-sm">BNB Smart Chain</p>
       </div>
+
+      {/* Business Hours Notice */}
+      {!isBusinessHours && (
+        <motion.div
+          initial={{ y: -20, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          className="bg-yellow-500/20 border border-yellow-500/30 rounded-xl p-4 flex items-center space-x-3"
+        >
+          <AlertCircle size={20} className="text-yellow-400 flex-shrink-0" />
+          <div className="flex-1">
+            <p className="text-yellow-300 text-sm font-medium">Aagnya Branch Closed</p>
+            <p className="text-yellow-400 text-xs">
+              Trading is only available from 9 AM to 6 PM IST. Please come back during business hours.
+            </p>
+            <p className="text-yellow-500 text-xs mt-1">
+              Current Time (IST): {new Date().toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: true })}
+            </p>
+          </div>
+        </motion.div>
+      )}
 
       {/* Error Displays */}
       {connectionError && (
@@ -638,13 +714,14 @@ const P2P: React.FC = () => {
                         return (
                           <motion.button
                             onClick={() => handleOrderClick(ad)}
-                            disabled={buttonInfo.disabled || isCreating}
+                            disabled={buttonInfo.disabled || isCreating || !isBusinessHours}
                             className={clsx(
                               'flex-1 py-2 px-3 rounded-lg font-semibold transition-all flex items-center justify-center space-x-1 text-xs',
                               buttonInfo.className,
-                              (buttonInfo.disabled || isCreating) && 'opacity-50 cursor-not-allowed'
+                              (buttonInfo.disabled || isCreating || !isBusinessHours) && 'opacity-50 cursor-not-allowed'
                             )}
-                            whileTap={{ scale: buttonInfo.disabled ? 1 : 0.95 }}
+                            whileTap={{ scale: (buttonInfo.disabled || !isBusinessHours) ? 1 : 0.95 }}
+                            title={!isBusinessHours ? 'Trading available only from 9 AM to 6 PM IST' : undefined}
                           >
                             {isCreating ? (
                               <>
@@ -731,6 +808,24 @@ const P2P: React.FC = () => {
               </div>
 
               <div className="space-y-3 sm:space-y-4">
+                {/* Business Hours Warning */}
+                {!isBusinessHours && (
+                  <div className="bg-yellow-500/20 border border-yellow-500/30 rounded-md p-3">
+                    <div className="flex items-center space-x-2">
+                      <AlertCircle size={16} className="text-yellow-400" />
+                      <div>
+                        <p className="text-yellow-300 text-sm font-medium">Aagnya Branch Closed</p>
+                        <p className="text-yellow-400 text-xs">
+                          Trading is only available from 9 AM to 6 PM IST
+                        </p>
+                        <p className="text-yellow-500 text-xs mt-1">
+                          Current Time: {new Date().toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: true })} IST
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {/* Ad Information */}
                 <div className="bg-white/5 rounded-md p-3 space-y-1 sm:space-y-2">
                   <div className="flex items-center justify-between">
@@ -943,7 +1038,8 @@ const P2P: React.FC = () => {
                       !orderAmount || 
                       creatingOrder === orderModal.ad.id ||
                       parseFloat(orderAmount) > parseFloat(orderModal.ad.maxAmount) ||
-                      parseFloat(orderAmount) < parseFloat(orderModal.ad.minAmount)
+                      parseFloat(orderAmount) < parseFloat(orderModal.ad.minAmount) ||
+                      !isBusinessHours
                     }
                     className={clsx(
                       'flex-1 py-2 px-3 rounded-md text-white disabled:opacity-50 disabled:cursor-not-allowed text-sm',
@@ -952,6 +1048,7 @@ const P2P: React.FC = () => {
                         : 'bg-gradient-to-r from-green-500 to-emerald-500'
                     )}
                     whileTap={{ scale: 0.98 }}
+                    title={!isBusinessHours ? 'Trading available only from 9 AM to 6 PM IST' : undefined}
                   >
                     {creatingOrder === orderModal.ad.id ? 'Creating...' : (orderModal.ad.type === 'BUY' ? 'Sell Request' : 'Buy Request')}
                   </motion.button>

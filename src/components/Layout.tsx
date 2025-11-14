@@ -160,18 +160,20 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               }`}
               style={{ touchAction: 'manipulation' }}
             >
-              <FileText size={20} className="sm:w-5 sm:h-5" />
+              <div className="relative">
+                <FileText size={20} className="sm:w-5 sm:h-5" />
+                {incomingCall && (
+                  <div className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 sm:w-3 sm:h-3 bg-red-500 rounded-full animate-pulse" />
+                )}
+                {!isOrdersPage && unreadOrdersCount > 0 && (
+                  <div className="absolute top-0 right-0 min-w-[18px] h-[18px] bg-red-500 rounded-full flex items-center justify-center px-1 translate-x-1/2 -translate-y-1/2">
+                    <span className="text-white text-[10px] font-bold">
+                      {unreadOrdersCount > 99 ? '99+' : unreadOrdersCount}
+                    </span>
+                  </div>
+                )}
+              </div>
               <span className="text-[10px] sm:text-xs font-medium leading-tight">Orders</span>
-              {incomingCall && (
-                <div className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 sm:w-3 sm:h-3 bg-red-500 rounded-full animate-pulse" />
-              )}
-              {!isOrdersPage && unreadOrdersCount > 0 && (
-                <div className="absolute -top-1 -right-1 min-w-[18px] h-[18px] bg-red-500 rounded-full flex items-center justify-center px-1">
-                  <span className="text-white text-[10px] font-bold">
-                    {unreadOrdersCount > 99 ? '99+' : unreadOrdersCount}
-                  </span>
-                </div>
-              )}
             </Link>
 
           

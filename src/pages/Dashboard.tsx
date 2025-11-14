@@ -1,5 +1,5 @@
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {ArrowUpRight, ArrowDownLeft, RefreshCw, CheckCircle, Loader2, AlertCircle, X, Star, MessageSquare, Plus, VideoIcon, Phone, FileText} from 'lucide-react';
 import { motion } from 'framer-motion';
@@ -46,6 +46,10 @@ const Dashboard: React.FC = () => {
   const [showDemoVideo, setShowDemoVideo] = useState(false);
   const [showSupportCallModal, setShowSupportCallModal] = useState<{isOpen: boolean, supportUrl: string}>({isOpen: false, supportUrl: ''});
   
+  // Refs to prevent infinite loops
+  const hasFetchedReviewsRef = useRef(false);
+  const lastAddressRef = useRef<string | null>(null);
+  
   const { 
     address, 
     isConnected, 
@@ -67,35 +71,8 @@ const Dashboard: React.FC = () => {
   const { user, refreshUserProfile } = useUserStore();
   const navigate = useNavigate();
 
-  useEffect(() => {
-    // Check if wallet is being restored
-    if (isConnected && address) {
-      setIsRestoringWallet(false);
-      // Add a small delay to ensure wallet is fully initialized before fetching balances
-      // Also check if balance update is already in progress to avoid duplicate calls
-      const balanceTimer = setTimeout(() => {
-        if (!isUpdatingBalances) {
-          console.log('🔄 Dashboard: Fetching balances for connected wallet...');
-          updateBalances();
-        } else {
-          console.log('⏸️ Dashboard: Balance update already in progress, skipping...');
-        }
-      }, 500);
-      fetchReviews();
-      // Refresh user profile to get latest verification status
-      console.log('🔄 Dashboard: Wallet connected, refreshing user profile...');
-      refreshUserProfile();
-      return () => clearTimeout(balanceTimer);
-    } else {
-      // Wait a bit for wallet restoration to complete
-      const timer = setTimeout(() => {
-        setIsRestoringWallet(false);
-      }, 2000);
-      return () => clearTimeout(timer);
-    }
-  }, [isConnected, address, updateBalances, refreshUserProfile, isUpdatingBalances]);
-
-  const fetchReviews = async () => {
+  // Define fetchReviews before using it in useEffect
+  const fetchReviews = React.useCallback(async () => {
     if (!isConnected || !address) return;
     
     setIsLoadingReviews(true);
@@ -118,7 +95,58 @@ const Dashboard: React.FC = () => {
     } finally {
       setIsLoadingReviews(false);
     }
-  };
+  }, [isConnected, address]);
+
+  // Separate effect for wallet connection and balance updates
+  useEffect(() => {
+    if (isConnected && address) {
+      setIsRestoringWallet(false);
+      
+      // Only update balances if address changed
+      const currentAddress = lastAddressRef.current;
+      if (currentAddress !== address && !isUpdatingBalances) {
+        const balanceTimer = setTimeout(() => {
+          console.log('🔄 Dashboard: Fetching balances for connected wallet...');
+          updateBalances();
+        }, 500);
+        lastAddressRef.current = address;
+        return () => clearTimeout(balanceTimer);
+      }
+    } else {
+      const timer = setTimeout(() => {
+        setIsRestoringWallet(false);
+      }, 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [isConnected, address, isUpdatingBalances, updateBalances]);
+
+  // Separate effect for user profile refresh (only when address changes)
+  useEffect(() => {
+    if (isConnected && address) {
+      const currentAddress = lastAddressRef.current;
+      if (currentAddress !== address) {
+        console.log('🔄 Dashboard: Wallet connected, refreshing user profile...');
+        refreshUserProfile();
+      }
+    }
+  }, [isConnected, address, refreshUserProfile]);
+
+  // Separate effect for fetching reviews (only when address changes or first load)
+  useEffect(() => {
+    if (isConnected && address) {
+      const currentAddress = lastAddressRef.current;
+      // Only fetch if address changed or we haven't fetched yet
+      if (currentAddress !== address || !hasFetchedReviewsRef.current) {
+        hasFetchedReviewsRef.current = true;
+        lastAddressRef.current = address;
+        fetchReviews();
+      }
+    } else {
+      // Reset when disconnected
+      hasFetchedReviewsRef.current = false;
+      lastAddressRef.current = null;
+    }
+  }, [isConnected, address, fetchReviews]);
 
   const handleConnectWallet = async () => {
     if (isConnected) {

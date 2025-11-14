@@ -59,6 +59,7 @@ const Orders: React.FC = () => {
   const [showPaymentDetailsModal, setShowPaymentDetailsModal] = useState<{isOpen: boolean, orderId: string}>({isOpen: false, orderId: ''});
   const [showPhoneCallModal, setShowPhoneCallModal] = useState<{isOpen: boolean, phoneNumber: string, userName: string}>({isOpen: false, phoneNumber: '', userName: ''});
   const [showAppealRedirectModal, setShowAppealRedirectModal] = useState<{isOpen: boolean, appealUrl: string, orderId: string}>({isOpen: false, appealUrl: '', orderId: ''});
+  const [showLockAlertModal, setShowLockAlertModal] = useState<{isOpen: boolean, orderId: string, userRole: 'buyer' | 'seller'}>({isOpen: false, orderId: '', userRole: 'buyer'});
   const { address, connectionError, clearError } = useWalletStore();
   const { user } = useUserStore();
   const { setUnreadOrdersCount, clearUnreadOrdersCount } = useNotificationStore();
@@ -586,10 +587,14 @@ const Orders: React.FC = () => {
 
       setOrders(mapped);
       
-      // Update unread orders count when orders are fetched
+      // Update unread orders count - only count CREATED and LOCKED orders
       // This will be cleared when user views the orders page
-      if (mapped.length > 0) {
-        setUnreadOrdersCount(mapped.length);
+      const unreadOrders = mapped.filter(order => 
+        order.state === 'CREATED' || order.state === 'LOCKED'
+      );
+      
+      if (unreadOrders.length > 0) {
+        setUnreadOrdersCount(unreadOrders.length);
       } else {
         clearUnreadOrdersCount();
       }
@@ -856,12 +861,7 @@ const Orders: React.FC = () => {
         // BUY ad: Order creator (seller) is locking, counterParty is ad owner (buyer)
         counterParty = order.adOwnerAddress || order.buyerAddress;
       }
-      
-      console.log('📊 Ad Type:', order?.adType);
-      console.log('🪙 Token:', tokenSymbol, '→ Address:', tokenAddress);
-      console.log('💰 Amount:', order?.amount);
-      console.log('👤 Buyer (counterParty):', counterParty);
-      console.log('ℹ️ Seller (caller) will create trade and lock funds');
+    
       
       let blockchainTradeId: number;
       let createTradeTxHash: string;
@@ -1389,6 +1389,24 @@ const Orders: React.FC = () => {
     });
   };
 
+  // Format date as "15 Nov 1:47 AM"
+  const formatDateSimple = useCallback((dateString: string): string => {
+    const date = new Date(dateString);
+    const istOffset = 5.5 * 60 * 60 * 1000; // 5 hours 30 minutes
+    const istDate = new Date(date.getTime() + istOffset);
+    
+    const day = istDate.getDate();
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const month = monthNames[istDate.getMonth()];
+    const hours = istDate.getHours();
+    const minutes = istDate.getMinutes();
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    const displayHours = hours % 12 || 12;
+    const displayMinutes = minutes.toString().padStart(2, '0');
+    
+    return `${day} ${month} ${displayHours}:${displayMinutes} ${ampm}`;
+  }, []);
+
   const calculateOrderExpiry = useCallback((order: Order) => {
     // Step 1: Convert UTC start_time to IST (UTC + 5:30)
     const startTimeUTC = new Date(order.startTime);
@@ -1413,6 +1431,49 @@ const Orders: React.FC = () => {
       expiryTimeIST: formatISTDateTime(expiryTimeIST)
     };
   }, [serverTime]);
+
+  // Calculate lock expiry countdown (2 hours from lock time)
+  const calculateLockExpiry = useCallback((order: Order) => {
+    if (!order.lockExpiresAt) {
+      return {
+        isExpired: false,
+        timeRemainingSeconds: 0,
+        timeRemainingHours: 0,
+        timeRemainingMinutes: 0,
+        timeRemainingSecs: 0,
+        lockExpiresAtIST: ''
+      };
+    }
+
+    const lockExpiresAtUTC = new Date(order.lockExpiresAt);
+    const istOffset = 5.5 * 60 * 60 * 1000; // 5 hours 30 minutes in milliseconds
+    const lockExpiresAtIST = new Date(lockExpiresAtUTC.getTime() + istOffset);
+    
+    // Calculate time remaining using current server time
+    const currentTimeUTC = new Date(serverTime);
+    const currentTimeIST = new Date(currentTimeUTC.getTime() + istOffset);
+    const timeRemainingMs = lockExpiresAtIST.getTime() - currentTimeIST.getTime();
+    const timeRemainingSeconds = Math.max(0, Math.floor(timeRemainingMs / 1000));
+    
+    const isExpired = timeRemainingSeconds <= 0;
+    const timeRemainingHours = Math.floor(timeRemainingSeconds / 3600);
+    const timeRemainingMinutes = Math.floor((timeRemainingSeconds % 3600) / 60);
+    const timeRemainingSecs = timeRemainingSeconds % 60;
+    
+    return {
+      isExpired,
+      timeRemainingSeconds,
+      timeRemainingHours,
+      timeRemainingMinutes,
+      timeRemainingSecs,
+      lockExpiresAtIST: formatISTDateTime(lockExpiresAtIST)
+    };
+  }, [serverTime]);
+
+  // Format time for lock countdown (HH:MM:SS)
+  const formatLockTime = useCallback((hours: number, minutes: number, seconds: number): string => {
+    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+  }, []);
 
   const getOrderStatusColor = useCallback((state: Order['state']) => {
     switch (state) {
@@ -1815,31 +1876,12 @@ const Orders: React.FC = () => {
   };
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="px-6 space-y-6">
       {/* Header */}
       <div className="relative text-center space-y-2">
-        <h2 className="text-2xl font-bold text-white">My Trading</h2>
-        <p className="text-gray-300 text-sm">Manage your orders and ads</p>
        
 
-        {/* Wallet Status Indicator */}
-        {address && (
-          <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="bg-gradient-to-r from-purple-500 to-blue-500 rounded-lg p-3 mx-auto max-w-sm"
-          >
-            <div className="flex items-center justify-center space-x-2 text-white">
-              <div className="w-2 h-2 bg-white rounded-full"></div>
-              <span className="text-sm font-medium">
-                {blockchainService.isTrustWalletAvailable() ? 'Trust Wallet' : 'Wallet'} Connected
-              </span>
-            </div>
-            <div className="text-xs text-white/80 mt-1 text-center">
-              {address.slice(0, 6)}...{address.slice(-4)}
-            </div>
-          </motion.div>
-        )}
+     
 
         {/* Call Status Indicator */}
         {isCallActive && (
@@ -2122,13 +2164,7 @@ const Orders: React.FC = () => {
                       </p>
                       <div className="bg-blue-500/10 border border-blue-500/20 rounded px-2 py-1 mt-1 inline-block">
                         <p className="text-xs text-blue-300">
-                          📅 Created: <span className="font-semibold">{expiryData.startTimeIST}</span>
-                        </p>
-                        <p className="text-xs text-blue-200 mt-1">
-                          ⏰ Expires: <span className="font-semibold">{expiryData.expiryTimeIST}</span>
-                        </p>
-                        <p className="text-xs text-blue-200">
-                          🌍 Timezone: Asia/Kolkata (IST) UTC+05:30
+                          📅 Created: <span className="font-semibold">{formatDateSimple(order.startTime)}</span>
                         </p>
                       </div>
                     </div>
@@ -2280,9 +2316,10 @@ const Orders: React.FC = () => {
                         </div>
                       )}
 
-                      {/* LOCKED State - Show View Details Button */}
+                      {/* LOCKED State - Show View Details Button with Countdown */}
                       {order.state === 'LOCKED' && (() => {
                         const hasViewed = viewedLockedOrders.has(order.id);
+                        const lockExpiry = calculateLockExpiry(order);
 
                         return (
                           <div className="space-y-3">
@@ -2293,25 +2330,109 @@ const Orders: React.FC = () => {
                               </span>
                             </div>
 
-                            {/* View Payment Details Button */}
-                            <motion.button
-                              onClick={() => {
-                                setShowPaymentDetailsModal({ isOpen: true, orderId: order.id });
-                                // Mark as viewed when opening modal
-                                setViewedLockedOrders(prev => new Set(prev).add(order.id));
-                              }}
-                              className="w-full bg-gradient-to-r from-purple-500 to-blue-500 text-white py-3 px-4 rounded-lg font-medium flex items-center justify-center space-x-2 shadow-lg hover:from-purple-600 hover:to-blue-600 transition-all"
-                              whileTap={{ scale: 0.98 }}
-                              whileHover={{ scale: 1.02 }}
-                            >
-                              <FileText size={18} />
-                              <span>📋 View Payment Details</span>
-                              {!hasViewed && (
-                                <span className="ml-2 bg-yellow-400 text-yellow-900 text-xs px-2 py-0.5 rounded-full font-bold">
-                                  New
-                                </span>
+                            {/* 2 Hour Countdown Timer with Alert Icon */}
+                            {order.lockExpiresAt && (
+                              <div className="bg-gradient-to-r from-purple-500/20 to-blue-500/20 border border-purple-500/30 rounded-lg p-4">
+                                <div className="flex items-center justify-between mb-3">
+                                  <div className="flex items-center space-x-2">
+                                    <Clock size={18} className="text-purple-300" />
+                                    <span className="text-sm font-semibold text-purple-300">
+                                      Lock Expires In
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center space-x-3">
+                                    {lockExpiry.isExpired ? (
+                                      <span className="text-red-400 text-sm font-bold">EXPIRED</span>
+                                    ) : (
+                                      <span className={`font-mono text-xl font-bold ${
+                                        lockExpiry.timeRemainingHours === 0 && lockExpiry.timeRemainingMinutes < 30
+                                          ? 'text-red-500 animate-pulse'
+                                          : lockExpiry.timeRemainingHours === 0
+                                          ? 'text-orange-400'
+                                          : 'text-green-400'
+                                      }`}>
+                                        {formatLockTime(lockExpiry.timeRemainingHours, lockExpiry.timeRemainingMinutes, lockExpiry.timeRemainingSecs)}
+                                      </span>
+                                    )}
+                                    {/* Alert Icon for Buyer */}
+                                    <motion.button
+                                      onClick={() => setShowLockAlertModal({ isOpen: true, orderId: order.id, userRole: 'buyer' })}
+                                      className="p-2 rounded-full bg-yellow-500/20 hover:bg-yellow-500/30 border border-yellow-500/30 transition-colors"
+                                      whileTap={{ scale: 0.95 }}
+                                      whileHover={{ scale: 1.1 }}
+                                      title="Important Instructions"
+                                    >
+                                      <AlertCircle size={20} className="text-yellow-400" />
+                                    </motion.button>
+                                  </div>
+                                </div>
+                                
+                                {/* Progress Bar */}
+                                {!lockExpiry.isExpired && (
+                                  <div className="space-y-2">
+                                    <div className="w-full bg-gray-700 rounded-full h-2">
+                                      <div 
+                                        className={`h-2 rounded-full transition-all ${
+                                          lockExpiry.timeRemainingHours === 0 && lockExpiry.timeRemainingMinutes < 30
+                                            ? 'bg-red-500'
+                                            : lockExpiry.timeRemainingHours === 0
+                                            ? 'bg-orange-500'
+                                            : 'bg-green-500'
+                                        }`}
+                                        style={{ 
+                                          width: `${Math.max(0, Math.min(100, (lockExpiry.timeRemainingSeconds / 7200) * 100))}%` 
+                                        }}
+                                      ></div>
+                                    </div>
+                                    <div className="flex justify-between text-xs text-gray-400">
+                                      <span>Lock expires at: {lockExpiry.lockExpiresAtIST}</span>
+                                      <span>{lockExpiry.timeRemainingHours}h {lockExpiry.timeRemainingMinutes}m remaining</span>
+                                    </div>
+                                  </div>
+                                )}
+                                
+                                {lockExpiry.isExpired && (
+                                  <div className="text-red-400 text-sm mt-2">
+                                    ⚠️ Lock period has expired. Appeal window is now open.
+                                  </div>
+                                )}
+                              </div>
+                            )}
+
+                            {/* View Payment Details and Confirm Buttons */}
+                            <div className="flex space-x-2">
+                              <motion.button
+                                onClick={() => {
+                                  setShowPaymentDetailsModal({ isOpen: true, orderId: order.id });
+                                  // Mark as viewed when opening modal
+                                  setViewedLockedOrders(prev => new Set(prev).add(order.id));
+                                }}
+                                className="flex-1 bg-gradient-to-r from-purple-500 to-blue-500 text-white py-3 px-4 rounded-lg font-medium flex items-center justify-center space-x-2 shadow-lg hover:from-purple-600 hover:to-blue-600 transition-all"
+                                whileTap={{ scale: 0.98 }}
+                                whileHover={{ scale: 1.02 }}
+                              >
+                                {/* <FileText size={18} /> */}
+                                <span>📋 View Payment Details</span>
+                                {!hasViewed && (
+                                  <span className="ml-2 bg-yellow-400 text-yellow-900 text-xs px-2 py-0.5 rounded-full font-bold">
+                                    New
+                                  </span>
+                                )}
+                              </motion.button>
+                              
+                              {/* Confirm Payment Button for Buyer */}
+                              {isBuyer && (order as any)?.blockchain_trade_id && (
+                                <motion.button
+                                  onClick={() => handleConfirmPayment(order.id, 'SENT')}
+                                  className="bg-blue-600 text-white px-4 py-3 rounded-lg font-medium hover:bg-blue-700 transition-colors flex items-center justify-center space-x-2"
+                                  whileTap={{ scale: 0.98 }}
+                                  title="Confirm payment sent (off-chain only - no gas fee)"
+                                >
+                                  <CheckCircle size={18} />
+                                  <span>Confirm</span>
+                                </motion.button>
                               )}
-                            </motion.button>
+                            </div>
                           </div>
                         );
                       })()}
@@ -2361,6 +2482,104 @@ const Orders: React.FC = () => {
                     </div>
                   )}
 
+                  {/* Status for Seller - LOCKED */}
+                  {isSeller && order.state === 'LOCKED' && (() => {
+                    const lockExpiry = calculateLockExpiry(order);
+                    return (
+                      <div className="space-y-3">
+                        <div className="flex items-center space-x-2 text-purple-400 bg-purple-500/20 p-3 rounded-lg">
+                          <Lock size={16} />
+                          <span className="text-sm font-medium">
+                            ⏰ Funds locked - Wait for buyer to complete payment
+                          </span>
+                        </div>
+
+                        {/* 2 Hour Countdown Timer with Alert Icon */}
+                        {order.lockExpiresAt && (
+                          <div className="bg-gradient-to-r from-purple-500/20 to-blue-500/20 border border-purple-500/30 rounded-lg p-4">
+                            <div className="flex items-center justify-between mb-3">
+                              <div className="flex items-center space-x-2">
+                                <Clock size={18} className="text-purple-300" />
+                                <span className="text-sm font-semibold text-purple-300">
+                                  Lock Expires In
+                                </span>
+                              </div>
+                              <div className="flex items-center space-x-3">
+                                {lockExpiry.isExpired ? (
+                                  <span className="text-red-400 text-sm font-bold">EXPIRED</span>
+                                ) : (
+                                  <span className={`font-mono text-xl font-bold ${
+                                    lockExpiry.timeRemainingHours === 0 && lockExpiry.timeRemainingMinutes < 30
+                                      ? 'text-red-500 animate-pulse'
+                                      : lockExpiry.timeRemainingHours === 0
+                                      ? 'text-orange-400'
+                                      : 'text-green-400'
+                                  }`}>
+                                    {formatLockTime(lockExpiry.timeRemainingHours, lockExpiry.timeRemainingMinutes, lockExpiry.timeRemainingSecs)}
+                                  </span>
+                                )}
+                                {/* Alert Icon */}
+                                <motion.button
+                                  onClick={() => setShowLockAlertModal({ isOpen: true, orderId: order.id, userRole: 'seller' })}
+                                  className="p-2 rounded-full bg-yellow-500/20 hover:bg-yellow-500/30 border border-yellow-500/30 transition-colors"
+                                  whileTap={{ scale: 0.95 }}
+                                  whileHover={{ scale: 1.1 }}
+                                  title="Important Instructions"
+                                >
+                                  <AlertCircle size={20} className="text-yellow-400" />
+                                </motion.button>
+                              </div>
+                            </div>
+                            
+                            {/* Progress Bar */}
+                            {!lockExpiry.isExpired && (
+                              <div className="space-y-2">
+                                <div className="w-full bg-gray-700 rounded-full h-2">
+                                  <div 
+                                    className={`h-2 rounded-full transition-all ${
+                                      lockExpiry.timeRemainingHours === 0 && lockExpiry.timeRemainingMinutes < 30
+                                        ? 'bg-red-500'
+                                        : lockExpiry.timeRemainingHours === 0
+                                        ? 'bg-orange-500'
+                                        : 'bg-green-500'
+                                    }`}
+                                    style={{ 
+                                      width: `${Math.max(0, Math.min(100, (lockExpiry.timeRemainingSeconds / 7200) * 100))}%` 
+                                    }}
+                                  ></div>
+                                </div>
+                                <div className="flex justify-between text-xs text-gray-400">
+                                  <span>Lock expires at: {lockExpiry.lockExpiresAtIST}</span>
+                                  <span>{lockExpiry.timeRemainingHours}h {lockExpiry.timeRemainingMinutes}m remaining</span>
+                                </div>
+                              </div>
+                            )}
+                            
+                            {lockExpiry.isExpired && (
+                              <div className="text-red-400 text-sm mt-2">
+                                ⚠️ Lock period has expired. Appeal window is now open.
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Confirm Payment Button for Seller */}
+                        {(order as any)?.blockchain_trade_id && (
+                          <motion.button
+                            onClick={() => handleConfirmPayment(order.id, 'RECEIVED')}
+                            className="w-full bg-gradient-to-r from-green-600 to-emerald-600 text-white py-3 px-4 rounded-lg font-medium hover:from-green-700 hover:to-emerald-700 transition-all flex items-center justify-center space-x-2 shadow-lg"
+                            whileTap={{ scale: 0.98 }}
+                            whileHover={{ scale: 1.02 }}
+                            title="Confirm payment received (on-chain - releases funds to buyer)"
+                          >
+                            <CheckCircle size={18} />
+                            <span>✅ Confirm Payment Received</span>
+                          </motion.button>
+                        )}
+                      </div>
+                    );
+                  })()}
+
                   {/* Status for Seller - RELEASED */}
                   {isSeller && order.state === 'RELEASED' && (
                     <div className="space-y-2">
@@ -2395,9 +2614,19 @@ const Orders: React.FC = () => {
                     </div>
                   )}
 
-                  {/* Dispute Resolution System */}
-                  {['LOCKED', 'UNDER_DISPUTE', 'APPEALED'].includes(order.state) && (
-                    <div className="space-y-4">
+                  {/* Dispute Resolution System - Show only after 2 hours (lock expires) */}
+                  {['LOCKED', 'UNDER_DISPUTE', 'APPEALED'].includes(order.state) && (() => {
+                    // For LOCKED state, only show after 2 hours (lock expires)
+                    // For UNDER_DISPUTE and APPEALED, always show
+                    if (order.state === 'LOCKED') {
+                      const lockExpiry = calculateLockExpiry(order);
+                      if (!lockExpiry.isExpired) {
+                        return null; // Don't show dispute resolution until lock expires
+                      }
+                    }
+                    
+                    return (
+                      <div className="space-y-4">
                       <div className="bg-gradient-to-r from-purple-500/20 to-blue-500/20 border border-purple-500/30 rounded-lg p-4">
                         <div className="flex items-center justify-between mb-3">
                           <div className="flex items-center space-x-2">
@@ -2425,11 +2654,34 @@ const Orders: React.FC = () => {
                         
                         {/* Quick Status */}
                         <div className="space-y-2">
-                          {order.state === 'LOCKED' && (
-                            <div className="text-sm text-blue-300">
-                              ⏰ Funds locked - Buyer confirms off-chain, Seller confirms on-chain to release funds
-                            </div>
-                          )}
+                          {order.state === 'LOCKED' && (() => {
+                            const lockExpiry = calculateLockExpiry(order);
+                            return (
+                              <div className="space-y-2">
+                                <div className="text-sm text-blue-300">
+                                  ⏰ Funds locked - Buyer confirms off-chain, Seller confirms on-chain to release funds
+                                </div>
+                                {order.lockExpiresAt && (
+                                  <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-2">
+                                    <div className="flex items-center justify-between">
+                                      <span className="text-xs text-blue-300">Lock Expires:</span>
+                                      {lockExpiry.isExpired ? (
+                                        <span className="text-red-400 text-xs font-bold">EXPIRED</span>
+                                      ) : (
+                                        <span className={`font-mono text-sm font-bold ${
+                                          lockExpiry.timeRemainingHours === 0 && lockExpiry.timeRemainingMinutes < 30
+                                            ? 'text-red-400'
+                                            : 'text-blue-300'
+                                        }`}>
+                                          {formatLockTime(lockExpiry.timeRemainingHours, lockExpiry.timeRemainingMinutes, lockExpiry.timeRemainingSecs)}
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })()}
                           {order.state === 'UNDER_DISPUTE' && (
                             <div className="text-sm text-orange-300">
                               ⚠️ Dispute filed - 48 hours to appeal
@@ -2501,7 +2753,8 @@ const Orders: React.FC = () => {
                         </div>
                       </div>
                     </div>
-                  )}
+                    );
+                  })()}
 
 
                 </motion.div>
@@ -3468,6 +3721,98 @@ const Orders: React.FC = () => {
                   If copy fails, tap the URL above to select it, then long press to copy
                 </p>
               </div>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+
+      {/* Lock Alert Modal - Shows instructions for buyer/seller */}
+      {showLockAlertModal.isOpen && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          onClick={() => setShowLockAlertModal({ isOpen: false, orderId: '', userRole: 'buyer' })}
+        >
+          <motion.div
+            initial={{ scale: 0.9, opacity: 0, y: 20 }}
+            animate={{ scale: 1, opacity: 1, y: 0 }}
+            exit={{ scale: 0.9, opacity: 0, y: 20 }}
+            className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-xl w-full max-w-md border border-white/20 text-white overflow-hidden shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between p-6 border-b border-white/10">
+              <div className="flex items-center space-x-3">
+                <div className="w-12 h-12 bg-gradient-to-br from-yellow-500 to-orange-500 rounded-full flex items-center justify-center">
+                  <AlertCircle size={24} className="text-white" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-white">Important Instructions</h3>
+                  <p className="text-sm text-gray-400">
+                    {showLockAlertModal.userRole === 'buyer' ? 'For Buyer' : 'For Seller'}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowLockAlertModal({ isOpen: false, orderId: '', userRole: 'buyer' })}
+                className="p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors"
+                title="Close"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="p-6 space-y-4">
+              <div className="bg-yellow-500/20 border border-yellow-500/30 rounded-lg p-4">
+                {showLockAlertModal.userRole === 'buyer' ? (
+                  <div className="space-y-2">
+                    <div className="flex items-center space-x-2 mb-2">
+                      <AlertCircle size={20} className="text-yellow-400" />
+                      <span className="font-semibold text-yellow-300">Buyer Instructions</span>
+                    </div>
+                    <p className="text-white text-base leading-relaxed">
+                      <strong>⚠️ Important:</strong> Agent branch me payment ke baad hi confirm karo.
+                    </p>
+                    <p className="text-gray-300 text-sm mt-2">
+                      Please complete the payment at the agent branch first, then click the "Confirm Payment Sent" button.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <div className="flex items-center space-x-2 mb-2">
+                      <AlertCircle size={20} className="text-yellow-400" />
+                      <span className="font-semibold text-yellow-300">Seller Instructions</span>
+                    </div>
+                    <p className="text-white text-base leading-relaxed">
+                      <strong>⚠️ Important:</strong> Payment milne ke baad confirm button dabao.
+                    </p>
+                    <p className="text-gray-300 text-sm mt-2">
+                      Only click the "Confirm Payment Received" button after you have actually received the payment from the buyer.
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Additional Info */}
+              <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3">
+                <p className="text-blue-300 text-sm">
+                  💡 This action is important for the security of the transaction. Please follow the instructions carefully.
+                </p>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="p-6 border-t border-white/10 bg-white/5">
+              <motion.button
+                onClick={() => setShowLockAlertModal({ isOpen: false, orderId: '', userRole: 'buyer' })}
+                className="w-full bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-white py-3 px-4 rounded-lg font-medium transition-all"
+                whileTap={{ scale: 0.98 }}
+              >
+                Got It
+              </motion.button>
             </div>
           </motion.div>
         </motion.div>

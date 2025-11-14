@@ -8,10 +8,9 @@ import clsx from 'clsx';
 import toast from 'react-hot-toast';
 
 const Profile: React.FC = () => {
-  const { user, agents, locations, isLoading, updateProfile, fetchAgents, fetchLocations, fetchUserProfile, loginWithWallet, refreshUserProfile } = useUserStore();
-  const { address, isConnected, connect, connectionError, clearError, chainId, switchToNetwork, connectMetaMask, connectTrustWallet } = useWalletStore();
+  const { user, agents, locations, isLoading, updateProfile, fetchAgents, fetchLocations, fetchUserProfile, refreshUserProfile } = useUserStore();
+  const { address, isConnected, connectionError, clearError } = useWalletStore();
   const [isEditing, setIsEditing] = useState(false);
-  const [isConnecting, setIsConnecting] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [showEditWarning, setShowEditWarning] = useState(false);
   const [formData, setFormData] = useState<ProfileData>({
@@ -21,22 +20,12 @@ const Profile: React.FC = () => {
     selectedAgentIds: [] // Changed to support multiple agents
   });
 
-  // Ensure wallet auto-connects on mount and load profile after connect
+  // Load profile when wallet is connected
   useEffect(() => {
-    if (!isConnected) {
-      connect();
-    } else if (address) {
+    if (isConnected && address) {
       fetchUserProfile(address);
     }
-  }, [address, isConnected, fetchUserProfile, connect]);
-
-  // Auto-generate token when user is verified but no token exists
-  useEffect(() => {
-    if (user && user.verified && !localStorage.getItem('authToken') && address) {
-      console.log('🔄 Profile: User verified but no token, generating token...');
-      handleWalletLogin();
-    }
-  }, [user, address]);
+  }, [address, isConnected, fetchUserProfile]);
 
   // Refresh user profile when wallet connects to get latest verification status
   useEffect(() => {
@@ -73,89 +62,6 @@ const Profile: React.FC = () => {
 
   const handleInputChange = (field: keyof ProfileData, value: string | string[]) => {
     setFormData(prev => ({ ...prev, [field]: value }));
-  };
-
-  // Connect Trust Wallet directly
-  const handleConnectTrustWallet = async () => {
-    try {
-      setIsConnecting(true);
-      await connectTrustWallet();
-      
-      // Ensure BSC Mainnet
-      if (chainId !== 56) {
-        await switchToNetwork(56);
-      }
-      
-      // Auto-authenticate after connection
-      if (address) {
-        await handleWalletLogin();
-      } else {
-        toast.success('Trust Wallet connected successfully!');
-      }
-    } catch (error: any) {
-      console.error('Trust Wallet connection error:', error);
-      toast.error(error.message || 'Failed to connect Trust Wallet');
-    } finally {
-      setIsConnecting(false);
-    }
-  };
-
-  // Connect MetaMask directly
-  const handleConnectMetaMask = async () => {
-    try {
-      setIsConnecting(true);
-      await connectMetaMask();
-      
-      // Ensure BSC Mainnet
-      if (chainId !== 56) {
-        await switchToNetwork(56);
-      }
-      
-      // Auto-authenticate after connection
-      if (address) {
-        await handleWalletLogin();
-      } else {
-        toast.success('MetaMask connected successfully!');
-      }
-    } catch (error: any) {
-      console.error('MetaMask connection error:', error);
-      toast.error(error.message || 'Failed to connect MetaMask');
-    } finally {
-      setIsConnecting(false);
-    }
-  };
-
-  const handleWalletLogin = async () => {
-    if (!address) return;
-
-    setIsConnecting(true);
-    try {
-      // Generate a message for the user to sign
-      const message = `Sign this message to authenticate with Zotrust P2P Platform.\n\nWallet: ${address}\nTimestamp: ${Date.now()}`;
-      
-      // Request signature from wallet
-      const signature = await (window as any).ethereum.request({
-        method: 'personal_sign',
-        params: [message, address],
-      });
-
-      const success = await loginWithWallet(address, signature, message);
-      if (success) {
-        toast.success('Wallet connected and authenticated successfully');
-        await fetchUserProfile(address);
-      } else {
-        toast.error('Failed to authenticate wallet');
-      }
-    } catch (error: any) {
-      console.error('Wallet login error:', error);
-      if (error.code === 4001) {
-        toast.error('User rejected the signature request');
-      } else {
-        toast.error('Failed to connect wallet');
-      }
-    } finally {
-      setIsConnecting(false);
-    }
   };
 
   const handleSaveProfile = async () => {
@@ -215,92 +121,22 @@ const Profile: React.FC = () => {
         </motion.div>
       )}
 
-        {/* Wallet Connection */}
-        {!isConnected && (
-        <motion.div
-            initial={{ y: 20, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-            className="bg-violet-500/10 backdrop-blur-lg rounded-lg p-4 border border-violet-500/20"
-          >
-            <div className="text-center space-y-3">
-              <Wallet size={32} className="text-violet-400 mx-auto" />
-              <div>
-                <h3 className="text-lg font-bold text-white mb-1">Connect Wallet</h3>
-                <p className="text-violet-300 text-sm mb-3">
-                  Connect to access P2P trading
-                </p>
-          </div>
-          
-          {/* Direct wallet connection buttons */}
-          <div className="space-y-2">
-            {(window as any).ethereum && (
-              <>
-                {((window as any).ethereum.isMetaMask || !(window as any).ethereum.isTrust) && (
-                  <button
-                    onClick={handleConnectMetaMask}
-                    disabled={isConnecting}
-                    className="w-full bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white px-4 py-2 rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2 text-sm"
-                  >
-                    {isConnecting ? (
-                      <>
-                        <Loader2 size={16} className="animate-spin" />
-                        <span>Connecting...</span>
-                      </>
-                    ) : (
-                      <>
-                        <span>🦊</span>
-                        <span>Connect MetaMask</span>
-                      </>
-                    )}
-                  </button>
-                )}
-                
-                {((window as any).ethereum.isTrust || (window as any).ethereum.isTrustWallet) && (
-                  <button
-                    onClick={handleConnectTrustWallet}
-                    disabled={isConnecting}
-                    className="w-full bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white px-4 py-2 rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2 text-sm"
-                  >
-                    {isConnecting ? (
-                      <>
-                        <Loader2 size={16} className="animate-spin" />
-                        <span>Connecting...</span>
-                      </>
-                    ) : (
-                      <>
-                        <span>🔷</span>
-                        <span>Connect Trust Wallet</span>
-                      </>
-                    )}
-                  </button>
-                )}
-              </>
-            )}
-            
-            {/* Fallback: Generic connect button */}
-            <button
-              onClick={handleWalletLogin}
-              disabled={isConnecting}
-              className="w-full bg-gradient-to-r from-violet-500 to-purple-500 text-white px-4 py-2 rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2 text-sm"
-            >
-              {isConnecting ? (
-                <>
-                  <Loader2 size={16} className="animate-spin" />
-                  <span>Connecting...</span>
-                </>
-              ) : (
-                <>
-                  <Wallet size={16} />
-                  <span>Connect Wallet</span>
-                </>
-              )}
-            </button>
-          </div>
-            </div>
-        </motion.div>
-      )}
 
         {/* Profile Content */}
+        {!isConnected && (
+          <motion.div
+            initial={{ y: 20, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            className="bg-violet-500/10 backdrop-blur-lg rounded-lg p-4 border border-violet-500/20 text-center"
+          >
+            <Wallet size={32} className="text-violet-400 mx-auto mb-2" />
+            <h3 className="text-lg font-bold text-white mb-1">Wallet Not Connected</h3>
+            <p className="text-violet-300 text-sm">
+              Please connect your wallet from Dashboard to view and edit your profile
+            </p>
+          </motion.div>
+        )}
+
         {isConnected && (
           <>
       {/* Verification Status */}
