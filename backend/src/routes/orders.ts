@@ -117,6 +117,78 @@ router.post('/', authenticateToken, async (req: any, res) => {
       });
     }
 
+    // Check trading hours and enabled status
+    console.log('⏰ CREATE ORDER: Checking trading hours and enabled status');
+    const tradingHoursResult = await pool.query(
+      `SELECT key, value FROM app_settings 
+       WHERE key IN ('trading_buy_enabled', 'trading_sell_enabled', 'trading_start_time', 'trading_end_time')`
+    );
+
+    const tradingSettings: any = {
+      buyEnabled: true,
+      sellEnabled: true,
+      startTime: '09:00',
+      endTime: '18:00'
+    };
+
+    tradingHoursResult.rows.forEach((row: any) => {
+      if (row.key === 'trading_buy_enabled') {
+        tradingSettings.buyEnabled = row.value === 'true';
+      } else if (row.key === 'trading_sell_enabled') {
+        tradingSettings.sellEnabled = row.value === 'true';
+      } else if (row.key === 'trading_start_time') {
+        tradingSettings.startTime = row.value;
+      } else if (row.key === 'trading_end_time') {
+        tradingSettings.endTime = row.value;
+      }
+    });
+
+    // Check if trading type is enabled
+    if (ad.type === 'BUY' && !tradingSettings.sellEnabled) {
+      console.log('❌ CREATE ORDER: SELL trading is disabled');
+      return res.status(400).json({
+        success: false,
+        error: 'SELL trading is currently disabled. Please try again later.'
+      });
+    }
+    if (ad.type === 'SELL' && !tradingSettings.buyEnabled) {
+      console.log('❌ CREATE ORDER: BUY trading is disabled');
+      return res.status(400).json({
+        success: false,
+        error: 'BUY trading is currently disabled. Please try again later.'
+      });
+    }
+
+    // Check if current time is within trading hours (IST)
+    const now = new Date();
+    const istFormatter = new Intl.DateTimeFormat('en-IN', {
+      timeZone: 'Asia/Kolkata',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    });
+    
+    const istParts = istFormatter.formatToParts(now);
+    const currentHour = parseInt(istParts.find(p => p.type === 'hour')?.value || '0', 10);
+    const currentMinute = parseInt(istParts.find(p => p.type === 'minute')?.value || '0', 10);
+    const currentTimeMinutes = currentHour * 60 + currentMinute;
+    
+    const [startHour, startMinute] = tradingSettings.startTime.split(':').map(Number);
+    const [endHour, endMinute] = tradingSettings.endTime.split(':').map(Number);
+    const startTimeMinutes = startHour * 60 + startMinute;
+    const endTimeMinutes = endHour * 60 + endMinute;
+    
+    if (currentTimeMinutes < startTimeMinutes || currentTimeMinutes >= endTimeMinutes) {
+      console.log('❌ CREATE ORDER: Outside trading hours', {
+        currentTime: `${currentHour}:${currentMinute.toString().padStart(2, '0')}`,
+        tradingHours: `${tradingSettings.startTime} - ${tradingSettings.endTime} IST`
+      });
+      return res.status(400).json({
+        success: false,
+        error: `Trading is only available from ${tradingSettings.startTime} to ${tradingSettings.endTime} IST. Aagnya branch is closed.`
+      });
+    }
+
     // Determine buyer and seller based on ad type
     const buyerAddress = ad.type === 'BUY' ? ad.owner_address : user.address;
     const sellerAddress = ad.type === 'BUY' ? user.address : ad.owner_address;

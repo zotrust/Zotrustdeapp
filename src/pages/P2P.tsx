@@ -30,8 +30,17 @@ const P2P: React.FC = () => {
   const [selectedAgentId, setSelectedAgentId] = useState<string>('');
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [orderError, setOrderError] = useState<string | null>(null);
-  const [isBusinessHours, setIsBusinessHours] = useState(true);
-  const [currentTimeIST, setCurrentTimeIST] = useState<Date>(new Date());
+  const [tradingSettings, setTradingSettings] = useState<{
+    buyEnabled: boolean;
+    sellEnabled: boolean;
+    startTime: string;
+    endTime: string;
+  }>({
+    buyEnabled: true,
+    sellEnabled: true,
+    startTime: '09:00',
+    endTime: '18:00'
+  });
 
   const { user, refreshUserProfile } = useUserStore();
   const { isConnected, address, connectionError, clearError } = useWalletStore();
@@ -64,51 +73,24 @@ const P2P: React.FC = () => {
     }
   }, [isConnected, address, refreshUserProfile]);
 
-  // Check business hours (9 AM - 6 PM IST)
-  const checkBusinessHours = () => {
-    const now = new Date();
-    
-    // Get IST time using Intl.DateTimeFormat
-    const istFormatter = new Intl.DateTimeFormat('en-IN', {
-      timeZone: 'Asia/Kolkata',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false
-    });
-    
-    const istParts = istFormatter.formatToParts(now);
-    const hours = parseInt(istParts.find(p => p.type === 'hour')?.value || '0', 10);
-    const minutes = parseInt(istParts.find(p => p.type === 'minute')?.value || '0', 10);
-    const currentTimeMinutes = hours * 60 + minutes;
-    
-    // Business hours: 9 AM (540 minutes) to 6 PM (1080 minutes)
-    const openTime = 9 * 60; // 9 AM = 540 minutes
-    const closeTime = 18 * 60; // 6 PM = 1080 minutes
-    
-    const isOpen = currentTimeMinutes >= openTime && currentTimeMinutes < closeTime;
-    setIsBusinessHours(isOpen);
-    
-    // Store IST time for display
-    const istTimeString = now.toLocaleString('en-IN', { 
-      timeZone: 'Asia/Kolkata',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: true
-    });
-    // Create date object for display (just for formatting)
-    setCurrentTimeIST(new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Kolkata' })));
-    
-    return isOpen;
+  // Fetch trading hours from backend
+  const fetchTradingHours = async () => {
+    try {
+      const response = await fetch('/api/admin/trading-hours');
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.data) {
+          setTradingSettings(data.data);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching trading hours:', error);
+    }
   };
 
-  // Update business hours status every minute
+  // Fetch trading hours on mount
   useEffect(() => {
-    checkBusinessHours(); // Initial check
-    const interval = setInterval(() => {
-      checkBusinessHours();
-    }, 60000); // Check every minute
-
-    return () => clearInterval(interval);
+    fetchTradingHours();
   }, []);
 
   const fetchAds = async () => {
@@ -271,12 +253,18 @@ const P2P: React.FC = () => {
     setCreatingOrder(ad.id);
     setOrderError(null);
 
-    // Check business hours before creating order
-    if (!isBusinessHours) {
-      setOrderError('Trading is only available from 9 AM to 6 PM IST. Aagnya branch is closed.');
+    // Check if trading type is enabled
+    if (ad.type === 'BUY' && !tradingSettings.sellEnabled) {
+      setOrderError('SELL trading is currently disabled. Please try again later.');
       setCreatingOrder(null);
       return;
     }
+    if (ad.type === 'SELL' && !tradingSettings.buyEnabled) {
+      setOrderError('BUY trading is currently disabled. Please try again later.');
+      setCreatingOrder(null);
+      return;
+    }
+
 
     try {
       const token = localStorage.getItem('authToken');
@@ -409,21 +397,22 @@ const P2P: React.FC = () => {
         <p className="text-gray-300 text-xs sm:text-sm">BNB Smart Chain</p>
       </div>
 
-      {/* Business Hours Notice */}
-      {!isBusinessHours && (
+      {/* Trading Status Notice */}
+      {(!tradingSettings.buyEnabled || !tradingSettings.sellEnabled) && (
         <motion.div
           initial={{ y: -20, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
-          className="bg-yellow-500/20 border border-yellow-500/30 rounded-xl p-4 flex items-center space-x-3"
+          className="bg-red-500/20 border border-red-500/30 rounded-xl p-4 flex items-center space-x-3"
         >
-          <AlertCircle size={20} className="text-yellow-400 flex-shrink-0" />
+          <AlertCircle size={20} className="text-red-400 flex-shrink-0" />
           <div className="flex-1">
-            <p className="text-yellow-300 text-sm font-medium">Aagnya Branch Closed</p>
-            <p className="text-yellow-400 text-xs">
-              Trading is only available from 9 AM to 6 PM IST. Please come back during business hours.
-            </p>
-            <p className="text-yellow-500 text-xs mt-1">
-              Current Time (IST): {new Date().toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: true })}
+            <p className="text-red-300 text-sm font-medium">Trading Disabled</p>
+            <p className="text-red-400 text-xs">
+              {!tradingSettings.buyEnabled && !tradingSettings.sellEnabled 
+                ? 'Both BUY and SELL trading are currently disabled.'
+                : !tradingSettings.buyEnabled 
+                  ? 'BUY trading is currently disabled.'
+                  : 'SELL trading is currently disabled.'}
             </p>
           </div>
         </motion.div>
@@ -711,17 +700,42 @@ const P2P: React.FC = () => {
                         const buttonInfo = getOrderButtonInfo(ad);
                         const isCreating = creatingOrder === ad.id;
 
+                        // When ad.type === 'BUY', user is SELLING to the buyer, so check sellEnabled
+                        // When ad.type === 'SELL', user is BUYING from the seller, so check buyEnabled
+                        const isTradingDisabled = (ad.type === 'BUY' && !tradingSettings.sellEnabled) || 
+                                                  (ad.type === 'SELL' && !tradingSettings.buyEnabled);
+                        const isDisabled = buttonInfo.disabled || isCreating || isTradingDisabled;
+                        
+                        // Debug logging
+                        if (process.env.NODE_ENV === 'development') {
+                          console.log('Button State:', {
+                            adId: ad.id,
+                            adType: ad.type,
+                            buttonText: buttonInfo.text,
+                            sellEnabled: tradingSettings.sellEnabled,
+                            buyEnabled: tradingSettings.buyEnabled,
+                            isTradingDisabled,
+                            buttonInfoDisabled: buttonInfo.disabled,
+                            isCreating,
+                            isDisabled
+                          });
+                        }
+                        
                         return (
                           <motion.button
                             onClick={() => handleOrderClick(ad)}
-                            disabled={buttonInfo.disabled || isCreating || !isBusinessHours}
+                            disabled={isDisabled}
                             className={clsx(
                               'flex-1 py-2 px-3 rounded-lg font-semibold transition-all flex items-center justify-center space-x-1 text-xs',
                               buttonInfo.className,
-                              (buttonInfo.disabled || isCreating || !isBusinessHours) && 'opacity-50 cursor-not-allowed'
+                              isDisabled && 'opacity-50 cursor-not-allowed'
                             )}
-                            whileTap={{ scale: (buttonInfo.disabled || !isBusinessHours) ? 1 : 0.95 }}
-                            title={!isBusinessHours ? 'Trading available only from 9 AM to 6 PM IST' : undefined}
+                            whileTap={{ scale: isDisabled ? 1 : 0.95 }}
+                            title={
+                              isTradingDisabled 
+                                ? `${ad.type === 'BUY' ? 'SELL' : 'BUY'} trading is currently disabled`
+                                : undefined
+                            }
                           >
                             {isCreating ? (
                               <>
@@ -808,18 +822,19 @@ const P2P: React.FC = () => {
               </div>
 
               <div className="space-y-3 sm:space-y-4">
-                {/* Business Hours Warning */}
-                {!isBusinessHours && (
-                  <div className="bg-yellow-500/20 border border-yellow-500/30 rounded-md p-3">
+                {/* Trading Status Warning */}
+                {(!tradingSettings.buyEnabled || !tradingSettings.sellEnabled) && (
+                  <div className="bg-red-500/20 border border-red-500/30 rounded-md p-3">
                     <div className="flex items-center space-x-2">
-                      <AlertCircle size={16} className="text-yellow-400" />
+                      <AlertCircle size={16} className="text-red-400" />
                       <div>
-                        <p className="text-yellow-300 text-sm font-medium">Aagnya Branch Closed</p>
-                        <p className="text-yellow-400 text-xs">
-                          Trading is only available from 9 AM to 6 PM IST
-                        </p>
-                        <p className="text-yellow-500 text-xs mt-1">
-                          Current Time: {new Date().toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: true })} IST
+                        <p className="text-red-300 text-sm font-medium">Trading Disabled</p>
+                        <p className="text-red-400 text-xs">
+                          {!tradingSettings.buyEnabled && !tradingSettings.sellEnabled 
+                            ? 'Both BUY and SELL trading are currently disabled.'
+                            : !tradingSettings.buyEnabled 
+                              ? 'BUY trading is currently disabled.'
+                              : 'SELL trading is currently disabled.'}
                         </p>
                       </div>
                     </div>
@@ -1039,7 +1054,8 @@ const P2P: React.FC = () => {
                       creatingOrder === orderModal.ad.id ||
                       parseFloat(orderAmount) > parseFloat(orderModal.ad.maxAmount) ||
                       parseFloat(orderAmount) < parseFloat(orderModal.ad.minAmount) ||
-                      !isBusinessHours
+                      (orderModal.ad.type === 'BUY' && !tradingSettings.sellEnabled) ||
+                      (orderModal.ad.type === 'SELL' && !tradingSettings.buyEnabled)
                     }
                     className={clsx(
                       'flex-1 py-2 px-3 rounded-md text-white disabled:opacity-50 disabled:cursor-not-allowed text-sm',
@@ -1048,7 +1064,13 @@ const P2P: React.FC = () => {
                         : 'bg-gradient-to-r from-green-500 to-emerald-500'
                     )}
                     whileTap={{ scale: 0.98 }}
-                    title={!isBusinessHours ? 'Trading available only from 9 AM to 6 PM IST' : undefined}
+                    title={
+                      (orderModal.ad.type === 'BUY' && !tradingSettings.sellEnabled)
+                        ? 'SELL trading is currently disabled'
+                        : (orderModal.ad.type === 'SELL' && !tradingSettings.buyEnabled)
+                          ? 'BUY trading is currently disabled'
+                          : undefined
+                    }
                   >
                     {creatingOrder === orderModal.ad.id ? 'Creating...' : (orderModal.ad.type === 'BUY' ? 'Sell Request' : 'Buy Request')}
                   </motion.button>

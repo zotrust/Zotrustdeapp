@@ -1,3 +1,4 @@
+-- Active: 1761026031156@@185.112.144.66@5432
 
 -- Users table
 CREATE TABLE IF NOT EXISTS users (
@@ -227,7 +228,11 @@ INSERT INTO app_settings (key, value) VALUES
 ('buyer_fee_percent', '0.01'),
 ('seller_fee_percent', '0.01'),
 ('accept_timeout_minutes', '5'),
-('lock_duration_hours', '1')
+('lock_duration_hours', '1'),
+('trading_buy_enabled', 'true'),
+('trading_sell_enabled', 'true'),
+('trading_start_time', '09:00'),
+('trading_end_time', '18:00')
 ON CONFLICT (key) DO NOTHING;
 
 -- Insert default locations

@@ -376,7 +376,11 @@ INSERT INTO app_settings (key, value, description) VALUES
     ('MIN_ORDER_AMOUNT_TBNB', '0.01', 'Minimum order amount in TBNB'),
     ('MIN_ORDER_AMOUNT_USDT', '10', 'Minimum order amount in USDT'),
     ('WEBSOCKET_HEARTBEAT_INTERVAL_MS', '30000', 'WebSocket heartbeat interval'),
-    ('ENABLE_MAINTENANCE_MODE', 'false', 'Enable/disable maintenance mode')
+    ('ENABLE_MAINTENANCE_MODE', 'false', 'Enable/disable maintenance mode'),
+    ('trading_buy_enabled', 'true', 'Enable/disable BUY trading (true/false)'),
+    ('trading_sell_enabled', 'true', 'Enable/disable SELL trading (true/false)'),
+    ('trading_start_time', '09:00', 'Trading start time in HH:MM format (24-hour, IST)'),
+    ('trading_end_time', '18:00', 'Trading end time in HH:MM format (24-hour, IST)')
 ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value;
 
 -- =============================================

@@ -9,7 +9,9 @@ import {
   DollarSign,
   Clock,
   Shield,
-  AlertCircle
+  AlertCircle,
+  ToggleLeft,
+  ToggleRight
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -19,16 +21,86 @@ interface AppSetting {
   description?: string;
 }
 
+interface TradingHours {
+  buyEnabled: boolean;
+  sellEnabled: boolean;
+  startTime: string;
+  endTime: string;
+}
+
 const AdminSettings: React.FC = () => {
   const [settings, setSettings] = useState<AppSetting[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [feeWallet, setFeeWallet] = useState('');
+  const [tradingHours, setTradingHours] = useState<TradingHours>({
+    buyEnabled: true,
+    sellEnabled: true,
+    startTime: '09:00',
+    endTime: '18:00'
+  });
+  const [isSavingTradingHours, setIsSavingTradingHours] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
     fetchSettings();
+    fetchTradingHours();
   }, []);
+
+  const fetchTradingHours = async () => {
+    try {
+      const token = localStorage.getItem('adminToken');
+      if (!token) return;
+
+      const response = await fetch('/api/admin/trading-hours', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.data) {
+          setTradingHours(data.data);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching trading hours:', error);
+    }
+  };
+
+  const handleSaveTradingHours = async () => {
+    setIsSavingTradingHours(true);
+    try {
+      const token = localStorage.getItem('adminToken');
+      if (!token) {
+        navigate('/admin/login');
+        return;
+      }
+
+      const response = await fetch('/api/admin/trading-hours', {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(tradingHours)
+      });
+
+      if (response.ok) {
+        toast.success('Trading hours updated successfully');
+        fetchTradingHours();
+      } else {
+        const errorData = await response.json();
+        toast.error(errorData.error || 'Failed to update trading hours');
+      }
+    } catch (error) {
+      console.error('Error updating trading hours:', error);
+      toast.error('Failed to update trading hours');
+    } finally {
+      setIsSavingTradingHours(false);
+    }
+  };
 
   const fetchSettings = async () => {
     try {
@@ -149,6 +221,115 @@ const AdminSettings: React.FC = () => {
           <RefreshCw size={16} />
           <span>Refresh</span>
         </button>
+      </div>
+
+      {/* Trading Hours Section */}
+      <div className="bg-white/10 backdrop-blur-lg rounded-xl p-6 border border-white/20 mb-6">
+        <div className="flex items-center space-x-3 mb-4">
+          <Clock className="w-6 h-6 text-yellow-400" />
+          <h2 className="text-xl font-semibold text-white">Trading Hours Configuration</h2>
+        </div>
+        
+        <div className="space-y-6">
+          {/* Enable/Disable Toggles */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Buy Trading Toggle */}
+            <div className="bg-white/5 rounded-lg p-4 border border-white/10">
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-sm font-medium text-white">BUY Trading</label>
+                <button
+                  onClick={() => setTradingHours({...tradingHours, buyEnabled: !tradingHours.buyEnabled})}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                    tradingHours.buyEnabled ? 'bg-green-500' : 'bg-gray-600'
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      tradingHours.buyEnabled ? 'translate-x-6' : 'translate-x-1'
+                    }`}
+                  />
+                </button>
+              </div>
+              <p className="text-xs text-gray-400">
+                {tradingHours.buyEnabled ? 'BUY trading is enabled' : 'BUY trading is disabled'}
+              </p>
+            </div>
+
+            {/* Sell Trading Toggle */}
+            <div className="bg-white/5 rounded-lg p-4 border border-white/10">
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-sm font-medium text-white">SELL Trading</label>
+                <button
+                  onClick={() => setTradingHours({...tradingHours, sellEnabled: !tradingHours.sellEnabled})}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                    tradingHours.sellEnabled ? 'bg-green-500' : 'bg-gray-600'
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      tradingHours.sellEnabled ? 'translate-x-6' : 'translate-x-1'
+                    }`}
+                  />
+                </button>
+              </div>
+              <p className="text-xs text-gray-400">
+                {tradingHours.sellEnabled ? 'SELL trading is enabled' : 'SELL trading is disabled'}
+              </p>
+            </div>
+          </div>
+
+          {/* Trading Hours Time Inputs */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Start Time (IST)
+              </label>
+              <input
+                type="time"
+                value={tradingHours.startTime}
+                onChange={(e) => setTradingHours({...tradingHours, startTime: e.target.value})}
+                className="w-full px-4 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-yellow-500"
+              />
+              <p className="text-xs text-gray-400 mt-1">Trading start time in 24-hour format</p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                End Time (IST)
+              </label>
+              <input
+                type="time"
+                value={tradingHours.endTime}
+                onChange={(e) => setTradingHours({...tradingHours, endTime: e.target.value})}
+                className="w-full px-4 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-yellow-500"
+              />
+              <p className="text-xs text-gray-400 mt-1">Trading end time in 24-hour format</p>
+            </div>
+          </div>
+
+          {/* Save Button */}
+          <div className="flex justify-end">
+            <button
+              onClick={handleSaveTradingHours}
+              disabled={isSavingTradingHours}
+              className="bg-yellow-600 hover:bg-yellow-700 disabled:bg-gray-600 text-white px-6 py-2 rounded-lg transition-colors flex items-center space-x-2"
+            >
+              {isSavingTradingHours ? (
+                <RefreshCw size={16} className="animate-spin" />
+              ) : (
+                <Save size={16} />
+              )}
+              <span>{isSavingTradingHours ? 'Saving...' : 'Save Trading Hours'}</span>
+            </button>
+          </div>
+
+          {/* Current Status Display */}
+          <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3">
+            <p className="text-sm text-blue-300">
+              <strong>Current Status:</strong> Trading is {tradingHours.buyEnabled && tradingHours.sellEnabled ? 'enabled' : 'partially enabled'} from {tradingHours.startTime} to {tradingHours.endTime} IST
+            </p>
+          </div>
+        </div>
       </div>
 
       {/* Fee Wallet Section */}
