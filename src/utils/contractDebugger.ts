@@ -38,7 +38,7 @@ export const debugSmartContract = async () => {
 
     // 4. Check contract address
     console.log(`📋 Contract Address: ${ZOTRUST_CONTRACT_ADDRESS}`);
-    if (ZOTRUST_CONTRACT_ADDRESS === '0x03AE241B01220D9b9698650e5ed012EE72171fCD') {
+    if (ZOTRUST_CONTRACT_ADDRESS === '0x02ADD84281025BeeB807f5b94Ea947599146ca00') {
       console.log('✅ Using provided contract address');
     } else {
       console.warn('⚠️  Contract address may need updating');

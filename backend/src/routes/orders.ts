@@ -117,18 +117,16 @@ router.post('/', authenticateToken, async (req: any, res) => {
       });
     }
 
-    // Check trading hours and enabled status
-    console.log('⏰ CREATE ORDER: Checking trading hours and enabled status');
+    // Check trading enabled status (time restrictions removed)
+    console.log('⏰ CREATE ORDER: Checking trading enabled status');
     const tradingHoursResult = await pool.query(
       `SELECT key, value FROM app_settings 
-       WHERE key IN ('trading_buy_enabled', 'trading_sell_enabled', 'trading_start_time', 'trading_end_time')`
+       WHERE key IN ('trading_buy_enabled', 'trading_sell_enabled')`
     );
 
     const tradingSettings: any = {
       buyEnabled: true,
-      sellEnabled: true,
-      startTime: '09:00',
-      endTime: '18:00'
+      sellEnabled: true
     };
 
     tradingHoursResult.rows.forEach((row: any) => {
@@ -136,10 +134,6 @@ router.post('/', authenticateToken, async (req: any, res) => {
         tradingSettings.buyEnabled = row.value === 'true';
       } else if (row.key === 'trading_sell_enabled') {
         tradingSettings.sellEnabled = row.value === 'true';
-      } else if (row.key === 'trading_start_time') {
-        tradingSettings.startTime = row.value;
-      } else if (row.key === 'trading_end_time') {
-        tradingSettings.endTime = row.value;
       }
     });
 
@@ -156,36 +150,6 @@ router.post('/', authenticateToken, async (req: any, res) => {
       return res.status(400).json({
         success: false,
         error: 'BUY trading is currently disabled. Please try again later.'
-      });
-    }
-
-    // Check if current time is within trading hours (IST)
-    const now = new Date();
-    const istFormatter = new Intl.DateTimeFormat('en-IN', {
-      timeZone: 'Asia/Kolkata',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false
-    });
-    
-    const istParts = istFormatter.formatToParts(now);
-    const currentHour = parseInt(istParts.find(p => p.type === 'hour')?.value || '0', 10);
-    const currentMinute = parseInt(istParts.find(p => p.type === 'minute')?.value || '0', 10);
-    const currentTimeMinutes = currentHour * 60 + currentMinute;
-    
-    const [startHour, startMinute] = tradingSettings.startTime.split(':').map(Number);
-    const [endHour, endMinute] = tradingSettings.endTime.split(':').map(Number);
-    const startTimeMinutes = startHour * 60 + startMinute;
-    const endTimeMinutes = endHour * 60 + endMinute;
-    
-    if (currentTimeMinutes < startTimeMinutes || currentTimeMinutes >= endTimeMinutes) {
-      console.log('❌ CREATE ORDER: Outside trading hours', {
-        currentTime: `${currentHour}:${currentMinute.toString().padStart(2, '0')}`,
-        tradingHours: `${tradingSettings.startTime} - ${tradingSettings.endTime} IST`
-      });
-      return res.status(400).json({
-        success: false,
-        error: `Trading is only available from ${tradingSettings.startTime} to ${tradingSettings.endTime} IST. Aagnya branch is closed.`
       });
     }
 
@@ -403,7 +367,7 @@ router.post('/:id/prepare-accept', authenticateToken, async (req: any, res) => {
         otpHash: otpHash,
         
         blockchain: {
-          contractAddress: process.env.CONTRACT_ADDRESS || '0x03AE241B01220D9b9698650e5ed012EE72171fCD',
+          contractAddress: process.env.CONTRACT_ADDRESS || '0x02ADD84281025BeeB807f5b94Ea947599146ca00',
           tradeId: parseInt(orderId),
           network: 'BSC Mainnet',
           chainId: 56
@@ -834,7 +798,7 @@ router.post('/:id/prepare-lock', authenticateToken, async (req: any, res) => {
         otpHash: otpHash,
         blockchain: {
           tradeId: tradeId,
-          contractAddress: process.env.CONTRACT_ADDRESS || '0x03AE241B01220D9b9698650e5ed012EE72171fCD',
+          contractAddress: process.env.CONTRACT_ADDRESS || '0x02ADD84281025BeeB807f5b94Ea947599146ca00',
           network: 'BSC Mainnet',
           chainId: 56
         }

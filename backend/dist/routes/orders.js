@@ -101,6 +101,37 @@ router.post('/', auth_1.authenticateToken, async (req, res) => {
                 error: `Amount must be between ${ad.min_amount} and ${ad.max_amount}`
             });
         }
+        // Check trading enabled status (time restrictions removed)
+        console.log('⏰ CREATE ORDER: Checking trading enabled status');
+        const tradingHoursResult = await database_1.default.query(`SELECT key, value FROM app_settings 
+       WHERE key IN ('trading_buy_enabled', 'trading_sell_enabled')`);
+        const tradingSettings = {
+            buyEnabled: true,
+            sellEnabled: true
+        };
+        tradingHoursResult.rows.forEach((row) => {
+            if (row.key === 'trading_buy_enabled') {
+                tradingSettings.buyEnabled = row.value === 'true';
+            }
+            else if (row.key === 'trading_sell_enabled') {
+                tradingSettings.sellEnabled = row.value === 'true';
+            }
+        });
+        // Check if trading type is enabled
+        if (ad.type === 'BUY' && !tradingSettings.sellEnabled) {
+            console.log('❌ CREATE ORDER: SELL trading is disabled');
+            return res.status(400).json({
+                success: false,
+                error: 'SELL trading is currently disabled. Please try again later.'
+            });
+        }
+        if (ad.type === 'SELL' && !tradingSettings.buyEnabled) {
+            console.log('❌ CREATE ORDER: BUY trading is disabled');
+            return res.status(400).json({
+                success: false,
+                error: 'BUY trading is currently disabled. Please try again later.'
+            });
+        }
         // Determine buyer and seller based on ad type
         const buyerAddress = ad.type === 'BUY' ? ad.owner_address : user.address;
         const sellerAddress = ad.type === 'BUY' ? user.address : ad.owner_address;
@@ -270,7 +301,7 @@ router.post('/:id/prepare-accept', auth_1.authenticateToken, async (req, res) =>
                 otp: otp,
                 otpHash: otpHash,
                 blockchain: {
-                    contractAddress: process.env.CONTRACT_ADDRESS || '0x03AE241B01220D9b9698650e5ed012EE72171fCD',
+                    contractAddress: process.env.CONTRACT_ADDRESS || '0x02ADD84281025BeeB807f5b94Ea947599146ca00',
                     tradeId: parseInt(orderId),
                     network: 'BSC Mainnet',
                     chainId: 56
@@ -605,7 +636,7 @@ router.post('/:id/prepare-lock', auth_1.authenticateToken, async (req, res) => {
                 otpHash: otpHash,
                 blockchain: {
                     tradeId: tradeId,
-                    contractAddress: process.env.CONTRACT_ADDRESS || '0x03AE241B01220D9b9698650e5ed012EE72171fCD',
+                    contractAddress: process.env.CONTRACT_ADDRESS || '0x02ADD84281025BeeB807f5b94Ea947599146ca00',
                     network: 'BSC Mainnet',
                     chainId: 56
                 }

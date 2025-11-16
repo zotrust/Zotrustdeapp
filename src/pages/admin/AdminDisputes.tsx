@@ -59,6 +59,8 @@ const AdminDisputes: React.FC = () => {
   });
   const [showWalletModal, setShowWalletModal] = useState(false);
   const [estimatedGasFee, setEstimatedGasFee] = useState<string | null>(null);
+  const [blockchainStatus, setBlockchainStatus] = useState<{tradeId: number, status: number} | null>(null);
+  const [isCheckingStatus, setIsCheckingStatus] = useState(false);
 
   // Retry contract call with exponential backoff
   const retryContractCall = async (
@@ -169,9 +171,50 @@ const AdminDisputes: React.FC = () => {
     }
   };
 
-  const handleViewAppeal = (appeal: Appeal) => {
+  // Fetch blockchain status for an appeal
+  const fetchBlockchainStatus = async (appeal: Appeal) => {
+    if (!window.ethereum) {
+      console.warn('Wallet not available for status check');
+      return null;
+    }
+
+    try {
+      setIsCheckingStatus(true);
+      const provider = new ethers.BrowserProvider(window.ethereum as any);
+      const contract = new ethers.Contract(ZOTRUST_CONTRACT_ADDRESS, ZOTRUST_CONTRACT_ABI, provider);
+      
+      const preferredTradeId = (appeal as any)?.order?.blockchain_trade_id ?? 
+                              (appeal as any)?.blockchain_trade_id ?? 
+                              appeal?.order_id;
+      const tradeId = Number(preferredTradeId);
+
+      if (!tradeId || Number.isNaN(tradeId) || tradeId <= 0) {
+        console.warn('Invalid trade ID for status check');
+        return null;
+      }
+
+      const trade = await retryContractCall(() => contract.trades(tradeId), 2, 1000);
+      const status = Number(trade.status);
+      
+      setBlockchainStatus({ tradeId, status });
+      return status;
+    } catch (error: any) {
+      console.error('Error fetching blockchain status:', error);
+      return null;
+    } finally {
+      setIsCheckingStatus(false);
+    }
+  };
+
+  const handleViewAppeal = async (appeal: Appeal) => {
     setSelectedAppeal(appeal);
     setShowModal(true);
+    setBlockchainStatus(null);
+    
+    // Fetch blockchain status when modal opens
+    if (window.ethereum) {
+      await fetchBlockchainStatus(appeal);
+    }
   };
 
   // Connect Trust Wallet
@@ -255,17 +298,25 @@ const AdminDisputes: React.FC = () => {
     }
   };
 /**
- * handleResolveAppeal - Simplified admin dispute resolution flow
+ * handleResolveAppeal - Admin dispute resolution flow
  * 
- * Simple Flow:
- * 1. Admin opens appeal (changes status to UNDER_DISPUTE)
- * 2. Admin releases funds via adminDecision()
+ * Required Flow:
+ * 1. Check current blockchain status
+ * 2. If LOCKED → Open appeal window (if possible) → Status becomes APPEAL_WINDOW_OPEN
+ * 3. If APPEAL_WINDOW_OPEN → Try adminDecision() directly (contract may allow it)
+ * 4. If UNDER_DISPUTE → Call adminDecision() to resolve
+ * 
+ * Important Notes:
+ * - Admin CANNOT call fileAppeal() - only participants (buyer/seller) can file appeals
+ * - Admin can call adminDecision() from UNDER_DISPUTE status (guaranteed to work)
+ * - Admin may be able to call adminDecision() from APPEAL_WINDOW_OPEN (depends on contract)
+ * - If status is LOCKED, admin must wait for appeal window or ask participant to file appeal
  * 
  * Status Flow (P2PEscrowV2 Contract):
  * 0 = CREATED          → Trade created, not locked yet
  * 1 = LOCKED           → Funds locked, waiting for payment confirmation
  * 2 = APPEAL_WINDOW_OPEN → Appeal window is open (auto-opens 2 hours after lock)
- * 3 = UNDER_DISPUTE    → Appeal filed, trade in dispute ✅ Admin resolves from here
+ * 3 = UNDER_DISPUTE    → Appeal filed by participant, trade in dispute ✅ Best state for admin resolution
  * 4 = RELEASED         → Funds released to buyer
  * 5 = REFUNDED         → Funds refunded to seller
  * 6 = COMPLETED        → Trade completed (final state)
@@ -372,46 +423,87 @@ const handleResolveAppeal = async (appealId: string, releaseToBuyer: boolean, re
       return;
     }
 
-    // 7) Open appeal if needed (change to UNDER_DISPUTE)
-    if (tradeStatus === STATUS.LOCKED || tradeStatus === STATUS.APPEAL_WINDOW_OPEN) {
-      // First open appeal window if LOCKED
+    // 7) Transition to UNDER_DISPUTE if needed (REQUIRED STEP)
+    // Admin must move trade to UNDER_DISPUTE before resolving
+    if (tradeStatus !== STATUS.UNDER_DISPUTE) {
+      toast.loading(`Current status: ${tradeStatus}. Moving to UNDER_DISPUTE...`, { id: 'resolve-chain' });
+      
+      // Step 7a: If LOCKED, first open appeal window
       if (tradeStatus === STATUS.LOCKED) {
-        toast.loading('Opening appeal window...', { id: 'resolve-chain' });
+        toast.loading('Step 1/2: Opening appeal window...', { id: 'resolve-chain' });
         try {
-          const openTx = await contract.openAppealWindow(tradeId);
-          await openTx.wait();
-          toast.success('Appeal window opened', { id: 'resolve-chain' });
+          // Try autoOpenAppealWindow first, fallback to openAppealWindow
+          let openTx;
+          try {
+            openTx = await contract.autoOpenAppealWindow(tradeId);
+          } catch (error: any) {
+            // If autoOpenAppealWindow doesn't exist, use openAppealWindow
+            if (error.message?.includes('autoOpenAppealWindow')) {
+              openTx = await contract.openAppealWindow(tradeId);
+            } else {
+              throw error;
+            }
+          }
+          const receipt = await openTx.wait();
+          console.log('✅ Appeal window opened, tx:', receipt.hash);
           
-          // Re-check status
-          const updatedTrade = await retryContractCall(() => contract.trades(tradeId), 2, 1000);
+          // Verify status changed
+          const updatedTrade = await retryContractCall(() => contract.trades(tradeId), 3, 1000);
           tradeStatus = Number(updatedTrade.status);
+          
+          if (tradeStatus === STATUS.APPEAL_WINDOW_OPEN) {
+            toast.success('Step 1/2: Appeal window opened', { id: 'resolve-chain' });
+          } else if (tradeStatus === STATUS.UNDER_DISPUTE) {
+            // Already in dispute, skip to resolution
+            toast.success('Trade is already in UNDER_DISPUTE', { id: 'resolve-chain' });
+          } else {
+            throw new Error(`Unexpected status after opening appeal window: ${tradeStatus}`);
+          }
         } catch (error: any) {
-          console.error('Error opening appeal window:', error);
-          // Continue - maybe already open
+          // Check if already in correct state
+          const checkTrade = await retryContractCall(() => contract.trades(tradeId), 2, 1000);
+          const checkStatus = Number(checkTrade.status);
+          
+          if (checkStatus === STATUS.APPEAL_WINDOW_OPEN || checkStatus === STATUS.UNDER_DISPUTE) {
+            tradeStatus = checkStatus;
+            console.log('Appeal window already open or in dispute, continuing...');
+          } else {
+            throw new Error(`Failed to open appeal window: ${error.message || error.reason || 'Unknown error'}`);
+          }
         }
       }
 
-      // File appeal to change to UNDER_DISPUTE
-      if (tradeStatus === STATUS.APPEAL_WINDOW_OPEN || tradeStatus === STATUS.LOCKED) {
-        toast.loading('Opening appeal (changing to UNDER_DISPUTE)...', { id: 'resolve-chain' });
-        try {
-          const fileTx = await contract.fileAppeal(tradeId, ''); // Empty CID for admin
-          await fileTx.wait();
-          toast.success('Appeal opened - Status changed to UNDER_DISPUTE', { id: 'resolve-chain' });
-          
-          // Re-check status
-          const updatedTrade = await retryContractCall(() => contract.trades(tradeId), 2, 1000);
-          tradeStatus = Number(updatedTrade.status);
-        } catch (error: any) {
-          console.error('Error filing appeal:', error);
-          // Continue - maybe already in dispute
-        }
+      // Step 7b: Admin cannot file appeal (only participants can)
+      // Try calling adminDecision directly - contract might allow it from APPEAL_WINDOW_OPEN
+      if (tradeStatus === STATUS.APPEAL_WINDOW_OPEN) {
+        // Check if adminDecision can be called from APPEAL_WINDOW_OPEN status
+        toast.loading('Attempting admin resolution from APPEAL_WINDOW_OPEN status...', { id: 'resolve-chain' });
+        // We'll try adminDecision directly below - skip to resolution step
+        console.log('⚠️ Trade is in APPEAL_WINDOW_OPEN. Admin will attempt direct resolution.');
+      } else if (tradeStatus === STATUS.LOCKED) {
+        // If still LOCKED after opening appeal window, we need to wait or participant must file appeal
+        throw new Error(
+          `Trade is still LOCKED. Admin cannot file appeals (only participants can). ` +
+          `Please wait for appeal window to open automatically, or ask buyer/seller to file an appeal first. ` +
+          `Current status: ${tradeStatus}`
+        );
       }
     }
 
-    // 8) Verify we're in UNDER_DISPUTE status
-    if (tradeStatus !== STATUS.UNDER_DISPUTE) {
-      throw new Error(`Cannot resolve from status ${tradeStatus}. Trade must be in UNDER_DISPUTE (3)`);
+    // 8) Try adminDecision - contract might allow it from APPEAL_WINDOW_OPEN or UNDER_DISPUTE
+    // If status is UNDER_DISPUTE, proceed normally
+    // If status is APPEAL_WINDOW_OPEN, try adminDecision (contract might allow it)
+    if (tradeStatus === STATUS.UNDER_DISPUTE) {
+      toast.loading('✅ Trade is in UNDER_DISPUTE. Proceeding with resolution...', { id: 'resolve-chain' });
+    } else if (tradeStatus === STATUS.APPEAL_WINDOW_OPEN) {
+      toast.loading('⚠️ Trade is in APPEAL_WINDOW_OPEN. Attempting admin resolution...', { id: 'resolve-chain' });
+      console.log('⚠️ Admin attempting resolution from APPEAL_WINDOW_OPEN status (contract may or may not allow this)');
+    } else {
+      throw new Error(
+        `Cannot resolve appeal. Trade status is ${tradeStatus}. ` +
+        `Admin can only resolve from UNDER_DISPUTE (3) or APPEAL_WINDOW_OPEN (2). ` +
+        `If status is LOCKED (1), please wait for appeal window to open or ask participant to file appeal.`
+      );
     }
 
     // 9) Estimate gas
@@ -456,6 +548,12 @@ const handleResolveAppeal = async (appealId: string, releaseToBuyer: boolean, re
     );
 
     toast.success('✅ Appeal resolved successfully');
+    
+    // Refresh blockchain status
+    if (selectedAppeal) {
+      await fetchBlockchainStatus(selectedAppeal);
+    }
+    
     fetchAppeals();
     setShowModal(false);
     setConfirmResolution({ type: null, appealId: '', reason: '' });
@@ -467,10 +565,26 @@ const handleResolveAppeal = async (appealId: string, releaseToBuyer: boolean, re
     
     if (error.code === 'ACTION_REJECTED' || error.message?.includes('User rejected')) {
       toast.error('Transaction rejected by user');
-    } else if (error.code === 'CALL_EXCEPTION') {
-      toast.error(`Contract error: ${error.message || 'Invalid state or permissions'}`);
-    } else if (error.reason) {
-      toast.error(`Contract error: ${error.reason}`);
+    } else if (error.code === 'CALL_EXCEPTION' || error.reason) {
+      // Check if it's a status-related error
+      const errorMessage = error.reason || error.message || 'Unknown contract error';
+      
+      if (errorMessage.includes('Not participant')) {
+        toast.error(
+          'Admin cannot file appeals. Please ask buyer or seller to file an appeal first, ' +
+          'or wait for the trade to be in UNDER_DISPUTE status.',
+          { duration: 8000 }
+        );
+      } else if (errorMessage.includes('Invalid state') || errorMessage.includes('status')) {
+        toast.error(
+          `Contract error: ${errorMessage}. ` +
+          `The trade may need to be in UNDER_DISPUTE status. ` +
+          `Please ask a participant to file an appeal first.`,
+          { duration: 8000 }
+        );
+      } else {
+        toast.error(`Contract error: ${errorMessage}`, { duration: 6000 });
+      }
     } else {
       toast.error(error.message || 'Failed to resolve appeal');
     }
@@ -956,75 +1070,168 @@ const markAppealResolvedDB = async (appealId: string, resolution: string, reason
                   </div>
                 )}
 
-                {/* Resolve Appeal Actions */}
-                {selectedAppeal.dispute_status === 'PENDING' && (
-                  <div className="pt-4 border-t border-white/20">
-                    <h3 className="text-lg font-medium text-white mb-4">Resolve Dispute</h3>
-                    
-                    {/* Trade Information */}
-                    <div className="bg-white/5 rounded-lg p-4 mb-4 border border-white/10">
-                      <div className="grid grid-cols-2 gap-4 mb-3">
-                        <div>
-                          <label className="text-xs text-gray-400">Amount</label>
-                          <p className="text-white font-semibold">{selectedAppeal.amount} {selectedAppeal.token}</p>
-                        </div>
-                        <div>
-                          <label className="text-xs text-gray-400">Trade ID</label>
-                          <p className="text-white font-mono text-sm">{selectedAppeal.blockchain_trade_id || 'N/A'}</p>
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <label className="text-xs text-gray-400">Buyer Address</label>
-                          <p className="text-white font-mono text-xs break-all">{selectedAppeal.buyer_address}</p>
-                        </div>
-                        <div>
-                          <label className="text-xs text-gray-400">Seller Address</label>
-                          <p className="text-white font-mono text-xs break-all">{selectedAppeal.seller_address}</p>
-                        </div>
-                      </div>
-                    </div>
-
-                    {!isConnected && (
-                      <div className="bg-yellow-500/20 border border-yellow-500/30 rounded-lg p-3 mb-4">
-                        <p className="text-yellow-200 text-sm">
-                          ⚠️ Please connect your wallet to resolve disputes on-chain
-                        </p>
-                      </div>
-                    )}
-
-                    {/* Action Buttons */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <motion.button
-                        onClick={() => handleInitiateResolution(selectedAppeal.id, true)}
-                        disabled={isResolving || !isConnected}
-                        className="bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 disabled:opacity-50 disabled:cursor-not-allowed text-white px-6 py-4 rounded-lg transition-all flex items-center justify-center space-x-3 font-medium"
-                        whileTap={{ scale: 0.98 }}
-                        whileHover={{ scale: 1.02 }}
-                      >
-                        <CheckCircle size={20} />
-                        <div className="text-left">
-                          <div className="font-semibold">Release Full Amount</div>
-                          <div className="text-xs text-green-100">Transfer to Buyer</div>
-                        </div>
-                      </motion.button>
-
-                      <motion.button
-                        onClick={() => handleInitiateResolution(selectedAppeal.id, false)}
-                        disabled={isResolving || !isConnected}
-                        className="bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700 disabled:opacity-50 disabled:cursor-not-allowed text-white px-6 py-4 rounded-lg transition-all flex items-center justify-center space-x-3 font-medium"
-                        whileTap={{ scale: 0.98 }}
-                        whileHover={{ scale: 1.02 }}
-                      >
-                        <XCircle size={20} />
-                        <div className="text-left">
-                          <div className="font-semibold">Refund Full Amount</div>
-                          <div className="text-xs text-orange-100">Return to Seller</div>
-                        </div>
-                      </motion.button>
+                {/* Blockchain Status Display */}
+                {isCheckingStatus && !blockchainStatus && (
+                  <div className="bg-blue-500/20 border border-blue-500/30 rounded-lg p-4 mb-4">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-4 h-4 border-2 border-blue-300 border-t-transparent rounded-full animate-spin" />
+                      <p className="text-blue-300 text-sm">Checking blockchain status...</p>
                     </div>
                   </div>
                 )}
+                {blockchainStatus && (
+                  <div className="bg-blue-500/20 border border-blue-500/30 rounded-lg p-4 mb-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <label className="text-xs text-blue-300 mb-1 block">🔗 Blockchain Status</label>
+                        <p className="text-white font-semibold">
+                          {blockchainStatus.status === 0 && 'CREATED'}
+                          {blockchainStatus.status === 1 && 'LOCKED'}
+                          {blockchainStatus.status === 2 && 'APPEAL_WINDOW_OPEN'}
+                          {blockchainStatus.status === 3 && 'UNDER_DISPUTE ✅'}
+                          {blockchainStatus.status === 4 && 'RELEASED'}
+                          {blockchainStatus.status === 5 && 'REFUNDED'}
+                          {blockchainStatus.status === 6 && 'COMPLETED'}
+                          {blockchainStatus.status > 6 && `Unknown (${blockchainStatus.status})`}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => selectedAppeal && fetchBlockchainStatus(selectedAppeal)}
+                        disabled={isCheckingStatus}
+                        className="text-blue-300 hover:text-blue-200 text-sm disabled:opacity-50 flex items-center space-x-1"
+                      >
+                        {isCheckingStatus ? (
+                          <>
+                            <div className="w-3 h-3 border-2 border-blue-300 border-t-transparent rounded-full animate-spin" />
+                            <span>Checking...</span>
+                          </>
+                        ) : (
+                          <>
+                            <span>🔄</span>
+                            <span>Refresh</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                    <p className="text-xs text-blue-400 mt-2">
+                      Trade ID: {blockchainStatus.tradeId} | Status Code: {blockchainStatus.status}
+                    </p>
+                  </div>
+                )}
+                {!isCheckingStatus && !blockchainStatus && window.ethereum && (
+                  <div className="bg-gray-500/20 border border-gray-500/30 rounded-lg p-3 mb-4">
+                    <p className="text-gray-300 text-sm">
+                      ⚠️ Could not fetch blockchain status. Click refresh to try again.
+                    </p>
+                    <button
+                      onClick={() => selectedAppeal && fetchBlockchainStatus(selectedAppeal)}
+                      className="text-blue-300 hover:text-blue-200 text-xs mt-2"
+                    >
+                      🔄 Retry
+                    </button>
+                  </div>
+                )}
+
+                {/* Resolve Appeal Actions - Based on Blockchain Status */}
+                {(() => {
+                  // Check if we can resolve based on blockchain status
+                  const canResolve = blockchainStatus && 
+                    blockchainStatus.status !== 4 && // Not RELEASED
+                    blockchainStatus.status !== 5 && // Not REFUNDED
+                    blockchainStatus.status !== 6;   // Not COMPLETED
+                  
+                  // Show resolution section if blockchain status allows OR if status not yet loaded
+                  const showResolution = canResolve || !blockchainStatus;
+                  
+                  if (!showResolution) return null;
+                  
+                  return (
+                    <div className="pt-4 border-t border-white/20">
+                      <h3 className="text-lg font-medium text-white mb-4">Resolve Dispute</h3>
+                      
+                      {/* Trade Information */}
+                      <div className="bg-white/5 rounded-lg p-4 mb-4 border border-white/10">
+                        <div className="grid grid-cols-2 gap-4 mb-3">
+                          <div>
+                            <label className="text-xs text-gray-400">Amount</label>
+                            <p className="text-white font-semibold">{selectedAppeal.amount} {selectedAppeal.token}</p>
+                          </div>
+                          <div>
+                            <label className="text-xs text-gray-400">Trade ID</label>
+                            <p className="text-white font-mono text-sm">{selectedAppeal.blockchain_trade_id || selectedAppeal.order_id || 'N/A'}</p>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <label className="text-xs text-gray-400">Buyer Address</label>
+                            <p className="text-white font-mono text-xs break-all">{selectedAppeal.buyer_address}</p>
+                          </div>
+                          <div>
+                            <label className="text-xs text-gray-400">Seller Address</label>
+                            <p className="text-white font-mono text-xs break-all">{selectedAppeal.seller_address}</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Status Warning */}
+                      {blockchainStatus && blockchainStatus.status !== 3 && (
+                        <div className="bg-yellow-500/20 border border-yellow-500/30 rounded-lg p-3 mb-4">
+                          <p className="text-yellow-200 text-sm">
+                            ⚠️ Current blockchain status: {blockchainStatus.status === 1 ? 'LOCKED' : blockchainStatus.status === 2 ? 'APPEAL_WINDOW_OPEN' : `Status ${blockchainStatus.status}`}
+                          </p>
+                          <p className="text-yellow-300 text-xs mt-1">
+                            {blockchainStatus.status === 1 ? (
+                              <>Admin cannot file appeals. Please wait for appeal window to open automatically, or ask buyer/seller to file an appeal first.</>
+                            ) : blockchainStatus.status === 2 ? (
+                              <>Admin will attempt resolution from APPEAL_WINDOW_OPEN. If this fails, a participant must file an appeal first to move to UNDER_DISPUTE.</>
+                            ) : (
+                              <>Admin will attempt to resolve. If status is not UNDER_DISPUTE, a participant may need to file an appeal first.</>
+                            )}
+                          </p>
+                        </div>
+                      )}
+
+                      {!isConnected && (
+                        <div className="bg-yellow-500/20 border border-yellow-500/30 rounded-lg p-3 mb-4">
+                          <p className="text-yellow-200 text-sm">
+                            ⚠️ Please connect your wallet to resolve disputes on-chain
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Action Buttons */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <motion.button
+                          onClick={() => handleInitiateResolution(selectedAppeal.id, true)}
+                          disabled={isResolving || !isConnected}
+                          className="bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 disabled:opacity-50 disabled:cursor-not-allowed text-white px-6 py-4 rounded-lg transition-all flex items-center justify-center space-x-3 font-medium"
+                          whileTap={{ scale: 0.98 }}
+                          whileHover={{ scale: 1.02 }}
+                        >
+                          <CheckCircle size={20} />
+                          <div className="text-left">
+                            <div className="font-semibold">Release Full Amount</div>
+                            <div className="text-xs text-green-100">Transfer to Buyer</div>
+                          </div>
+                        </motion.button>
+
+                        <motion.button
+                          onClick={() => handleInitiateResolution(selectedAppeal.id, false)}
+                          disabled={isResolving || !isConnected}
+                          className="bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700 disabled:opacity-50 disabled:cursor-not-allowed text-white px-6 py-4 rounded-lg transition-all flex items-center justify-center space-x-3 font-medium"
+                          whileTap={{ scale: 0.98 }}
+                          whileHover={{ scale: 1.02 }}
+                        >
+                          <XCircle size={20} />
+                          <div className="text-left">
+                            <div className="font-semibold">Refund Full Amount</div>
+                            <div className="text-xs text-orange-100">Return to Seller</div>
+                          </div>
+                        </motion.button>
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
               </div>
             </motion.div>
@@ -1083,39 +1290,7 @@ const markAppealResolvedDB = async (appealId: string, resolution: string, reason
                   </div>
                 )}
 
-                {/* Contract Limitation Warning */}
-                {selectedAppeal && (() => {
-                  const amount = parseFloat(selectedAppeal.amount);
-                  const sellerExtra = amount * 0.01; // 1% of amount
-                  const totalLocked = amount + sellerExtra;
-                  return (
-                    <div className="bg-red-500/20 border border-red-500/30 rounded-lg p-4">
-                      <div className="flex items-start space-x-2 mb-2">
-                        <AlertTriangle size={20} className="text-red-400 flex-shrink-0 mt-0.5" />
-                        <div className="flex-1">
-                          <p className="text-red-200 font-semibold text-sm mb-2">
-                            ⚠️ Contract Limitation Warning
-                          </p>
-                          <div className="space-y-2 text-xs text-red-300">
-                            <p>
-                              <strong>Amount to transfer:</strong> {selectedAppeal.amount} {selectedAppeal.token}
-                            </p>
-                            <p>
-                              <strong>Amount that will remain stuck:</strong> {sellerExtra.toFixed(6)} {selectedAppeal.token} (1% seller extra)
-                            </p>
-                            <p>
-                              <strong>Total locked in contract:</strong> {totalLocked.toFixed(6)} {selectedAppeal.token}
-                            </p>
-                            <p className="text-red-200 mt-2">
-                              <strong>Note:</strong> The smart contract's <code className="bg-red-600/30 px-1 rounded">adminDecision()</code> function only transfers the base <code className="bg-red-600/30 px-1 rounded">amount</code>, leaving the <code className="bg-red-600/30 px-1 rounded">sellerExtra</code> (1% security deposit) permanently stuck in the contract. This is a known contract limitation.
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })()}
-
+              
                 {/* Reason Input */}
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-2">

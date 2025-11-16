@@ -13,7 +13,8 @@ import toast from 'react-hot-toast';
 import io from 'socket.io-client';
 import { blockchainService } from '../services/blockchainService';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { TOKENS } from '../config/contracts';
+import { TOKENS, ERC20_ABI } from '../config/contracts';
+import { ethers } from 'ethers';
 
 const Orders: React.FC = () => {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -782,6 +783,90 @@ const Orders: React.FC = () => {
     }
   };
 
+  // Helper function to check balance before locking
+  const checkBalanceBeforeLock = async (order: Order): Promise<{ hasEnoughBalance: boolean; message: string }> => {
+    try {
+      if (!window.ethereum || !address) {
+        return { hasEnoughBalance: false, message: 'Wallet not connected' };
+      }
+
+      const provider = new ethers.BrowserProvider(window.ethereum as any);
+      const tokenSymbol = order?.token || 'BNB';
+      const tokenConfig = ((TOKENS as any)[tokenSymbol]) || TOKENS.BNB;
+      const tokenAddress = tokenConfig.address;
+      const isNativeBNB = tokenConfig.isNative || false;
+      const requiredAmount = order?.amount || 0;
+      
+      // For native BNB, check native balance
+      if (isNativeBNB) {
+        const balance = await provider.getBalance(address);
+        const balanceBNB = parseFloat(ethers.formatEther(balance));
+        const requiredBNB = parseFloat(requiredAmount.toString());
+        
+        // Need extra BNB for gas (estimate ~0.001 BNB for safety)
+        const gasReserve = 0.001;
+        const totalRequired = requiredBNB + gasReserve;
+        
+        if (balanceBNB < totalRequired) {
+          const shortfall = totalRequired - balanceBNB;
+          return {
+            hasEnoughBalance: false,
+            message: `Insufficient BNB balance!\n\n` +
+                     `Required: ${totalRequired.toFixed(6)} BNB (${requiredBNB.toFixed(6)} BNB for lock + ${gasReserve.toFixed(6)} BNB for gas)\n` +
+                     `Your Balance: ${balanceBNB.toFixed(6)} BNB\n` +
+                     `Shortfall: ${shortfall.toFixed(6)} BNB\n\n` +
+                     `Please add more BNB to your wallet.`
+          };
+        }
+        
+        return { hasEnoughBalance: true, message: '' };
+      } else {
+        // For ERC20 tokens, check token balance
+        const tokenContract = new ethers.Contract(tokenAddress, ERC20_ABI, provider);
+        const balance = await tokenContract.balanceOf(address);
+        const decimals = await tokenContract.decimals();
+        const balanceFormatted = parseFloat(ethers.formatUnits(balance, decimals));
+        const requiredAmountFormatted = parseFloat(requiredAmount.toString());
+        
+        // Also check native BNB for gas fees (need at least 0.001 BNB)
+        const nativeBalance = await provider.getBalance(address);
+        const nativeBalanceBNB = parseFloat(ethers.formatEther(nativeBalance));
+        const minGasBNB = 0.001;
+        
+        if (balanceFormatted < requiredAmountFormatted) {
+          const shortfall = requiredAmountFormatted - balanceFormatted;
+          return {
+            hasEnoughBalance: false,
+            message: `Insufficient ${tokenSymbol} balance!\n\n` +
+                     `Required: ${requiredAmountFormatted.toFixed(6)} ${tokenSymbol}\n` +
+                     `Your Balance: ${balanceFormatted.toFixed(6)} ${tokenSymbol}\n` +
+                     `Shortfall: ${shortfall.toFixed(6)} ${tokenSymbol}\n\n` +
+                     `Please add more ${tokenSymbol} to your wallet.`
+          };
+        }
+        
+        if (nativeBalanceBNB < minGasBNB) {
+          return {
+            hasEnoughBalance: false,
+            message: `Insufficient BNB for gas fees!\n\n` +
+                     `You have enough ${tokenSymbol} but need BNB for transaction fees.\n` +
+                     `Required: ${minGasBNB.toFixed(6)} BNB\n` +
+                     `Your Balance: ${nativeBalanceBNB.toFixed(6)} BNB\n\n` +
+                     `Please add at least ${minGasBNB.toFixed(6)} BNB to your wallet for gas fees.`
+          };
+        }
+        
+        return { hasEnoughBalance: true, message: '' };
+      }
+    } catch (error: any) {
+      console.error('Error checking balance:', error);
+      return {
+        hasEnoughBalance: false,
+        message: `Failed to check balance: ${error.message || 'Unknown error'}`
+      };
+    }
+  };
+
   const handleLockFunds = async (orderId: string) => {
     console.log('🔒 handleLockFunds: Starting fund lock process:', orderId);
     
@@ -792,6 +877,22 @@ const Orders: React.FC = () => {
     }
     
     try {
+      // Check balance BEFORE proceeding
+      console.log('💰 Checking balance before lock...');
+      toast.loading('Checking balance...', { id: 'lock-flow' });
+      
+      const balanceCheck = await checkBalanceBeforeLock(order);
+      
+      if (!balanceCheck.hasEnoughBalance) {
+        toast.error(balanceCheck.message, {
+          id: 'lock-flow',
+          duration: 10000
+        });
+        return;
+      }
+      
+      toast.dismiss('lock-flow');
+      
       const token = localStorage.getItem('authToken') || '';
       
       // Step 1: Get OTP from backend
@@ -1692,15 +1793,58 @@ const Orders: React.FC = () => {
     }
   }, [showFundLockedPopover.isOpen, showFundLockedPopover.orderId, orders, address, userInfoMap, fetchUserInfo]);
 
+  // Calculate when seller can redeem (50 hours total: 2h lock + 48h appeal window)
+  const calculateRedeemEligibility = useCallback((order: Order) => {
+    if (!order.lockExpiresAt) {
+      return {
+        canRedeem: false,
+        timeRemainingSeconds: 0,
+        timeRemainingHours: 0,
+        timeRemainingMinutes: 0,
+        timeRemainingSecs: 0,
+        redeemEligibleAt: null,
+        redeemEligibleAtIST: ''
+      };
+    }
+
+    // lockExpiresAt is when 2-hour lock period ends (appeal window opens)
+    // Seller can redeem after 48 hours from appeal window opening
+    // Total: 50 hours from when funds were locked
+    const appealWindowStartMs = new Date(order.lockExpiresAt).getTime();
+    const redeemEligibleAtMs = appealWindowStartMs + (48 * 60 * 60 * 1000); // 48 hours after appeal window opens
+    
+    const currentTimeMs = serverTime;
+    const timeRemainingMs = redeemEligibleAtMs - currentTimeMs;
+    const timeRemainingSeconds = Math.max(0, Math.floor(timeRemainingMs / 1000));
+    
+    const canRedeem = timeRemainingSeconds <= 0;
+    const timeRemainingHours = Math.floor(timeRemainingSeconds / 3600);
+    const timeRemainingMinutes = Math.floor((timeRemainingSeconds % 3600) / 60);
+    const timeRemainingSecs = timeRemainingSeconds % 60;
+    
+    const redeemEligibleAtIST = canRedeem ? null : new Date(redeemEligibleAtMs);
+    const redeemEligibleAtISTFormatted = redeemEligibleAtIST 
+      ? formatISTDateTime(redeemEligibleAtIST) 
+      : '';
+    
+    return {
+      canRedeem,
+      timeRemainingSeconds,
+      timeRemainingHours,
+      timeRemainingMinutes,
+      timeRemainingSecs,
+      redeemEligibleAt: redeemEligibleAtIST,
+      redeemEligibleAtIST: redeemEligibleAtISTFormatted
+    };
+  }, [serverTime]);
+
   const canShowRedeem = (order: Order) => {
     if (order.state !== 'LOCKED') return false;
     const isSeller = order.sellerAddress.toLowerCase() === (address || '').toLowerCase();
     if (!isSeller) return false;
-    const lockMs = new Date(order.lockExpiresAt as any).getTime();
-    const nowMs = serverTime;
-    // appeal window starts at lockExpiresAt; seller can redeem after +48h
-    const appealDeadlineMs = lockMs + (48 * 60 * 60 * 1000);
-    return nowMs > appealDeadlineMs;
+    
+    const redeemInfo = calculateRedeemEligibility(order);
+    return redeemInfo.canRedeem;
   };
 
   const handleRedeem = async (order: Order) => {
@@ -1715,12 +1859,62 @@ const Orders: React.FC = () => {
         });
         return;
       }
-      toast.loading('Redeeming on-chain...', { id: 'redeem' });
+      
+      // Check eligibility before attempting
+      const redeemInfo = calculateRedeemEligibility(order);
+      if (!redeemInfo.canRedeem) {
+        toast.error(
+          `Refund not yet available. Please wait ${redeemInfo.timeRemainingHours}h ${redeemInfo.timeRemainingMinutes}m more.`,
+          { duration: 6000 }
+        );
+        return;
+      }
+      
+      // Confirm with user
+      const shouldProceed = window.confirm(
+        `💰 Claim Refund\n\n` +
+        `You will receive:\n` +
+        `- Original Amount: ${order.amount} ${order.token}\n` +
+        `- Extra (1%): ${(parseFloat(order.amount.toString()) * 0.01).toFixed(6)} ${order.token}\n` +
+        `- Total: ${(parseFloat(order.amount.toString()) * 1.01).toFixed(6)} ${order.token}\n\n` +
+        `This will refund your funds if buyer hasn't paid within 48 hours.\n\n` +
+        `Continue?`
+      );
+      
+      if (!shouldProceed) {
+        toast('Refund cancelled', { id: 'redeem' });
+        return;
+      }
+      
+      toast.loading('Claiming refund on blockchain...', { id: 'redeem' });
       const tx = await blockchainService.redeemAfterAppealWindow(tradeId);
-      toast.success(`Redeemed! TX: ${tx.slice(0,10)}...`, { id: 'redeem' });
+      
+      toast.success(
+        `✅ Refund claimed successfully!\n` +
+        `You received: ${(parseFloat(order.amount.toString()) * 1.01).toFixed(6)} ${order.token}\n` +
+        `TX: ${tx.slice(0,10)}...`,
+        { 
+          id: 'redeem',
+          duration: 10000
+        }
+      );
+      
       fetchOrders();
     } catch (e: any) {
-      toast.error(e?.reason || e?.message || 'Redeem failed', { id: 'redeem' });
+      console.error('Error redeeming:', e);
+      
+      // Better error messages
+      if (e?.reason?.includes('Appeal deadline not passed')) {
+        toast.error('Please wait for 48 hours appeal window to complete', { id: 'redeem', duration: 6000 });
+      } else if (e?.reason?.includes('Appeal already filed')) {
+        toast.error('Buyer has filed an appeal. Admin will resolve the dispute.', { id: 'redeem', duration: 8000 });
+      } else if (e?.reason?.includes('Not in appeal window')) {
+        toast.error('Appeal window not open yet. Please wait for 2 hours after lock.', { id: 'redeem', duration: 6000 });
+      } else if (e?.reason?.includes('Only seller')) {
+        toast.error('Only seller can claim refund', { id: 'redeem' });
+      } else {
+        toast.error(e?.reason || e?.message || 'Failed to claim refund', { id: 'redeem', duration: 6000 });
+      }
     }
   };
 
@@ -2563,6 +2757,85 @@ const Orders: React.FC = () => {
                           </div>
                         )}
 
+                        {/* Redeem Eligibility Countdown (48 hours after appeal window opens) */}
+                        {lockExpiry.isExpired && (() => {
+                          const redeemInfo = calculateRedeemEligibility(order);
+                          return (
+                            <div className="bg-gradient-to-r from-orange-500/20 to-red-500/20 border border-orange-500/30 rounded-lg p-4">
+                              <div className="flex items-center justify-between mb-3">
+                                <div className="flex items-center space-x-2">
+                                  <Clock size={18} className="text-orange-300" />
+                                  <span className="text-sm font-semibold text-orange-300">
+                                    {redeemInfo.canRedeem ? '✅ Ready to Claim Refund' : '⏳ Time Until Refund Available'}
+                                  </span>
+                                </div>
+                                <div className="flex items-center space-x-3">
+                                  {redeemInfo.canRedeem ? (
+                                    <span className="text-green-400 text-sm font-bold">ELIGIBLE</span>
+                                  ) : (
+                                    <span className={`font-mono text-xl font-bold ${
+                                      redeemInfo.timeRemainingHours === 0 && redeemInfo.timeRemainingMinutes < 60
+                                        ? 'text-red-500 animate-pulse'
+                                        : redeemInfo.timeRemainingHours < 6
+                                        ? 'text-orange-400'
+                                        : 'text-yellow-400'
+                                    }`}>
+                                      {formatLockTime(redeemInfo.timeRemainingHours, redeemInfo.timeRemainingMinutes, redeemInfo.timeRemainingSecs)}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                              
+                              {!redeemInfo.canRedeem && (
+                                <div className="space-y-2">
+                                  <div className="w-full bg-gray-700 rounded-full h-2">
+                                    <div 
+                                      className={`h-2 rounded-full transition-all ${
+                                        redeemInfo.timeRemainingHours === 0 && redeemInfo.timeRemainingMinutes < 60
+                                          ? 'bg-red-500'
+                                          : redeemInfo.timeRemainingHours < 6
+                                          ? 'bg-orange-500'
+                                          : 'bg-yellow-500'
+                                      }`}
+                                      style={{ 
+                                        width: `${Math.max(0, Math.min(100, (redeemInfo.timeRemainingSeconds / (48 * 60 * 60)) * 100))}%` 
+                                      }}
+                                    ></div>
+                                  </div>
+                                  <div className="flex justify-between text-xs text-gray-400">
+                                    <span>Refund available at: {redeemInfo.redeemEligibleAtIST || 'Calculating...'}</span>
+                                    <span>{redeemInfo.timeRemainingHours}h {redeemInfo.timeRemainingMinutes}m remaining</span>
+                                  </div>
+                                  <p className="text-xs text-orange-300 mt-2">
+                                    💡 After 48 hours from appeal window opening, you can claim your full refund (amount + 1% extra)
+                                  </p>
+                                </div>
+                              )}
+                              
+                              {redeemInfo.canRedeem && (
+                                <div className="mt-3">
+                                  <p className="text-sm text-green-300 mb-2">
+                                    ✅ 48 hours have passed! You can now claim your refund if buyer hasn't paid.
+                                  </p>
+                                  <motion.button
+                                    onClick={() => handleRedeem(order)}
+                                    className="w-full bg-gradient-to-r from-green-600 to-emerald-600 text-white py-3 px-4 rounded-lg font-medium hover:from-green-700 hover:to-emerald-700 transition-all flex items-center justify-center space-x-2 shadow-lg"
+                                    whileTap={{ scale: 0.98 }}
+                                    whileHover={{ scale: 1.02 }}
+                                    title="Claim full refund (amount + 1% extra) after 48 hours appeal window"
+                                  >
+                                    <XCircle size={18} />
+                                    <span>💰 Claim Refund (Amount + 1% Extra)</span>
+                                  </motion.button>
+                                  <p className="text-xs text-green-300 mt-2 text-center">
+                                    You will receive: {order.amount} {order.token} + {(parseFloat(order.amount.toString()) * 0.01).toFixed(6)} {order.token} = {(parseFloat(order.amount.toString()) * 1.01).toFixed(6)} {order.token}
+                                  </p>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
+
                         {/* Confirm Payment Button for Seller */}
                         {(order as any)?.blockchain_trade_id && (
                           <motion.button
@@ -2740,16 +3013,32 @@ const Orders: React.FC = () => {
                           )}
 
                           {/* Redeem Button for Seller after 48h appeal window */}
-                          {order.state === 'LOCKED' && canShowRedeem(order) && (order as any)?.blockchain_trade_id && (
-                            <motion.button
-                              onClick={() => handleRedeem(order)}
-                              className="flex-1 bg-red-600 text-white px-3 py-2 rounded-md text-sm font-medium hover:bg-red-700"
-                              whileTap={{ scale: 0.95 }}
-                            >
-                              <XCircle size={14} className="inline mr-1" />
-                              Redeem Funds
-                            </motion.button>
-                          )}
+                          {order.state === 'LOCKED' && (() => {
+                            const redeemInfo = calculateRedeemEligibility(order);
+                            const isSeller = order.sellerAddress.toLowerCase() === (address || '').toLowerCase();
+                            
+                            if (!isSeller || !(order as any)?.blockchain_trade_id) return null;
+                            
+                            if (redeemInfo.canRedeem) {
+                              return (
+                                <motion.button
+                                  onClick={() => handleRedeem(order)}
+                                  className="flex-1 bg-gradient-to-r from-green-600 to-emerald-600 text-white px-3 py-2 rounded-md text-sm font-medium hover:from-green-700 hover:to-emerald-700 shadow-lg"
+                                  whileTap={{ scale: 0.95 }}
+                                  title="Claim full refund (amount + 1% extra)"
+                                >
+                                  <XCircle size={14} className="inline mr-1" />
+                                  💰 Claim Refund
+                                </motion.button>
+                              );
+                            } else {
+                              return (
+                                <div className="flex-1 bg-orange-500/20 border border-orange-500/30 rounded-md px-3 py-2 text-xs text-orange-300">
+                                  ⏳ Refund in {redeemInfo.timeRemainingHours}h {redeemInfo.timeRemainingMinutes}m
+                                </div>
+                              );
+                            }
+                          })()}
                         </div>
                       </div>
                     </div>

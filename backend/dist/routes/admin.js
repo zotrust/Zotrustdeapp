@@ -575,6 +575,138 @@ router.get('/settings', auth_1.authenticateAdmin, async (req, res) => {
         });
     }
 });
+// Update app setting
+router.put('/settings/:key', auth_1.authenticateAdmin, async (req, res) => {
+    try {
+        const { key } = req.params;
+        const { value, description } = req.body;
+        if (!value) {
+            return res.status(400).json({
+                success: false,
+                error: 'Value is required'
+            });
+        }
+        const result = await database_1.default.query(`INSERT INTO app_settings (key, value, description, updated_at)
+       VALUES ($1, $2, $3, NOW())
+       ON CONFLICT (key) DO UPDATE SET
+       value = EXCLUDED.value,
+       description = COALESCE(EXCLUDED.description, app_settings.description),
+       updated_at = NOW()
+       RETURNING *`, [key, value, description || null]);
+        const response = {
+            success: true,
+            data: result.rows[0],
+            message: 'Setting updated successfully'
+        };
+        res.json(response);
+    }
+    catch (error) {
+        console.error('Update setting error:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Internal server error'
+        });
+    }
+});
+// Get trading hours settings (public endpoint - no auth required)
+router.get('/trading-hours', async (req, res) => {
+    try {
+        const result = await database_1.default.query(`SELECT key, value FROM app_settings 
+       WHERE key IN ('trading_buy_enabled', 'trading_sell_enabled', 'trading_start_time', 'trading_end_time')`);
+        const settings = {
+            buyEnabled: true,
+            sellEnabled: true,
+            startTime: '09:00',
+            endTime: '18:00'
+        };
+        result.rows.forEach((row) => {
+            if (row.key === 'trading_buy_enabled') {
+                settings.buyEnabled = row.value === 'true';
+            }
+            else if (row.key === 'trading_sell_enabled') {
+                settings.sellEnabled = row.value === 'true';
+            }
+            else if (row.key === 'trading_start_time') {
+                settings.startTime = row.value;
+            }
+            else if (row.key === 'trading_end_time') {
+                settings.endTime = row.value;
+            }
+        });
+        const response = {
+            success: true,
+            data: settings
+        };
+        res.json(response);
+    }
+    catch (error) {
+        console.error('Get trading hours error:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Internal server error'
+        });
+    }
+});
+// Update trading hours settings (admin only)
+router.put('/trading-hours', auth_1.authenticateAdmin, async (req, res) => {
+    try {
+        const { buyEnabled, sellEnabled, startTime, endTime } = req.body;
+        // Validate time format (HH:MM)
+        const timeRegex = /^([0-1][0-9]|2[0-3]):[0-5][0-9]$/;
+        if (startTime && !timeRegex.test(startTime)) {
+            return res.status(400).json({
+                success: false,
+                error: 'Invalid start time format. Use HH:MM (24-hour format)'
+            });
+        }
+        if (endTime && !timeRegex.test(endTime)) {
+            return res.status(400).json({
+                success: false,
+                error: 'Invalid end time format. Use HH:MM (24-hour format)'
+            });
+        }
+        // Update settings
+        const updates = [];
+        if (buyEnabled !== undefined) {
+            await database_1.default.query(`INSERT INTO app_settings (key, value, updated_at)
+         VALUES ('trading_buy_enabled', $1, NOW())
+         ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`, [buyEnabled.toString()]);
+            updates.push('buyEnabled');
+        }
+        if (sellEnabled !== undefined) {
+            await database_1.default.query(`INSERT INTO app_settings (key, value, updated_at)
+         VALUES ('trading_sell_enabled', $1, NOW())
+         ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`, [sellEnabled.toString()]);
+            updates.push('sellEnabled');
+        }
+        if (startTime) {
+            await database_1.default.query(`INSERT INTO app_settings (key, value, updated_at)
+         VALUES ('trading_start_time', $1, NOW())
+         ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`, [startTime]);
+            updates.push('startTime');
+        }
+        if (endTime) {
+            await database_1.default.query(`INSERT INTO app_settings (key, value, updated_at)
+         VALUES ('trading_end_time', $1, NOW())
+         ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`, [endTime]);
+            updates.push('endTime');
+        }
+        // Log update
+        await database_1.default.query('INSERT INTO audit_logs (action, details, ip_address) VALUES ($1, $2, $3)', ['ADMIN_UPDATE_TRADING_HOURS', JSON.stringify({ buyEnabled, sellEnabled, startTime, endTime }), req.ip]);
+        const response = {
+            success: true,
+            message: `Trading hours updated: ${updates.join(', ')}`
+        };
+        res.json(response);
+    }
+    catch (error) {
+        console.error('Update trading hours error:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Internal server error'
+        });
+    }
+});
 // Get admin dashboard stats
 router.get('/dashboard', auth_1.authenticateAdmin, async (req, res) => {
     try {
