@@ -480,15 +480,17 @@ router.post('/appeals/:appealId/resolve', authenticateAdmin, async (req, res) =>
       newOrderState = 'REFUNDED'; // For split refund, mark as refunded
     }
 
-    // Update order state
+    // Update order state and timestamp
     await pool.query(
-      'UPDATE orders SET state = $1 WHERE id = $2',
+      'UPDATE orders SET state = $1, updated_at = NOW() WHERE id = $2',
       [newOrderState, appeal.order_id]
     );
 
+    console.log(`✅ Order ${appeal.order_id} status updated from ${order.state} to ${newOrderState}`);
+
     // Update appeal status
     await pool.query(
-      'UPDATE appeals SET status = $1 WHERE id = $2',
+      'UPDATE appeals SET status = $1, resolved_at = NOW() WHERE id = $2',
       ['RESOLVED', appealId]
     );
 
@@ -497,6 +499,8 @@ router.post('/appeals/:appealId/resolve', authenticateAdmin, async (req, res) =>
       'UPDATE disputes SET status = $1, resolution = $2, resolution_reason = $3, resolved_at = $4, resolved_by = $5 WHERE id = $6',
       ['RESOLVED', value.resolution, value.resolution_reason, new Date(), (req as any).user?.address || 'ADMIN', appeal.dispute_id]
     );
+
+    console.log(`✅ Dispute ${appeal.dispute_id} and Appeal ${appealId} marked as RESOLVED`);
 
     // Log timeline event
     await pool.query(
@@ -572,6 +576,123 @@ router.get('/disputes/stats', authenticateAdmin, async (req, res) => {
     res.status(500).json({
       success: false,
       error: 'Internal server error'
+    });
+  }
+});
+
+// Verify and sync order status with blockchain
+router.post('/orders/:orderId/sync-blockchain-status', authenticateAdmin, async (req, res) => {
+  try {
+    const { orderId } = req.params;
+
+    // Get order details
+    const orderResult = await pool.query(
+      'SELECT * FROM orders WHERE id = $1',
+      [orderId]
+    );
+
+    if (orderResult.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: 'Order not found'
+      });
+    }
+
+    const order = orderResult.rows[0];
+
+    // Check if blockchain_trade_id exists
+    if (!order.blockchain_trade_id) {
+      return res.status(400).json({
+        success: false,
+        error: 'No blockchain trade ID found for this order'
+      });
+    }
+
+    // Get blockchain status
+    const blockchainTrade = await contractService.getTradeFromChain(order.blockchain_trade_id);
+    
+    console.log('🔍 Blockchain Status Check:', {
+      orderId,
+      tradeId: order.blockchain_trade_id,
+      dbStatus: order.state,
+      blockchainStatus: Number(blockchainTrade.status),
+      blockchainStatusName: getBlockchainStatusName(Number(blockchainTrade.status))
+    });
+
+    let newOrderState = order.state;
+    let needsUpdate = false;
+
+    // Map blockchain status to database status - EXACT MATCH
+    // Blockchain statuses: 0=CREATED, 1=LOCKED, 2=RELEASED, 3=APPEALED, 4=APPEAL_WINDOW, 5=REFUNDED, 6=COMPLETED
+    const status = Number(blockchainTrade.status);
+    
+    // Helper function to get status name
+    function getBlockchainStatusName(status: number): string {
+      const statusNames = ['CREATED', 'LOCKED', 'RELEASED', 'APPEALED', 'APPEAL_WINDOW', 'REFUNDED', 'COMPLETED'];
+      return statusNames[status] || 'UNKNOWN';
+    }
+    
+    // Status 6 = COMPLETED on blockchain -> COMPLETED in database
+    if (status === 6 && order.state !== 'COMPLETED') {
+      newOrderState = 'COMPLETED';
+      needsUpdate = true;
+    } 
+    // Status 2 = RELEASED on blockchain -> RELEASED in database
+    else if (status === 2 && order.state !== 'RELEASED') {
+      newOrderState = 'RELEASED';
+      needsUpdate = true;
+    } 
+    // Status 5 = REFUNDED on blockchain -> REFUNDED in database
+    else if (status === 5 && order.state !== 'REFUNDED') {
+      newOrderState = 'REFUNDED';
+      needsUpdate = true;
+    } 
+    // Status 1 = LOCKED on blockchain -> LOCKED in database
+    else if (status === 1 && !['LOCKED', 'UNDER_DISPUTE', 'APPEALED'].includes(order.state)) {
+      newOrderState = 'LOCKED';
+      needsUpdate = true;
+    }
+
+    if (needsUpdate) {
+      // Update database to match blockchain
+      await pool.query(
+        'UPDATE orders SET state = $1, updated_at = NOW() WHERE id = $2',
+        [newOrderState, orderId]
+      );
+
+      console.log(`✅ Order ${orderId} status synced: ${order.state} → ${newOrderState}`);
+
+      res.json({
+        success: true,
+        message: 'Order status synced with blockchain',
+        data: {
+          orderId,
+          previousState: order.state,
+          newState: newOrderState,
+          blockchainStatus: status,
+          blockchainStatusName: getBlockchainStatusName(status),
+          synced: true
+        }
+      });
+    } else {
+      res.json({
+        success: true,
+        message: 'Order status already in sync',
+        data: {
+          orderId,
+          currentState: order.state,
+          blockchainStatus: status,
+          blockchainStatusName: getBlockchainStatusName(status),
+          synced: false
+        }
+      });
+    }
+
+  } catch (error) {
+    console.error('Sync blockchain status error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to sync blockchain status'
     });
   }
 });

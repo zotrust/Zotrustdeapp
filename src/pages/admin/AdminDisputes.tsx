@@ -614,6 +614,32 @@ const markAppealResolvedDB = async (appealId: string, resolution: string, reason
     throw new Error(errorData.error || 'Failed to update backend');
   }
   
+  const result = await response.json();
+  
+  // After successful backend update, sync blockchain status
+  if (result.success && result.data?.orderId) {
+    try {
+      console.log('🔄 Syncing blockchain status for order:', result.data.orderId);
+      const syncResponse = await fetch(`/api/admin/orders/${result.data.orderId}/sync-blockchain-status`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (syncResponse.ok) {
+        const syncResult = await syncResponse.json();
+        console.log('✅ Blockchain status synced:', syncResult);
+      } else {
+        console.warn('⚠️ Failed to sync blockchain status, but resolution succeeded');
+      }
+    } catch (syncError) {
+      console.warn('⚠️ Error syncing blockchain status:', syncError);
+      // Don't throw error - resolution already succeeded
+    }
+  }
+  
   return response;
 };
   const handleInitiateResolution = async (appealId: string, releaseToBuyer: boolean) => {

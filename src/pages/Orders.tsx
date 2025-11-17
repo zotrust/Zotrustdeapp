@@ -2020,8 +2020,9 @@ const Orders: React.FC = () => {
       let message = '';
       let isError = false;
       
-      // Check if blockchain shows RELEASED or COMPLETED (both mean funds are released)
+      // Check blockchain status - exact match priority
       const blockchainIsReleased = verification.isReleased || verification.blockchainStatus === 6; // 6 = COMPLETED
+      const blockchainIsCompleted = verification.blockchainStatus === 6; // Specifically COMPLETED
       
       if (dbState === 'RELEASED' && !blockchainIsReleased) {
         const isSeller = order.sellerAddress.toLowerCase() === (address || '').toLowerCase();
@@ -2032,8 +2033,61 @@ const Orders: React.FC = () => {
         }
         isError = true;
       } else if (dbState !== 'RELEASED' && blockchainIsReleased) {
-        message = `⚠️ Blockchain shows ${blockchainState} (funds released) but database shows ${dbState}. Database needs to be synced.`;
+        message = `⚠️ Blockchain shows ${blockchainState} (funds released) but database shows ${dbState}. Auto-syncing...`;
         isError = true;
+        
+        // Automatically call sync API to update database
+        toast.loading('Syncing order status with blockchain...', { id: 'verify-status' });
+        
+        try {
+          const token = localStorage.getItem('authToken') || '';
+          const syncResponse = await fetch(`/api/orders/${order.id}/sync-blockchain-status`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            }
+          });
+          
+          if (syncResponse.ok) {
+            const syncResult = await syncResponse.json();
+            console.log('✅ Blockchain status synced automatically:', syncResult);
+            
+            // Wait a moment then refresh orders
+            setTimeout(() => {
+              fetchOrders();
+              
+              // Show appropriate message based on sync result
+              if (syncResult.data?.synced) {
+                toast.success(
+                  `✅ Order status synced! Updated from ${syncResult.data.previousState} to ${syncResult.data.newState}`, 
+                  { id: 'verify-status', duration: 6000 }
+                );
+              } else {
+                toast.success(
+                  `✅ Order status verified! Already in sync (${syncResult.data.currentState})`, 
+                  { id: 'verify-status', duration: 5000 }
+                );
+              }
+            }, 1000);
+            
+            return; // Exit early since we're handling the success message
+          } else {
+            console.warn('⚠️ Failed to sync blockchain status automatically');
+            // Fall back to manual refresh
+            setTimeout(() => {
+              fetchOrders();
+              toast('Order refreshed. Please verify status again.', { id: 'verify-status', duration: 5000 });
+            }, 2000);
+          }
+        } catch (syncError) {
+          console.error('Error auto-syncing:', syncError);
+          // Fall back to manual refresh
+          setTimeout(() => {
+            fetchOrders();
+            toast('Order refreshed. Please verify status again.', { id: 'verify-status', duration: 5000 });
+          }, 2000);
+        }
       } else if (dbState === blockchainState || (dbState === 'RELEASED' && blockchainIsReleased)) {
         message = `✅ Status synced! Both database and blockchain show ${blockchainState || 'RELEASED'}.`;
         isError = false;
