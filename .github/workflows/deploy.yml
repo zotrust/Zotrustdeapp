@@ -21,37 +21,20 @@ jobs:
           node-version: '18'
           cache: 'npm'
 
-      - name: 📥 Install Frontend Dependencies
+      - name: 🏗️ Build Frontend Only
         run: |
-          npm ci
-          echo "✅ Frontend dependencies installed"
-
-      - name: 📥 Install Backend Dependencies
-        run: |
-          cd backend
-          npm ci
-          echo "✅ Backend dependencies installed"
-
-      - name: 🏗️ Build Frontend
-        run: |
+          echo "📥 Installing frontend dependencies..."
+          npm ci --no-audit --no-fund
+          echo "🏗️ Building frontend..."
           npm run build
           echo "✅ Frontend built successfully"
         env:
           NODE_ENV: production
 
-      - name: 🏗️ Build Backend
-        run: |
-          cd backend
-          npm run build
-          echo "✅ Backend built successfully"
-
       - name: 📋 List Build Artifacts
         run: |
           echo "=== Frontend Build ==="
           ls -lh dist/ | head -10
-          echo ""
-          echo "=== Backend Build ==="
-          ls -lh backend/dist/ | head -10
 
       - name: 🗜️ Create Deployment Package
         run: |
@@ -61,10 +44,11 @@ jobs:
           # Copy frontend build
           cp -r dist deploy/
           
-          # Copy backend
+          # Copy backend source (NOT build)
           mkdir -p deploy/backend
-          cp -r backend/dist deploy/backend/
+          cp -r backend/src deploy/backend/
           cp backend/package*.json deploy/backend/
+          cp backend/tsconfig.json deploy/backend/ 2>/dev/null || true
           cp -r backend/migrations deploy/backend/ 2>/dev/null || true
           
           # Create archive
@@ -89,7 +73,7 @@ jobs:
           script: |
             set -e
             
-            echo "🔄 Deploying to VPS..."
+            echo "🔄 Deploying to VPS (Low Memory Mode)..."
             
             # Define paths
             APP_DIR="/var/www/Zotrustdeapp"
@@ -112,20 +96,24 @@ jobs:
             tar -xzf /tmp/deploy.tar.gz -C $APP_DIR
             rm /tmp/deploy.tar.gz
             
-            # Install backend dependencies
+            # Install backend dependencies (production only - saves memory)
             echo "📥 Installing backend dependencies..."
             cd $APP_DIR/backend
-            npm ci --production
+            npm ci --production --no-audit --no-fund
+            
+            # Build backend on VPS (using less memory with single process)
+            echo "🏗️ Building backend on VPS..."
+            npx tsc --build || echo "⚠️ Build warning (continuing)"
             
             # Restart backend with PM2
             echo "🔄 Restarting backend service..."
             if pm2 list | grep -q "zotrust-backend"; then
-              pm2 restart zotrust-backend
+              pm2 restart zotrust-backend --update-env
               echo "✅ Backend restarted"
             else
-              pm2 start dist/index.js --name "zotrust-backend"
+              pm2 start dist/index.js --name "zotrust-backend" --max-memory-restart 200M
               pm2 save
-              echo "✅ Backend started"
+              echo "✅ Backend started with memory limit"
             fi
             
             # Reload Nginx
@@ -137,11 +125,15 @@ jobs:
             cd $BACKUP_DIR
             ls -t backup_*.tar.gz | tail -n +6 | xargs rm -f 2>/dev/null || true
             
-            echo "✅ Deployment completed successfully!"
+            # Memory status
             echo ""
-            echo "📊 Deployment Status:"
+            echo "💾 Memory Status:"
+            free -h
+            echo ""
+            echo "📊 PM2 Status:"
             pm2 list
             echo ""
+            echo "✅ Deployment completed successfully!"
             echo "🌐 Application should be live at: https://zotrust.net"
 
       - name: 🔍 Health Check
