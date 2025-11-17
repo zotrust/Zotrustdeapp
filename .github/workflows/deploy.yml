@@ -8,63 +8,11 @@ on:
   workflow_dispatch:  # Allow manual trigger
 
 jobs:
-  build-and-deploy:
+  deploy:
     runs-on: ubuntu-latest
     
     steps:
-      - name: 🚀 Checkout Code
-        uses: actions/checkout@v3
-
-      - name: 📦 Setup Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: '18'
-          cache: 'npm'
-
-      - name: 🏗️ Build Frontend Only
-        run: |
-          echo "📥 Installing frontend dependencies..."
-          npm ci --no-audit --no-fund
-          echo "🏗️ Building frontend..."
-          npm run build
-          echo "✅ Frontend built successfully"
-        env:
-          NODE_ENV: production
-
-      - name: 📋 List Build Artifacts
-        run: |
-          echo "=== Frontend Build ==="
-          ls -lh dist/ | head -10
-
-      - name: 🗜️ Create Deployment Package
-        run: |
-          echo "Creating deployment package..."
-          mkdir -p deploy
-          
-          # Copy frontend build
-          cp -r dist deploy/
-          
-          # Copy backend source (NOT build)
-          mkdir -p deploy/backend
-          cp -r backend/src deploy/backend/
-          cp backend/package*.json deploy/backend/
-          cp backend/tsconfig.json deploy/backend/ 2>/dev/null || true
-          cp -r backend/migrations deploy/backend/ 2>/dev/null || true
-          
-          # Create archive
-          tar -czf deploy.tar.gz -C deploy .
-          echo "✅ Deployment package created: $(du -h deploy.tar.gz | cut -f1)"
-
       - name: 🚀 Deploy to VPS
-        uses: appleboy/scp-action@v0.1.4
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          source: "deploy.tar.gz"
-          target: "/tmp/"
-
-      - name: 🔄 Extract and Restart Services
         uses: appleboy/ssh-action@v1.0.0
         with:
           host: ${{ secrets.VPS_HOST }}
@@ -73,83 +21,25 @@ jobs:
           script: |
             set -e
             
-            echo "🔄 Deploying to VPS (Low Memory Mode)..."
+            echo "🔄 Deploying to VPS..."
             
-            # Define paths
-            APP_DIR="/var/www/Zotrustdeapp"
-            BACKUP_DIR="/var/www/backups"
-            TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+            # Navigate to project directory
+            cd /var/www/Zotrustdeapp
             
-            # Create backup of current deployment
-            echo "📦 Creating backup..."
-            mkdir -p $BACKUP_DIR
-            if [ -d "$APP_DIR" ]; then
-              tar -czf $BACKUP_DIR/backup_$TIMESTAMP.tar.gz -C $APP_DIR . 2>/dev/null || true
-              echo "✅ Backup created: backup_$TIMESTAMP.tar.gz"
-            fi
+            # Git pull latest code
+            echo "📥 Pulling latest code from GitHub..."
+            git pull origin main
             
-            # Create app directory if not exists
-            mkdir -p $APP_DIR
+            # Restart PM2
+            echo "🔄 Restarting backend..."
+            pm2 restart zotrust-backend
             
-            # Extract new deployment
-            echo "📂 Extracting deployment package..."
-            tar -xzf /tmp/deploy.tar.gz -C $APP_DIR
-            rm /tmp/deploy.tar.gz
-            
-            # Install backend dependencies (production only - saves memory)
-            echo "📥 Installing backend dependencies..."
-            cd $APP_DIR/backend
-            npm ci --production --no-audit --no-fund
-            
-            # Build backend on VPS (using less memory with single process)
-            echo "🏗️ Building backend on VPS..."
-            npx tsc --build || echo "⚠️ Build warning (continuing)"
-            
-            # Restart backend with PM2
-            echo "🔄 Restarting backend service..."
-            if pm2 list | grep -q "zotrust-backend"; then
-              pm2 restart zotrust-backend --update-env
-              echo "✅ Backend restarted"
-            else
-              pm2 start dist/index.js --name "zotrust-backend" --max-memory-restart 200M
-              pm2 save
-              echo "✅ Backend started with memory limit"
-            fi
-            
-            # Reload Nginx
-            echo "🔄 Reloading Nginx..."
-            sudo systemctl reload nginx || echo "⚠️ Nginx reload failed (may need manual restart)"
-            
-            # Cleanup old backups (keep last 5)
-            echo "🧹 Cleaning old backups..."
-            cd $BACKUP_DIR
-            ls -t backup_*.tar.gz | tail -n +6 | xargs rm -f 2>/dev/null || true
-            
-            # Memory status
             echo ""
-            echo "💾 Memory Status:"
-            free -h
-            echo ""
+            echo "✅ Deployment completed!"
             echo "📊 PM2 Status:"
             pm2 list
             echo ""
-            echo "✅ Deployment completed successfully!"
-            echo "🌐 Application should be live at: https://zotrust.net"
-
-      - name: 🔍 Health Check
-        run: |
-          echo "🔍 Performing health check..."
-          sleep 5
-          
-          # Check if API is responding
-          response=$(curl -s -o /dev/null -w "%{http_code}" https://zotrust.net/api/health || echo "000")
-          
-          if [ "$response" = "200" ]; then
-            echo "✅ Health check passed! API is responding."
-          else
-            echo "⚠️ Health check failed. HTTP Status: $response"
-            echo "Please check the deployment manually."
-          fi
+            echo "🌐 Live at: https://zotrust.net"
 
       - name: 📢 Deployment Summary
         if: always()
@@ -162,4 +52,3 @@ jobs:
           echo "Author: ${{ github.actor }}"
           echo "Time: $(date)"
           echo "════════════════════════════════════════════"
-
