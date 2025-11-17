@@ -1041,4 +1041,134 @@ router.get('/requests', auth_1.authenticateToken, async (req, res) => {
         });
     }
 });
+// Sync order status with blockchain (for users)
+router.post('/:id/sync-blockchain-status', auth_1.authenticateToken, async (req, res) => {
+    try {
+        const orderId = req.params.id;
+        const user = req.user;
+        console.log('🔄 SYNC BLOCKCHAIN STATUS: Starting sync for order:', orderId);
+        console.log('👤 SYNC BLOCKCHAIN STATUS: User:', user?.address);
+        // Get order details
+        const orderResult = await database_1.default.query('SELECT * FROM orders WHERE id = $1', [orderId]);
+        if (orderResult.rows.length === 0) {
+            return res.status(404).json({
+                success: false,
+                error: 'Order not found'
+            });
+        }
+        const order = orderResult.rows[0];
+        // Check if user is buyer or seller
+        if (order.buyer_address.toLowerCase() !== user.address.toLowerCase() &&
+            order.seller_address.toLowerCase() !== user.address.toLowerCase()) {
+            return res.status(403).json({
+                success: false,
+                error: 'Access denied'
+            });
+        }
+        // Check if blockchain_trade_id exists
+        if (!order.blockchain_trade_id) {
+            return res.status(400).json({
+                success: false,
+                error: 'No blockchain trade ID found for this order'
+            });
+        }
+        // Get blockchain status
+        const blockchainTrade = await contractService.getTradeFromChain(order.blockchain_trade_id);
+        const status = Number(blockchainTrade.status);
+        const statusNames = ['CREATED', 'LOCKED', 'RELEASED', 'APPEALED', 'APPEAL_WINDOW', 'REFUNDED', 'COMPLETED'];
+        const blockchainStatusName = statusNames[status] || 'UNKNOWN';
+        console.log('🔍 SYNC BLOCKCHAIN STATUS: Blockchain status check:', {
+            orderId,
+            tradeId: order.blockchain_trade_id,
+            dbStatus: order.state,
+            blockchainStatus: status,
+            blockchainStatusName
+        });
+        let newOrderState = order.state;
+        let needsUpdate = false;
+        // Map blockchain status to database status - EXACT MATCH
+        console.log('🔍 SYNC BLOCKCHAIN STATUS: Checking if update needed:', {
+            blockchainStatus: status,
+            blockchainStatusName,
+            currentDbState: order.state
+        });
+        // Status 6 = COMPLETED on blockchain -> COMPLETED in database
+        if (status === 6 && order.state !== 'COMPLETED') {
+            newOrderState = 'COMPLETED';
+            needsUpdate = true;
+            console.log('✅ SYNC BLOCKCHAIN STATUS: Update required! Blockchain is COMPLETED but DB shows:', order.state);
+        }
+        // Status 2 = RELEASED on blockchain -> RELEASED in database
+        else if (status === 2 && order.state !== 'RELEASED') {
+            newOrderState = 'RELEASED';
+            needsUpdate = true;
+            console.log('✅ SYNC BLOCKCHAIN STATUS: Update required! Blockchain is RELEASED but DB shows:', order.state);
+        }
+        // Status 5 = REFUNDED on blockchain -> REFUNDED in database
+        else if (status === 5 && order.state !== 'REFUNDED') {
+            newOrderState = 'REFUNDED';
+            needsUpdate = true;
+            console.log('✅ SYNC BLOCKCHAIN STATUS: Update required! Blockchain is REFUNDED but DB shows:', order.state);
+        }
+        // Status 1 = LOCKED on blockchain -> LOCKED in database
+        else if (status === 1 && !['LOCKED', 'UNDER_DISPUTE', 'APPEALED'].includes(order.state)) {
+            newOrderState = 'LOCKED';
+            needsUpdate = true;
+            console.log('✅ SYNC BLOCKCHAIN STATUS: Update required! Blockchain is LOCKED but DB shows:', order.state);
+        }
+        // Status 4 = APPEAL_WINDOW on blockchain -> Keep as is (special state)
+        else if (status === 4 && !['LOCKED', 'UNDER_DISPUTE', 'APPEALED'].includes(order.state)) {
+            // Appeal window is still technically locked
+            newOrderState = 'LOCKED';
+            needsUpdate = true;
+            console.log('✅ SYNC BLOCKCHAIN STATUS: Update required! Blockchain is APPEAL_WINDOW but DB shows:', order.state);
+        }
+        else {
+            console.log('ℹ️ SYNC BLOCKCHAIN STATUS: No update needed, statuses match');
+        }
+        if (needsUpdate) {
+            // Update database to match blockchain
+            await database_1.default.query('UPDATE orders SET state = $1, updated_at = NOW() WHERE id = $2', [newOrderState, orderId]);
+            console.log(`✅ SYNC BLOCKCHAIN STATUS: Order ${orderId} synced: ${order.state} → ${newOrderState}`);
+            // Log the sync action
+            await database_1.default.query('INSERT INTO audit_logs (user_address, action, resource_type, resource_id, details, ip_address) VALUES ($1, $2, $3, $4, $5, $6)', [user.address, 'SYNC_BLOCKCHAIN_STATUS', 'order', orderId, JSON.stringify({
+                    previousState: order.state,
+                    newState: newOrderState,
+                    blockchainStatus: status
+                }), req.ip]);
+            res.json({
+                success: true,
+                message: 'Order status synced with blockchain',
+                data: {
+                    orderId,
+                    previousState: order.state,
+                    newState: newOrderState,
+                    blockchainStatus: status,
+                    blockchainStatusName,
+                    synced: true
+                }
+            });
+        }
+        else {
+            res.json({
+                success: true,
+                message: 'Order status already in sync',
+                data: {
+                    orderId,
+                    currentState: order.state,
+                    blockchainStatus: status,
+                    blockchainStatusName,
+                    synced: false
+                }
+            });
+        }
+    }
+    catch (error) {
+        console.error('💥 SYNC BLOCKCHAIN STATUS: Error:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to sync blockchain status'
+        });
+    }
+});
 exports.default = router;
