@@ -46,6 +46,8 @@ const AdminAgents: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [editingAgent, setEditingAgent] = useState<Agent | null>(null);
+  const [locationSearchQuery, setLocationSearchQuery] = useState('');
+  const [showLocationDropdown, setShowLocationDropdown] = useState(false);
   const [formData, setFormData] = useState({
     branch_name: '',
     mobile: '',
@@ -63,6 +65,19 @@ const AdminAgents: React.FC = () => {
   useEffect(() => {
     filterAgents();
   }, [agents, searchTerm]);
+
+  // Close location dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (showLocationDropdown && !target.closest('.location-search-container')) {
+        setShowLocationDropdown(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showLocationDropdown]);
 
   const fetchAgents = async () => {
     try {
@@ -139,6 +154,7 @@ const AdminAgents: React.FC = () => {
       location_id: '',
       verified: false
     });
+    setLocationSearchQuery('');
     setShowModal(true);
   };
 
@@ -151,7 +167,24 @@ const AdminAgents: React.FC = () => {
       location_id: agent.location_id.toString(),
       verified: agent.verified
     });
+    // Set location search query to agent's location name
+    const selectedLocation = locations.find(loc => loc.id === agent.location_id);
+    setLocationSearchQuery(selectedLocation?.name || '');
     setShowModal(true);
+  };
+
+  // Filter locations based on search query
+  const filteredLocations = locations.filter(location =>
+    location.name?.toLowerCase().includes(locationSearchQuery.toLowerCase()) ||
+    location.city?.toLowerCase().includes(locationSearchQuery.toLowerCase()) ||
+    location.state?.toLowerCase().includes(locationSearchQuery.toLowerCase())
+  );
+
+  // Handle location selection
+  const handleLocationSelect = (locationId: number, locationName: string) => {
+    setFormData({ ...formData, location_id: locationId.toString() });
+    setLocationSearchQuery(locationName);
+    setShowLocationDropdown(false);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -378,8 +411,12 @@ const AdminAgents: React.FC = () => {
                   {editingAgent ? 'Edit Agent' : 'Add New Agent'}
                 </h2>
                 <button
-                  onClick={() => setShowModal(false)}
-                  className="text-gray-400 hover:text-white transition-colors"
+                  onClick={() => {
+                    setShowModal(false);
+                    setShowLocationDropdown(false);
+                    setLocationSearchQuery('');
+                  }}
+                  className="text-gray-400 hover:text-white transition-colors text-3xl leading-none"
                 >
                   ×
                 </button>
@@ -410,21 +447,54 @@ const AdminAgents: React.FC = () => {
                   />
                 </div>
 
-                <div>
+                <div className="relative location-search-container">
                   <label className="block text-sm font-medium text-gray-300 mb-2">Location</label>
-                  <select
-                    value={formData.location_id}
-                    onChange={(e) => setFormData({ ...formData, location_id: e.target.value })}
-                    required
-                    className="w-full px-4 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="">Select Location</option>
-                    {locations.map((location) => (
-                      <option key={location.id} value={location.id} className="bg-gray-800">
-                        {location.name} - {location.city}, {location.state}
-                      </option>
-                    ))}
-                  </select>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={locationSearchQuery}
+                      onChange={(e) => {
+                        setLocationSearchQuery(e.target.value);
+                        setShowLocationDropdown(true);
+                      }}
+                      onFocus={() => setShowLocationDropdown(true)}
+                      required
+                      className="w-full px-4 py-2 pr-10 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="Search location..."
+                      autoComplete="off"
+                    />
+                    <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" size={16} />
+                  </div>
+
+                  {/* Location Dropdown */}
+                  {showLocationDropdown && filteredLocations.length > 0 && (
+                    <div className="absolute z-50 w-full mt-1 max-h-48 overflow-y-auto bg-slate-800 border border-white/30 rounded-lg shadow-2xl">
+                      {filteredLocations.map((location) => (
+                        <button
+                          key={location.id}
+                          type="button"
+                          onClick={() => handleLocationSelect(location.id, location.name)}
+                          className={`w-full text-left px-4 py-3 hover:bg-white/10 transition-colors border-b border-white/5 last:border-b-0 ${
+                            formData.location_id === location.id.toString() ? 'bg-white/10' : ''
+                          }`}
+                        >
+                          <p className="text-white font-medium text-sm">{location.name}</p>
+                          <p className="text-gray-400 text-xs">
+                            {location.city}{location.state ? `, ${location.state}` : ''}
+                          </p>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* No Results */}
+                  {showLocationDropdown && locationSearchQuery && filteredLocations.length === 0 && (
+                    <div className="absolute z-50 w-full mt-1 bg-slate-800 border border-white/30 rounded-lg shadow-2xl p-4">
+                      <p className="text-gray-400 text-sm text-center">
+                        No locations found for "{locationSearchQuery}"
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 <div>
@@ -453,7 +523,11 @@ const AdminAgents: React.FC = () => {
                 <div className="flex space-x-3 pt-4">
                   <button
                     type="button"
-                    onClick={() => setShowModal(false)}
+                    onClick={() => {
+                      setShowModal(false);
+                      setShowLocationDropdown(false);
+                      setLocationSearchQuery('');
+                    }}
                     className="flex-1 bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg transition-colors"
                   >
                     Cancel

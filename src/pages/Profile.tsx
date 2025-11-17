@@ -87,9 +87,9 @@ const Profile: React.FC = () => {
 
   // Filter locations based on search query
   const filteredLocations = locations.filter(location =>
-    location.name.toLowerCase().includes(locationSearchQuery.toLowerCase()) ||
-    location.city.toLowerCase().includes(locationSearchQuery.toLowerCase()) ||
-    location.state.toLowerCase().includes(locationSearchQuery.toLowerCase())
+    location.name?.toLowerCase().includes(locationSearchQuery.toLowerCase()) ||
+    location.city?.toLowerCase().includes(locationSearchQuery.toLowerCase()) ||
+    location.state?.toLowerCase().includes(locationSearchQuery.toLowerCase())
   );
 
   // Handle location selection
@@ -305,7 +305,7 @@ const Profile: React.FC = () => {
                   >
                     <p className="text-white font-medium text-sm">{location.name}</p>
                     <p className="text-violet-300 text-xs">
-                      {location.city}, {location.state}
+                      {location.city} {location.state ? `, ${location.state}` : ''}
                     </p>
                   </button>
                 ))}
@@ -363,7 +363,7 @@ const Profile: React.FC = () => {
                           />
                           <div className="flex-1 min-w-0">
                             <p className="text-white font-medium text-sm truncate">{agent.branchName}</p>
-                            <p className="text-violet-300 text-xs truncate">{agent.locationName}</p>
+                            <p className="text-violet-300 text-xs break-words">{agent.address}</p>
                             <p className="text-violet-400 text-xs truncate">{agent.mobile}</p>
                           </div>
                           <div className="flex-shrink-0">
