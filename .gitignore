@@ -7,7 +7,7 @@ node_modules/
 *.tar.gz
 *.bin
 *.node
-dist/
+
 build/trust.zip
 *.zip
 node_modules/
