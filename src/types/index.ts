@@ -109,6 +109,9 @@ export interface ProfileData {
 export interface Location {
   id: string;
   name: string;
+  city: string;
+  state: string;
+  country?: string;
 }
 
 export interface SignalingMessage {

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import {User, MapPin, Phone, CheckCircle, AlertCircle, Wallet, Loader2, X} from 'lucide-react';
+import {User, MapPin, Phone, CheckCircle, AlertCircle, Wallet, Loader2, X, Search} from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useUserStore } from '../stores/userStore';
 import { useWalletStore } from '../stores/walletStore';
@@ -13,6 +13,8 @@ const Profile: React.FC = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [showEditWarning, setShowEditWarning] = useState(false);
+  const [locationSearchQuery, setLocationSearchQuery] = useState('');
+  const [showLocationDropdown, setShowLocationDropdown] = useState(false);
   const [formData, setFormData] = useState<ProfileData>({
     name: '',
     phone: '',
@@ -43,8 +45,14 @@ const Profile: React.FC = () => {
         locationId: user.locationId || '',
         selectedAgentIds: user.selectedAgentIds || [] // Changed to support multiple agents
       });
+      
+      // Set location search query to selected location name
+      const selectedLocation = locations.find(loc => loc.id === user.locationId);
+      if (selectedLocation) {
+        setLocationSearchQuery(selectedLocation.name);
+      }
     }
-  }, [user]);
+  }, [user, locations]);
 
   // Fetch locations on mount
   useEffect(() => {
@@ -60,8 +68,35 @@ const Profile: React.FC = () => {
     }
   }, [formData.locationId, fetchAgents]);
 
+  // Close location dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (showLocationDropdown && !target.closest('.location-search-container')) {
+        setShowLocationDropdown(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showLocationDropdown]);
+
   const handleInputChange = (field: keyof ProfileData, value: string | string[]) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  // Filter locations based on search query
+  const filteredLocations = locations.filter(location =>
+    location.name.toLowerCase().includes(locationSearchQuery.toLowerCase()) ||
+    location.city.toLowerCase().includes(locationSearchQuery.toLowerCase()) ||
+    location.state.toLowerCase().includes(locationSearchQuery.toLowerCase())
+  );
+
+  // Handle location selection
+  const handleLocationSelect = (locationId: string, locationName: string) => {
+    handleInputChange('locationId', locationId);
+    setLocationSearchQuery(locationName);
+    setShowLocationDropdown(false);
   };
 
   const handleSaveProfile = async () => {
@@ -232,25 +267,59 @@ const Profile: React.FC = () => {
             />
           </div>
 
-                {/* Location */}
-          <div>
+                {/* Location Search */}
+          <div className="relative location-search-container">
             <label className="block text-xs font-medium text-violet-300 mb-1">
-                    Location *
+              Location *
             </label>
-            <select
-                    value={formData.locationId}
-                    onChange={(e) => handleInputChange('locationId', e.target.value)}
-              disabled={!isEditing}
-              className="w-full bg-white/10 border border-violet-500/20 rounded px-2 py-1.5 text-white text-sm focus:outline-none focus:border-violet-500 disabled:opacity-50"
-              required
-            >
-                    <option value="" className="bg-slate-800">Select location</option>
-                    {locations.map((location) => (
-                      <option key={location.id} value={location.id} className="bg-slate-800">
-                        {location.name}
-                </option>
-              ))}
-            </select>
+            <div className="relative">
+              <input
+                type="text"
+                value={locationSearchQuery}
+                onChange={(e) => {
+                  setLocationSearchQuery(e.target.value);
+                  setShowLocationDropdown(true);
+                }}
+                onFocus={() => setShowLocationDropdown(true)}
+                disabled={!isEditing}
+                className="w-full bg-white/10 border border-violet-500/20 rounded px-2 py-1.5 pr-8 text-white text-sm focus:outline-none focus:border-violet-500 disabled:opacity-50"
+                placeholder="Search location..."
+                required
+                autoComplete="off"
+              />
+              <Search size={16} className="absolute right-2 top-1/2 -translate-y-1/2 text-violet-400 pointer-events-none" />
+            </div>
+
+            {/* Location Dropdown */}
+            {showLocationDropdown && isEditing && filteredLocations.length > 0 && (
+              <div className="absolute z-10 w-full mt-1 max-h-48 overflow-y-auto bg-slate-800 border border-violet-500/30 rounded-lg shadow-xl">
+                {filteredLocations.map((location) => (
+                  <button
+                    key={location.id}
+                    type="button"
+                    onClick={() => handleLocationSelect(location.id, location.name)}
+                    className={clsx(
+                      'w-full text-left px-3 py-2 hover:bg-violet-500/20 transition-colors border-b border-white/5 last:border-b-0',
+                      formData.locationId === location.id && 'bg-violet-500/30'
+                    )}
+                  >
+                    <p className="text-white font-medium text-sm">{location.name}</p>
+                    <p className="text-violet-300 text-xs">
+                      {location.city}, {location.state}
+                    </p>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* No Results */}
+            {showLocationDropdown && isEditing && locationSearchQuery && filteredLocations.length === 0 && (
+              <div className="absolute z-10 w-full mt-1 bg-slate-800 border border-violet-500/30 rounded-lg shadow-xl p-3">
+                <p className="text-violet-300 text-sm text-center">
+                  No locations found for "{locationSearchQuery}"
+                </p>
+              </div>
+            )}
           </div>
 
                 {/* Agent Selection - Multiple Selection with Checkboxes */}
@@ -351,6 +420,7 @@ const Profile: React.FC = () => {
                       onClick={() => {
                         setIsEditing(false);
                         setSaveError(null);
+                        setShowLocationDropdown(false);
                         // Reset form data to user data
                         if (user) {
                           setFormData({
@@ -359,6 +429,11 @@ const Profile: React.FC = () => {
                             locationId: user.locationId || '',
                             selectedAgentIds: user.selectedAgentIds || []
                           });
+                          // Reset location search query
+                          const selectedLocation = locations.find(loc => loc.id === user.locationId);
+                          if (selectedLocation) {
+                            setLocationSearchQuery(selectedLocation.name);
+                          }
                         }
                       }}
                       className="px-3 py-2 border border-violet-500/20 text-white rounded hover:bg-white/10 transition-colors text-sm"

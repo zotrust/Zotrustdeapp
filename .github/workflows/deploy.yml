@@ -1,0 +1,173 @@
+name: Deploy to VPS
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch:  # Allow manual trigger
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 🚀 Checkout Code
+        uses: actions/checkout@v3
+
+      - name: 📦 Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: 📥 Install Frontend Dependencies
+        run: |
+          npm ci
+          echo "✅ Frontend dependencies installed"
+
+      - name: 📥 Install Backend Dependencies
+        run: |
+          cd backend
+          npm ci
+          echo "✅ Backend dependencies installed"
+
+      - name: 🏗️ Build Frontend
+        run: |
+          npm run build
+          echo "✅ Frontend built successfully"
+        env:
+          NODE_ENV: production
+
+      - name: 🏗️ Build Backend
+        run: |
+          cd backend
+          npm run build
+          echo "✅ Backend built successfully"
+
+      - name: 📋 List Build Artifacts
+        run: |
+          echo "=== Frontend Build ==="
+          ls -lh dist/ | head -10
+          echo ""
+          echo "=== Backend Build ==="
+          ls -lh backend/dist/ | head -10
+
+      - name: 🗜️ Create Deployment Package
+        run: |
+          echo "Creating deployment package..."
+          mkdir -p deploy
+          
+          # Copy frontend build
+          cp -r dist deploy/
+          
+          # Copy backend
+          mkdir -p deploy/backend
+          cp -r backend/dist deploy/backend/
+          cp backend/package*.json deploy/backend/
+          cp -r backend/migrations deploy/backend/ 2>/dev/null || true
+          
+          # Create archive
+          tar -czf deploy.tar.gz -C deploy .
+          echo "✅ Deployment package created: $(du -h deploy.tar.gz | cut -f1)"
+
+      - name: 🚀 Deploy to VPS
+        uses: appleboy/scp-action@v0.1.4
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          source: "deploy.tar.gz"
+          target: "/tmp/"
+
+      - name: 🔄 Extract and Restart Services
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            set -e
+            
+            echo "🔄 Deploying to VPS..."
+            
+            # Define paths
+            APP_DIR="/var/www/Zotrustdeapp"
+            BACKUP_DIR="/var/www/backups"
+            TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+            
+            # Create backup of current deployment
+            echo "📦 Creating backup..."
+            mkdir -p $BACKUP_DIR
+            if [ -d "$APP_DIR" ]; then
+              tar -czf $BACKUP_DIR/backup_$TIMESTAMP.tar.gz -C $APP_DIR . 2>/dev/null || true
+              echo "✅ Backup created: backup_$TIMESTAMP.tar.gz"
+            fi
+            
+            # Create app directory if not exists
+            mkdir -p $APP_DIR
+            
+            # Extract new deployment
+            echo "📂 Extracting deployment package..."
+            tar -xzf /tmp/deploy.tar.gz -C $APP_DIR
+            rm /tmp/deploy.tar.gz
+            
+            # Install backend dependencies
+            echo "📥 Installing backend dependencies..."
+            cd $APP_DIR/backend
+            npm ci --production
+            
+            # Restart backend with PM2
+            echo "🔄 Restarting backend service..."
+            if pm2 list | grep -q "zotrust-backend"; then
+              pm2 restart zotrust-backend
+              echo "✅ Backend restarted"
+            else
+              pm2 start dist/index.js --name "zotrust-backend"
+              pm2 save
+              echo "✅ Backend started"
+            fi
+            
+            # Reload Nginx
+            echo "🔄 Reloading Nginx..."
+            sudo systemctl reload nginx || echo "⚠️ Nginx reload failed (may need manual restart)"
+            
+            # Cleanup old backups (keep last 5)
+            echo "🧹 Cleaning old backups..."
+            cd $BACKUP_DIR
+            ls -t backup_*.tar.gz | tail -n +6 | xargs rm -f 2>/dev/null || true
+            
+            echo "✅ Deployment completed successfully!"
+            echo ""
+            echo "📊 Deployment Status:"
+            pm2 list
+            echo ""
+            echo "🌐 Application should be live at: https://zotrust.net"
+
+      - name: 🔍 Health Check
+        run: |
+          echo "🔍 Performing health check..."
+          sleep 5
+          
+          # Check if API is responding
+          response=$(curl -s -o /dev/null -w "%{http_code}" https://zotrust.net/api/health || echo "000")
+          
+          if [ "$response" = "200" ]; then
+            echo "✅ Health check passed! API is responding."
+          else
+            echo "⚠️ Health check failed. HTTP Status: $response"
+            echo "Please check the deployment manually."
+          fi
+
+      - name: 📢 Deployment Summary
+        if: always()
+        run: |
+          echo "════════════════════════════════════════════"
+          echo "🚀 DEPLOYMENT SUMMARY"
+          echo "════════════════════════════════════════════"
+          echo "Branch: ${{ github.ref_name }}"
+          echo "Commit: ${{ github.sha }}"
+          echo "Author: ${{ github.actor }}"
+          echo "Time: $(date)"
+          echo "════════════════════════════════════════════"
+

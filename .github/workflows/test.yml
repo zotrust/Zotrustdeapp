@@ -1,0 +1,122 @@
+name: Test & Build
+
+on:
+  push:
+    branches:
+      - develop
+      - feature/*
+  pull_request:
+    branches:
+      - main
+      - master
+      - develop
+
+jobs:
+  test-frontend:
+    name: 🎨 Test Frontend
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v3
+
+      - name: 📦 Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: 📥 Install Dependencies
+        run: npm ci
+
+      - name: 🔍 Lint Check
+        run: npm run lint || echo "⚠️ Linting issues found"
+        continue-on-error: true
+
+      - name: 🏗️ Build Frontend
+        run: |
+          npm run build
+          echo "✅ Frontend build successful"
+
+      - name: 📊 Build Size Analysis
+        run: |
+          echo "📦 Build Size:"
+          du -sh dist/
+          echo ""
+          echo "📄 Main Assets:"
+          du -h dist/assets/* | sort -h | tail -10
+
+  test-backend:
+    name: 🔧 Test Backend
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v3
+
+      - name: 📦 Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+
+      - name: 📥 Install Dependencies
+        run: |
+          cd backend
+          npm ci
+
+      - name: 🔍 TypeScript Check
+        run: |
+          cd backend
+          npx tsc --noEmit || echo "⚠️ TypeScript errors found"
+        continue-on-error: true
+
+      - name: 🏗️ Build Backend
+        run: |
+          cd backend
+          npm run build
+          echo "✅ Backend build successful"
+
+      - name: 📊 Build Verification
+        run: |
+          cd backend
+          echo "📦 Backend Build:"
+          ls -lh dist/ | head -10
+
+  security-scan:
+    name: 🔒 Security Scan
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v3
+
+      - name: 🔍 Run Security Audit
+        run: |
+          echo "🔒 Scanning for vulnerabilities..."
+          npm audit --production || echo "⚠️ Vulnerabilities found"
+          cd backend
+          npm audit --production || echo "⚠️ Backend vulnerabilities found"
+
+  build-summary:
+    name: 📋 Build Summary
+    needs: [test-frontend, test-backend, security-scan]
+    runs-on: ubuntu-latest
+    if: always()
+    
+    steps:
+      - name: 📊 Summary
+        run: |
+          echo "════════════════════════════════════════════"
+          echo "📋 BUILD SUMMARY"
+          echo "════════════════════════════════════════════"
+          echo "Branch: ${{ github.ref_name }}"
+          echo "Commit: ${{ github.sha }}"
+          echo "Author: ${{ github.actor }}"
+          echo ""
+          echo "Frontend: ${{ needs.test-frontend.result }}"
+          echo "Backend: ${{ needs.test-backend.result }}"
+          echo "Security: ${{ needs.security-scan.result }}"
+          echo "════════════════════════════════════════════"
+
