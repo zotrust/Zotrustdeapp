@@ -18,7 +18,7 @@ const updateLocationSchema = joi_1.default.object({
 // GET /api/locations - Get all locations
 router.get('/', auth_1.authenticateAdmin, async (req, res) => {
     try {
-        const { name, limit = 100, offset = 0 } = req.query;
+        const { name, limit = 400, offset = 0 } = req.query;
         let query = `
       SELECT l.*, 
              COUNT(a.id) as agent_count

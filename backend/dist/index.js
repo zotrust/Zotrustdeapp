@@ -46,7 +46,6 @@ const winston_1 = __importDefault(require("winston"));
 const path = __importStar(require("path"));
 const os = __importStar(require("os"));
 const fs = __importStar(require("fs"));
-const ngrok_1 = require("@ngrok/ngrok");
 // Import configurations
 const database_1 = require("./config/database");
 const database_2 = __importDefault(require("./config/database"));
@@ -802,37 +801,6 @@ const startServer = async () => {
                 console.log(`   Health check: ${addresses[0]}/health`);
                 console.log(`   API base: ${addresses[0]}/api`);
                 console.log(`   WebSocket: ws://${addresses[0].replace('http://', '')}\n`);
-            }
-            // Setup ngrok tunnel for public access
-            try {
-                const ngrokAuthtoken = process.env.NGROK_AUTHTOKEN || '34V5baVtGJwAdOk3TbeOSZ84LtQ_3EgdmJHHvWKo5XpJmfjgV';
-                const ngrokSubdomain = `zotrust-${Date.now()}`;
-                console.log('🚀 Setting up ngrok tunnel...');
-                const listener = await (0, ngrok_1.connect)({
-                    addr: Number(PORT),
-                    authtoken: ngrokAuthtoken,
-                    // Remove subdomain to get a random ngrok URL
-                });
-                const publicUrl = listener.url();
-                console.log(`\n🌍 Public Access via ngrok:`);
-                console.log(`   Main URL: ${publicUrl}`);
-                console.log(`   Health check: ${publicUrl}/health`);
-                console.log(`   API base: ${publicUrl}/api`);
-                console.log(`   WebSocket: ${publicUrl.replace('https://', 'wss://').replace('http://', 'ws://')}\n`);
-                logger.info('ngrok tunnel established', { publicUrl });
-            }
-            catch (error) {
-                // Check if it's the "endpoint already online" error
-                if (error.errorCode === 'ERR_NGROK_334' || error.message?.includes('already online')) {
-                    console.log('⚠️  ngrok tunnel already active - using existing tunnel');
-                    console.log('   (This is normal if ngrok is running in another process)');
-                    logger.warn('ngrok tunnel already exists', { error: error.message });
-                }
-                else {
-                    console.error('❌ Failed to setup ngrok tunnel:', error);
-                    logger.error('ngrok tunnel failed', { error: error.message });
-                    console.log('   Server will continue running with local network access only');
-                }
             }
         });
     }

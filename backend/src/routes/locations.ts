@@ -17,7 +17,7 @@ const updateLocationSchema = Joi.object({
 // GET /api/locations - Get all locations
 router.get('/', authenticateAdmin, async (req, res) => {
   try {
-    const { name, limit = 100, offset = 0 } = req.query;
+    const { name, limit = 400, offset = 0 } = req.query;
     
     let query = `
       SELECT l.*, 
@@ -30,6 +30,7 @@ router.get('/', authenticateAdmin, async (req, res) => {
     const params = [];
     let paramCount = 0;
     
+   
     if (name) {
       conditions.push(`l.name ILIKE $${++paramCount}`);
       params.push(`%${name}%`);
