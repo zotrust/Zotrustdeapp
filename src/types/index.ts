@@ -40,6 +40,9 @@ export interface Ad {
   ownerAddress: string;
   ownerSelectedAgentIds: string[]; // Changed to support multiple agents
   owner_name?: string;
+  owner_verified?: boolean;
+  successful_orders?: number;
+  failed_orders?: number;
   type: 'BUY' | 'SELL';
   token: 'USDT' | 'USDC';
   priceInr: string;

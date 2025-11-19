@@ -19,7 +19,8 @@ import {
   PhoneOff,
   Mic,
   MicOff,
-  MessageSquare
+  MessageSquare,
+  UserCircle
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { checkAdminAuth, clearExpiredToken } from '../utils/adminAuth';
@@ -712,6 +713,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
     { name: 'Chat Support', href: '/admin/chat', icon: MessageSquare },
     { name: 'Agents', href: '/admin/agents', icon: Users },
     { name: 'Locations', href: '/admin/locations', icon: MapPin },
+    { name: 'Users', href: '/admin/users', icon: UserCircle },
     { name: 'Reviews', href: '/admin/reviews', icon: Star },
     { name: 'Videos', href: '/admin/videos', icon: Video },
     { name: 'Settings', href: '/admin/settings', icon: Settings },

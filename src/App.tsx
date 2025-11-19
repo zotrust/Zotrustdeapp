@@ -21,6 +21,7 @@ import AdminAgents from './pages/admin/AdminAgents';
 import AdminLocations from './pages/admin/AdminLocations';
 import AdminSettings from './pages/admin/AdminSettings';
 import AdminReviews from './pages/admin/AdminReviews';
+import AdminUsers from './pages/admin/AdminUsers';
 import AdminVideos from './pages/admin/AdminVideos';
 import AdminSupportCalls from './pages/admin/AdminSupportCalls';
 import AdminChat from './pages/admin/AdminChat';
@@ -171,6 +172,10 @@ const router = createBrowserRouter([
           {
             path: 'reviews',
             element: <AdminReviews />
+          },
+          {
+            path: 'users',
+            element: <AdminUsers />
           },
           {
             path: 'videos',

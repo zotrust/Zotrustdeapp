@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Plus, Phone, MessageCircleDashed as MessageCircle, Filter, RefreshCw, Loader2, X, AlertCircle } from 'lucide-react';
+import { Plus, Phone, MessageCircleDashed as MessageCircle, Filter, RefreshCw, Loader2, X, AlertCircle, Star, CheckCircle, XCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Ad } from '../types';
 import { useUserStore } from '../stores/userStore';
@@ -154,6 +154,9 @@ const P2P: React.FC = () => {
             ownerAddress: ad.owner_address,
             ownerSelectedAgentIds: ad.selected_agent_ids || [],
             owner_name: ad.owner_name || '',
+            owner_verified: ad.owner_verified || false,
+            successful_orders: parseInt(ad.successful_orders || '0'),
+            failed_orders: parseInt(ad.failed_orders || '0'),
             type: ad.type,
             token: ad.token,
             priceInr: ad.price_inr.toString(),
@@ -611,9 +614,30 @@ const P2P: React.FC = () => {
                         <div className="w-7 h-7 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-white font-bold text-xs">
                           {ownerName.charAt(0).toUpperCase()}
                         </div>
-                        <div>
-                          <p className="text-white font-medium text-xs">{ownerName}</p>
-
+                        <div className="flex flex-col space-y-0.5">
+                          <div className="flex items-center space-x-1.5">
+                            <p className="text-white font-medium text-xs">{ownerName}</p>
+                            {ad.owner_verified && (
+                              <div className="flex items-center space-x-1">
+                                <Star size={10} className="text-yellow-400 fill-yellow-400 flex-shrink-0" />
+                                <span className="text-[10px] text-yellow-400 font-medium">Verified User</span>
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex items-center space-x-2 text-[9px]">
+                            {ad.successful_orders !== undefined && (
+                              <div className="flex items-center space-x-0.5">
+                                <CheckCircle size={9} className="text-green-400" />
+                                <span className="text-green-400 font-medium">{ad.successful_orders || 0}</span>
+                              </div>
+                            )}
+                            {ad.failed_orders !== undefined && (
+                              <div className="flex items-center space-x-0.5">
+                                <XCircle size={9} className="text-red-400" />
+                                <span className="text-red-400 font-medium">{ad.failed_orders || 0}</span>
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </div>
                       <span className={clsx(

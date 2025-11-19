@@ -101,22 +101,29 @@ router.get('/', authenticateToken, async (req: any, res) => {
       });
     }
     
-    // Build explicit branch name matching condition
+    // Build explicit branch name matching condition with proper parameterization
     // Only show ads where ad owner's agent branch_name matches user's agent branch_name
     const branchNameConditions = userAgentBranchNames.map((_, index) => 
       `LOWER(TRIM(ad_owner_agent.branch_name)) = $${index + 2}`
     ).join(' OR ');
     
+    // Build query params: [user.address, ...userAgentBranchNames, ...otherParams]
+    const queryParams: any[] = [user.address, ...userAgentBranchNames];
+    let paramIndex = queryParams.length + 1;
+    
     let query = `
-      SELECT a.*, u.name as owner_name, u.selected_agent_ids,
-             ag.branch_name, ag.mobile as agent_mobile, ag.address as agent_address
+      SELECT a.*, u.name as owner_name, u.verified as owner_verified, u.selected_agent_ids,
+             ag.branch_name, ag.mobile as agent_mobile, ag.address as agent_address,
+             COUNT(DISTINCT CASE WHEN o.state IN ('COMPLETED', 'RELEASED') THEN o.id END) as successful_orders,
+             COUNT(DISTINCT CASE WHEN o.state IN ('CANCELLED', 'REFUNDED') THEN o.id END) as failed_orders
       FROM ads a
       JOIN users u ON a.owner_address = u.address
       JOIN agents ag ON a.owner_selected_agent_id = ag.id
-      WHERE a.active = true 
+      LEFT JOIN orders o ON (o.buyer_address = u.address OR o.seller_address = u.address)
+      WHERE (a.active IS TRUE) 
         AND a.owner_address != $1
         AND u.selected_agent_ids IS NOT NULL
-        AND array_length(u.selected_agent_ids::int[], 1) > 0
+        AND COALESCE(array_length(u.selected_agent_ids, 1), 0) > 0
         AND (
           -- Check if ad owner has any agent with matching branch_name (case-insensitive)
           -- Only match by branch_name, not by agent ID
@@ -124,7 +131,7 @@ router.get('/', authenticateToken, async (req: any, res) => {
             SELECT 1 
             FROM agents ad_owner_agent
             WHERE ad_owner_agent.id = ANY(u.selected_agent_ids::int[])
-              AND (${branchNameConditions})
+              AND (${branchNameConditions || 'FALSE'})
           )
         )
         AND (
@@ -135,11 +142,8 @@ router.get('/', authenticateToken, async (req: any, res) => {
           (a.type = 'BUY' AND (a.buy_quantity IS NULL OR CAST(a.buy_quantity AS DECIMAL) > 0))
         )
     `;
-    
-    // Build query params: [user.address, ...userAgentBranchNames, ...otherParams]
-    const queryParams: any[] = [user.address, ...userAgentBranchNames];
-    let paramIndex = queryParams.length + 1;
 
+    // Add additional filters before GROUP BY
     if (type) {
       query += ` AND a.type = $${paramIndex}`;
       queryParams.push(type);
@@ -158,14 +162,17 @@ router.get('/', authenticateToken, async (req: any, res) => {
       paramIndex++;
     }
 
+    // Add GROUP BY and ORDER BY after all WHERE conditions
+    query += ` GROUP BY a.id, u.address, u.name, u.verified, u.selected_agent_ids, ag.id, ag.branch_name, ag.mobile, ag.address`;
     query += ` ORDER BY a.created_at DESC LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
     queryParams.push(limit, offset);
 
     console.log('📊 EXECUTING QUERY:', {
-      query: query.substring(0, 200) + '...',
-      params: queryParams.slice(0, 10), // Show first 10 params to avoid too much output
+      query: query,
+      params: queryParams,
       totalParams: queryParams.length,
       userBranchNames: userAgentBranchNames,
+      branchNameConditions: branchNameConditions,
       paramBreakdown: {
         userAddress: queryParams[0],
         branchNames: queryParams.slice(1, 1 + userAgentBranchNames.length),

@@ -93,7 +93,7 @@ router.get('/', auth_1.authenticateToken, async (req, res) => {
         // Only show ads where ad owner's agent branch_name matches user's agent branch_name
         const branchNameConditions = userAgentBranchNames.map((_, index) => `LOWER(TRIM(ad_owner_agent.branch_name)) = $${index + 2}`).join(' OR ');
         let query = `
-      SELECT a.*, u.name as owner_name, u.selected_agent_ids,
+      SELECT a.*, u.name as owner_name, u.verified as owner_verified, u.selected_agent_ids,
              ag.branch_name, ag.mobile as agent_mobile, ag.address as agent_address
       FROM ads a
       JOIN users u ON a.owner_address = u.address
