@@ -21,6 +21,7 @@ const P2P: React.FC = () => {
     ad: null
   });
   const [isLoading, setIsLoading] = useState(false);
+  const [isFetchingAds, setIsFetchingAds] = useState(false);
   const [creatingOrder, setCreatingOrder] = useState<string | null>(null);
   const [orderModal, setOrderModal] = useState<{ isOpen: boolean; ad: Ad | null }>({
     isOpen: false,
@@ -51,19 +52,7 @@ const P2P: React.FC = () => {
     }
   }, [activeTab, selectedToken, isConnected, user?.selectedAgentIds]);
 
-  // Auto-refresh ads every 15 seconds
-  useEffect(() => {
-    if (!isConnected || !user?.selectedAgentIds || user.selectedAgentIds.length === 0) {
-      return;
-    }
 
-    const refreshInterval = setInterval(() => {
-      console.log('🔄 Auto-refreshing P2P ads every 15 seconds...');
-      fetchAds();
-    }, 15000); // 15 seconds
-
-    return () => clearInterval(refreshInterval);
-  }, [isConnected, user?.selectedAgentIds]);
 
   // Refresh user profile when wallet connects to get latest verification status
   useEffect(() => {
@@ -94,6 +83,10 @@ const P2P: React.FC = () => {
   }, []);
 
   const fetchAds = async () => {
+    if (isFetchingAds) {
+      return;
+    }
+    setIsFetchingAds(true);
     setIsLoading(true);
     setFetchError(null);
 
@@ -135,6 +128,7 @@ const P2P: React.FC = () => {
       setAds([]);
     } finally {
       setIsLoading(false);
+      setIsFetchingAds(false);
     }
   };
 

@@ -63,14 +63,15 @@ const CreateAdModal: React.FC<CreateAdModalProps> = ({ isOpen, onClose, onSucces
   );
 
   useEffect(() => {
-    if (isOpen && user?.locationId) {
-      fetchAgents(user.locationId);
+    if (isOpen) {
+      // Fetch all agents so we can show every branch the user selected (even across multiple locations)
+      fetchAgents();
     }
     // Update balance when modal opens for SELL ads
     if (isOpen && isConnected) {
       updateBalances();
     }
-  }, [isOpen, user?.locationId, isConnected]);
+  }, [isOpen, isConnected, fetchAgents, updateBalances]);
 
   useEffect(() => {
     if (user?.selectedAgentIds && user.selectedAgentIds.length > 0) {

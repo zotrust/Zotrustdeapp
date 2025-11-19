@@ -17,7 +17,7 @@ interface Review {
   reviewee_name: string;
   order_id: number;
   rating: number;
-  message: string;
+  comment: string;
   created_at: string;
   is_approved: boolean;
   is_visible: boolean;
@@ -73,8 +73,6 @@ const Dashboard: React.FC = () => {
 
   // Define fetchReviews before using it in useEffect
   const fetchReviews = React.useCallback(async () => {
-    if (!isConnected || !address) return;
-    
     setIsLoadingReviews(true);
     try {
       // Fetch all reviews instead of just user-specific reviews
@@ -95,7 +93,7 @@ const Dashboard: React.FC = () => {
     } finally {
       setIsLoadingReviews(false);
     }
-  }, [isConnected, address]);
+  }, []);
 
   // Separate effect for wallet connection and balance updates
   useEffect(() => {
@@ -131,22 +129,13 @@ const Dashboard: React.FC = () => {
     }
   }, [isConnected, address, refreshUserProfile]);
 
-  // Separate effect for fetching reviews (only when address changes or first load)
+  // Separate effect for fetching reviews on initial load and manual refresh
   useEffect(() => {
-    if (isConnected && address) {
-      const currentAddress = lastAddressRef.current;
-      // Only fetch if address changed or we haven't fetched yet
-      if (currentAddress !== address || !hasFetchedReviewsRef.current) {
-        hasFetchedReviewsRef.current = true;
-        lastAddressRef.current = address;
-        fetchReviews();
-      }
-    } else {
-      // Reset when disconnected
-      hasFetchedReviewsRef.current = false;
-      lastAddressRef.current = null;
+    if (!hasFetchedReviewsRef.current) {
+      hasFetchedReviewsRef.current = true;
+      fetchReviews();
     }
-  }, [isConnected, address, fetchReviews]);
+  }, [fetchReviews]);
 
   const handleConnectWallet = async () => {
     if (isConnected) {
@@ -619,7 +608,6 @@ const Dashboard: React.FC = () => {
 
  
       {/* Reviews Section */}
-      {isConnected && (
         <div className="bg-white rounded-xl p-4 shadow-lg space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="text-lg font-bold text-gray-800 flex items-center space-x-2">
@@ -690,13 +678,6 @@ const Dashboard: React.FC = () => {
             ) : reviews.length > 0 ? (
               reviews
                 .filter(review => showOnlyApproved ? review.is_approved : true)
-                .filter((review, index, self) => {
-                  // Remove duplicates based on reviewer_name (case-insensitive)
-                  const reviewerName = (review.reviewer_name || 'Anonymous User').toLowerCase().trim();
-                  return index === self.findIndex(r => 
-                    (r.reviewer_name || 'Anonymous User').toLowerCase().trim() === reviewerName
-                  );
-                })
                 .map((review) => (
                 <motion.div 
                   key={review.id} 
@@ -739,8 +720,8 @@ const Dashboard: React.FC = () => {
                       })}
                     </span>
                   </div>
-                  {review.message && (
-                    <p className="text-sm text-gray-700 leading-relaxed mt-2">{review.message}</p>
+                  {review.comment && (
+                    <p className="text-sm text-gray-700 leading-relaxed mt-2">{review.comment}</p>
                   )}
                 </motion.div>
               ))
@@ -760,7 +741,6 @@ const Dashboard: React.FC = () => {
             )}
           </div>
         </div>
-      )}
 
       {/* Status Card */}
       <div className="bg-violet-500/20 border-violet-500/30 text-violet-300 p-3 rounded-lg border flex items-center space-x-2">

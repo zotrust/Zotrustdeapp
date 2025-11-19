@@ -9,10 +9,13 @@
  * Usage: npm run insert-reviews
  */
 
+import fs from 'fs';
+import path from 'path';
 import pool from '../src/config/database';
-import { randomBytes } from 'crypto';
+import { createHash } from 'crypto';
 
 interface Review {
+  id: number;
   reviewer_address: string;
   reviewer_name: string;
   reviewee_address: string;
@@ -23,17 +26,32 @@ interface Review {
   created_at: Date;
 }
 
-// Indian Names (Mix of Hindi, Gujarati, English Indian names)
-const indianNames = [
-  'Rajesh Kumar', 'Priya Sharma', 'Amit Patel', 'Sneha Desai', 'Vikram Singh',
-  'Kavita Mehta', 'Rahul Shah', 'Anjali Joshi', 'Suresh Gupta', 'Divya Reddy',
-  'Manoj Agarwal', 'Pooja Verma', 'Nikhil Jain', 'Swati Kapoor', 'Arjun Malhotra',
-  'Neha Trivedi', 'Karan Bhatt', 'Riya Chawla', 'Harsh Dave', 'Shreya Modi',
-  'Rohan Mehta', 'Isha Shah', 'Yash Patel', 'Aarohi Desai', 'Vedant Joshi',
-  'Ananya Singh', 'Dhruv Kumar', 'Ishita Sharma', 'Arnav Agarwal', 'Saanvi Reddy',
-  'Advik Gupta', 'Anvi Patel', 'Vihaan Shah', 'Aadhya Mehta', 'Aarav Joshi',
-  'Krishna Desai', 'Radha Patel', 'Shivam Kumar', 'Gauri Sharma', 'Om Singh',
-  'Lakshmi Reddy', 'Vishnu Agarwal', 'Saraswati Mehta', 'Ganesh Joshi', 'Parvati Shah'
+const csvPath = path.join(__dirname, '../src/routes/revei.csv');
+const platformAddress = '0x' + '9'.repeat(40);
+const platformName = 'Zotrust Platform Desk';
+const adminUserId = 1;
+
+const fourStarIds = new Set<number>([
+  42, 46, 50, 54, 57, 59, 60, 63, 64, 67, 68, 70, 72, 77, 81, 85, 89, 92, 94, 95,
+  98, 99, 102, 103, 105, 107, 115, 118, 122, 126, 130, 134
+]);
+
+const indianFirstNames = [
+  'Aarav', 'Vihaan', 'Aditya', 'Vivaan', 'Ayaan', 'Krishna', 'Ishaan', 'Kabir',
+  'Rudra', 'Arjun', 'Yuvan', 'Kiaan', 'Atharv', 'Pranav', 'Harsh', 'Kunal',
+  'Manan', 'Devansh', 'Arnav', 'Parth', 'Yash', 'Om', 'Samar', 'Tanish',
+  'Lakshya', 'Ayan', 'Shivansh', 'Jai', 'Aryan', 'Vikram', 'Raghav', 'Utsav',
+  'Vedant', 'Ansh', 'Hriday', 'Nishit', 'Dhruv', 'Sahil', 'Tarun', 'Aniket',
+  'Ritesh', 'Madhav', 'Kabya', 'Siddharth', 'Shaurya', 'Keshav', 'Arnav', 'Reyansh'
+];
+
+const indianLastNames = [
+  'Patel', 'Sharma', 'Singh', 'Mehta', 'Reddy', 'Das', 'Iyer', 'Menon', 'Jain',
+  'Shah', 'Garg', 'Kapoor', 'Khan', 'Srivastava', 'Desai', 'Bhatt', 'Chopra',
+  'Kulkarni', 'Naidu', 'Basu', 'Ghosh', 'Verma', 'Joshi', 'Agarwal', 'Bhandari',
+  'Chaudhary', 'Trivedi', 'Malhotra', 'Nair', 'Yadav', 'Shetty', 'Gupta',
+  'Bose', 'Parikh', 'Dutta', 'Bose', 'Nanda', 'Sethi', 'Saxena', 'Thakkar',
+  'Chhabra', 'Sarin', 'Kamat', 'Tiwari', 'Nigam', 'Dubey', 'Pathak', 'Bansal'
 ];
 
 // Indian Cities
@@ -43,562 +61,60 @@ const indianCities = [
   'Thane', 'Bhopal', 'Visakhapatnam', 'Patna', 'Vadodara', 'Ghaziabad'
 ];
 
-// Generate random Ethereum address
-function generateRandomAddress(): string {
-  const randomHex = randomBytes(20).toString('hex');
-  return '0x' + randomHex;
+function generateDeterministicAddress(seed: string): string {
+  const hex = createHash('sha256').update(seed).digest('hex');
+  return `0x${hex.slice(0, 40)}`;
 }
 
-// Sample reviews data - 35 reviews
-const reviews: Review[] = [
-  // English Reviews (Age 30-40, practical)
-  {
-    reviewer_address: '',
-    reviewer_name: '',
-    reviewee_address: '',
-    reviewee_name: '',
-    order_id: null,
-    rating: 5,
-    message: 'I used Zotrust to swap cash ↔ USDT. The escrow worked fine and fees were low. Completed my first trade in ~20 minutes.',
-    created_at: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000)
-  },
-  {
-    reviewer_address: '',
-    reviewer_name: '',
-    reviewee_address: '',
-    reviewee_name: '',
-    order_id: null,
-    rating: 4,
-    message: 'Good P2P flow and easy wallet connect. Had a small UI glitch but support helped within a day.',
-    created_at: new Date(Date.now() - 85 * 24 * 60 * 60 * 1000)
-  },
-  {
-    reviewer_address: '',
-    reviewer_name: '',
-    reviewee_address: '',
-    reviewee_name: '',
-    order_id: null,
-    rating: 5,
-    message: 'Quick trades, clear terms, and reasonable fees. Recommended for regular P2P traders.',
-    created_at: new Date(Date.now() - 80 * 24 * 60 * 60 * 1000)
-  },
-  {
-    reviewer_address: '',
-    reviewer_name: '',
-    reviewee_address: '',
-    reviewee_name: '',
-    order_id: null,
-    rating: 5,
-    message: 'Fast and secure platform. Completed multiple trades without any issues. Great experience!',
-    created_at: new Date(Date.now() - 75 * 24 * 60 * 60 * 1000)
-  },
-  {
-    reviewer_address: '',
-    reviewer_name: '',
-    reviewee_address: '',
-    reviewee_name: '',
-    order_id: null,
-    rating: 4,
-    message: 'Easy to use interface. Escrow system is reliable. Would recommend to friends.',
-    created_at: new Date(Date.now() - 70 * 24 * 60 * 60 * 1000)
-  },
-  
-  // English Reviews (Age 40-50+, reassuring/concise)
-  {
-    reviewer_address: '',
-    reviewer_name: '',
-    reviewee_address: '',
-    reviewee_name: '',
-    order_id: null,
-    rating: 5,
-    message: 'Easy to use — I bought USDT without trouble. Escrow felt secure. Will use again.',
-    created_at: new Date(Date.now() - 65 * 24 * 60 * 60 * 1000)
-  },
-  {
-    reviewer_address: '',
-    reviewer_name: '',
-    reviewee_address: '',
-    reviewee_name: '',
-    order_id: null,
-    rating: 5,
-    message: 'Straightforward process for a non-tech person. Support was patient and helpful.',
-    created_at: new Date(Date.now() - 60 * 24 * 60 * 60 * 1000)
-  },
-  {
-    reviewer_address: '',
-    reviewer_name: '',
-    reviewee_address: '',
-    reviewee_name: '',
-    order_id: null,
-    rating: 5,
-    message: 'I felt safe using Zotrust for cash to USDT. Transaction completed smoothly.',
-    created_at: new Date(Date.now() - 55 * 24 * 60 * 60 * 1000)
-  },
-  {
-    reviewer_address: '',
-    reviewer_name: '',
-    reviewee_address: '',
-    reviewee_name: '',
-    order_id: null,
-    rating: 4,
-    message: 'Simple and secure. Good for first-time crypto users. Support team is responsive.',
-    created_at: new Date(Date.now() - 50 * 24 * 60 * 60 * 1000)
-  },
-  {
-    reviewer_address: '',
-    reviewer_name: '',
-    reviewee_address: '',
-    reviewee_name: '',
-    order_id: null,
-    rating: 5,
-    message: 'Trustworthy platform. Completed my transaction without any hassles. Highly recommended.',
-    created_at: new Date(Date.now() - 45 * 24 * 60 * 60 * 1000)
-  },
-  
-  // Gujarati Reviews (Age 30-40, friendly)
-  {
-    reviewer_address: '',
-    reviewer_name: '',
-    reviewee_address: '',
-    reviewee_name: '',
-    order_id: null,
-    rating: 5,
-    message: 'Zotrust thi USDT kharidi karvi asaan hati. Escrow secure lage che ane fees ochhi hati. Recommend karu chu.',
-    created_at: new Date(Date.now() - 40 * 24 * 60 * 60 * 1000)
-  },
-  {
-    reviewer_address: '',
-    reviewer_name: '',
-    reviewee_address: '',
-    reviewee_name: '',
-    order_id: null,
-    rating: 5,
-    message: 'Wallet connect saral che ane trade jaldi complete thayu. Support pan madadgar che.',
-    created_at: new Date(Date.now() - 35 * 24 * 60 * 60 * 1000)
-  },
-  {
-    reviewer_address: '',
-    reviewer_name: '',
-    reviewee_address: '',
-    reviewee_name: '',
-    order_id: null,
-    rating: 4,
-    message: 'Platform aavjo che, fees reasonable che. Ek vaar try karo, definitely recommend karu chu.',
-    created_at: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
-  },
-  {
-    reviewer_address: '',
-    reviewer_name: '',
-    reviewee_address: '',
-    reviewee_name: '',
-    order_id: null,
-    rating: 5,
-    message: 'Bilkul safe ane secure platform. Multiple trades kari chhe, badhiya experience.',
-    created_at: new Date(Date.now() - 25 * 24 * 60 * 60 * 1000)
-  },
-  
-  // Gujarati Reviews (Age 40-50+, reassuring)
-  {
-    reviewer_address: '',
-    reviewer_name: '',
-    reviewee_address: '',
-    reviewee_name: '',
-    order_id: null,
-    rating: 5,
-    message: 'Platform samajva ma saral padi. Payment process safe hatu ane admin response pan sari hati.',
-    created_at: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000)
-  },
-  {
-    reviewer_address: '',
-    reviewer_name: '',
-    reviewee_address: '',
-    reviewee_name: '',
-    order_id: null,
-    rating: 5,
-    message: 'Pehli vaar P2P karto hoyu pan sab kuch theek rahi. Thanks, Zotrust.',
-    created_at: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000)
-  },
-  {
-    reviewer_address: '',
-    reviewer_name: '',
-    reviewee_address: '',
-    reviewee_name: '',
-    order_id: null,
-    rating: 4,
-    message: 'Bharosemand platform che. Thoda UI improve thai sake pan overall acha che.',
-    created_at: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000)
-  },
-  
-  // Hinglish Reviews
-  {
-    reviewer_address: '',
-    reviewer_name: '',
-    reviewee_address: '',
-    reviewee_name: '',
-    order_id: null,
-    rating: 5,
-    message: 'Platform theek hai — escrow pe trust kar sakte ho. Pehli trade 30 min me complete hui. Fees reasonable.',
-    created_at: new Date(Date.now() - 88 * 24 * 60 * 60 * 1000)
-  },
-  {
-    reviewer_address: '',
-    reviewer_name: '',
-    reviewee_address: '',
-    reviewee_name: '',
-    order_id: null,
-    rating: 4,
-    message: 'Cash se USDT buy kiya, support ne help ki. Thoda UI improve karna chahiye par overall acha experience.',
-    created_at: new Date(Date.now() - 83 * 24 * 60 * 60 * 1000)
-  },
-  {
-    reviewer_address: '',
-    reviewer_name: '',
-    reviewee_address: '',
-    reviewee_name: '',
-    order_id: null,
-    rating: 4,
-    message: 'Easy flow, fast payments, safe lagta hai. 4/5.',
-    created_at: new Date(Date.now() - 78 * 24 * 60 * 60 * 1000)
-  },
-  {
-    reviewer_address: '',
-    reviewer_name: '',
-    reviewee_address: '',
-    reviewee_name: '',
-    order_id: null,
-    rating: 5,
-    message: 'Bahut acha platform hai. Quick transactions aur secure escrow. Recommend karta hoon.',
-    created_at: new Date(Date.now() - 73 * 24 * 60 * 60 * 1000)
-  },
-  {
-    reviewer_address: '',
-    reviewer_name: '',
-    reviewee_address: '',
-    reviewee_name: '',
-    order_id: null,
-    rating: 4,
-    message: 'Good experience, thoda improvements chahiye in UI but overall solid platform.',
-    created_at: new Date(Date.now() - 68 * 24 * 60 * 60 * 1000)
-  },
-  
-  // Short Reviews (English)
-  {
-    reviewer_address: '',
-    reviewer_name: '',
-    reviewee_address: '',
-    reviewee_name: '',
-    order_id: null,
-    rating: 4,
-    message: 'Fast P2P trades, secure escrow, low fees. 4/5.',
-    created_at: new Date(Date.now() - 63 * 24 * 60 * 60 * 1000)
-  },
-  {
-    reviewer_address: '',
-    reviewer_name: '',
-    reviewee_address: '',
-    reviewee_name: '',
-    order_id: null,
-    rating: 5,
-    message: 'Smooth wallet connect and quick payouts. Recommended.',
-    created_at: new Date(Date.now() - 58 * 24 * 60 * 60 * 1000)
-  },
-  {
-    reviewer_address: '',
-    reviewer_name: '',
-    reviewee_address: '',
-    reviewee_name: '',
-    order_id: null,
-    rating: 5,
-    message: 'Excellent service. Fast and reliable. Will use again.',
-    created_at: new Date(Date.now() - 53 * 24 * 60 * 60 * 1000)
-  },
-  {
-    reviewer_address: '',
-    reviewer_name: '',
-    reviewee_address: '',
-    reviewee_name: '',
-    order_id: null,
-    rating: 4,
-    message: 'Good platform for P2P trading. Secure and user-friendly.',
-    created_at: new Date(Date.now() - 48 * 24 * 60 * 60 * 1000)
-  },
-  
-  // Short Reviews (Gujarati)
-  {
-    reviewer_address: '',
-    reviewer_name: '',
-    reviewee_address: '',
-    reviewee_name: '',
-    order_id: null,
-    rating: 4,
-    message: 'ઝપટદાર trades ane secure escrow — 4/5.',
-    created_at: new Date(Date.now() - 42 * 24 * 60 * 60 * 1000)
-  },
-  {
-    reviewer_address: '',
-    reviewer_name: '',
-    reviewee_address: '',
-    reviewee_name: '',
-    order_id: null,
-    rating: 5,
-    message: 'Aasaan ane bharosemand — recommend.',
-    created_at: new Date(Date.now() - 37 * 24 * 60 * 60 * 1000)
-  },
-  {
-    reviewer_address: '',
-    reviewer_name: '',
-    reviewee_address: '',
-    reviewee_name: '',
-    order_id: null,
-    rating: 5,
-    message: 'Badhiya platform che, jaldi trade complete thai jay che.',
-    created_at: new Date(Date.now() - 32 * 24 * 60 * 60 * 1000)
-  },
-  
-  // Short Reviews (Hinglish)
-  {
-    reviewer_address: '',
-    reviewer_name: '',
-    reviewee_address: '',
-    reviewee_name: '',
-    order_id: null,
-    rating: 4,
-    message: 'Quick trade, secure escrow — 4/5.',
-    created_at: new Date(Date.now() - 27 * 24 * 60 * 60 * 1000)
-  },
-  {
-    reviewer_address: '',
-    reviewer_name: '',
-    reviewee_address: '',
-    reviewee_name: '',
-    order_id: null,
-    rating: 4,
-    message: 'Good experience, thoda improvements chahiye in UI.',
-    created_at: new Date(Date.now() - 22 * 24 * 60 * 60 * 1000)
-  },
-  {
-    reviewer_address: '',
-    reviewer_name: '',
-    reviewee_address: '',
-    reviewee_name: '',
-    order_id: null,
-    rating: 5,
-    message: 'Best P2P platform hai. Fast, secure, aur reliable.',
-    created_at: new Date(Date.now() - 17 * 24 * 60 * 60 * 1000)
-  },
-  {
-    reviewer_address: '',
-    reviewer_name: '',
-    reviewee_address: '',
-    reviewee_name: '',
-    order_id: null,
-    rating: 4,
-    message: 'Acha platform hai. Fees reasonable hai aur support bhi good hai.',
-    created_at: new Date(Date.now() - 12 * 24 * 60 * 60 * 1000)
-  },
-  {
-    reviewer_address: '',
-    reviewer_name: '',
-    reviewee_address: '',
-    reviewee_name: '',
-    order_id: null,
-    rating: 5,
-    message: 'Perfect platform for crypto trading. Highly satisfied.',
-    created_at: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
-  },
-  {
-    reviewer_address: '',
-    reviewer_name: '',
-    reviewee_address: '',
-    reviewee_name: '',
-    order_id: null,
-    rating: 4,
-    message: 'Smooth experience. Easy to use and secure.',
-    created_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000)
-  },
-  
-  // Reviews with Transaction Amounts and Counts
-  {
-    reviewer_address: '',
-    reviewer_name: '',
-    reviewee_address: '',
-    reviewee_name: '',
-    order_id: null,
-    rating: 5,
-    message: 'I have done 2 lakh worth of transactions on Zotrust. Very reliable platform with secure escrow. Highly recommended!',
-    created_at: new Date(Date.now() - 95 * 24 * 60 * 60 * 1000)
-  },
-  {
-    reviewer_address: '',
-    reviewer_name: '',
-    reviewee_address: '',
-    reviewee_name: '',
-    order_id: null,
-    rating: 5,
-    message: 'Completed transactions worth 1.5 lakh. Platform is trustworthy and fees are reasonable. Will continue using.',
-    created_at: new Date(Date.now() - 92 * 24 * 60 * 60 * 1000)
-  },
-  {
-    reviewer_address: '',
-    reviewer_name: '',
-    reviewee_address: '',
-    reviewee_name: '',
-    order_id: null,
-    rating: 5,
-    message: 'Done 50+ transactions on this platform. Total value around 3 lakh. Never faced any issue. Best P2P platform!',
-    created_at: new Date(Date.now() - 89 * 24 * 60 * 60 * 1000)
-  },
-  {
-    reviewer_address: '',
-    reviewer_name: '',
-    reviewee_address: '',
-    reviewee_name: '',
-    order_id: null,
-    rating: 5,
-    message: 'I have completed 75+ trades worth 4 lakh on Zotrust. Escrow system is excellent and fees are low. Perfect for regular traders.',
-    created_at: new Date(Date.now() - 82 * 24 * 60 * 60 * 1000)
-  },
-  {
-    reviewer_address: '',
-    reviewer_name: '',
-    reviewee_address: '',
-    reviewee_name: '',
-    order_id: null,
-    rating: 5,
-    message: 'Done transactions worth 2.5 lakh. Platform is secure and user-friendly. Support team is very helpful.',
-    created_at: new Date(Date.now() - 79 * 24 * 60 * 60 * 1000)
-  },
-  {
-    reviewer_address: '',
-    reviewer_name: '',
-    reviewee_address: '',
-    reviewee_name: '',
-    order_id: null,
-    rating: 5,
-    message: 'I have done 3 lakh worth of transactions. Zotrust is my go-to platform for P2P trading. Fast, secure, and trustworthy.',
-    created_at: new Date(Date.now() - 69 * 24 * 60 * 60 * 1000)
-  },
-  {
-    reviewer_address: '',
-    reviewer_name: '',
-    reviewee_address: '',
-    reviewee_name: '',
-    order_id: null,
-    rating: 5,
-    message: 'Completed 60+ trades worth 3.5 lakh. Excellent platform with great escrow system. Recommended for serious traders.',
-    created_at: new Date(Date.now() - 66 * 24 * 60 * 60 * 1000)
-  },
-  {
-    reviewer_address: '',
-    reviewer_name: '',
-    reviewee_address: '',
-    reviewee_name: '',
-    order_id: null,
-    rating: 5,
-    message: 'I have completed 40+ trades, total value 2.2 lakh. All went smoothly. Best P2P platform I have used so far.',
-    created_at: new Date(Date.now() - 59 * 24 * 60 * 60 * 1000)
-  },
-  {
-    reviewer_address: '',
-    reviewer_name: '',
-    reviewee_address: '',
-    reviewee_name: '',
-    order_id: null,
-    rating: 5,
-    message: 'Traded 2.8 lakh worth on Zotrust. Platform is secure and transactions are fast. Support is responsive. 5/5!',
-    created_at: new Date(Date.now() - 56 * 24 * 60 * 60 * 1000)
-  },
-  {
-    reviewer_address: '',
-    reviewer_name: '',
-    reviewee_address: '',
-    reviewee_name: '',
-    order_id: null,
-    rating: 5,
-    message: 'Done 100+ transactions worth 5 lakh. Zotrust is reliable and fees are low. Perfect for high-volume traders.',
-    created_at: new Date(Date.now() - 52 * 24 * 60 * 60 * 1000)
-  },
-  {
-    reviewer_address: '',
-    reviewer_name: '',
-    reviewee_address: '',
-    reviewee_name: '',
-    order_id: null,
-    rating: 5,
-    message: 'I have done 2.3 lakh worth of transactions. Platform is excellent, escrow works perfectly. Highly recommended!',
-    created_at: new Date(Date.now() - 46 * 24 * 60 * 60 * 1000)
-  },
-  {
-    reviewer_address: '',
-    reviewer_name: '',
-    reviewee_address: '',
-    reviewee_name: '',
-    order_id: null,
-    rating: 5,
-    message: 'Traded 4 lakh worth, completed 80+ transactions. Zotrust is the best P2P platform. Fast, secure, and reliable.',
-    created_at: new Date(Date.now() - 43 * 24 * 60 * 60 * 1000)
-  },
-  {
-    reviewer_address: '',
-    reviewer_name: '',
-    reviewee_address: '',
-    reviewee_name: '',
-    order_id: null,
-    rating: 5,
-    message: 'I have done 3.2 lakh worth of transactions on Zotrust. Platform is trustworthy and escrow system is excellent.',
-    created_at: new Date(Date.now() - 33 * 24 * 60 * 60 * 1000)
-  },
-  {
-    reviewer_address: '',
-    reviewer_name: '',
-    reviewee_address: '',
-    reviewee_name: '',
-    order_id: null,
-    rating: 5,
-    message: 'Traded 2.6 lakh, completed 55+ transactions. All went perfectly. Best experience with any P2P platform.',
-    created_at: new Date(Date.now() - 29 * 24 * 60 * 60 * 1000)
-  },
-  {
-    reviewer_address: '',
-    reviewer_name: '',
-    reviewee_address: '',
-    reviewee_name: '',
-    order_id: null,
-    rating: 5,
-    message: 'Done 90+ trades worth 4.5 lakh. Zotrust is reliable, fast, and secure. Perfect for regular crypto traders.',
-    created_at: new Date(Date.now() - 26 * 24 * 60 * 60 * 1000)
-  },
-  {
-    reviewer_address: '',
-    reviewer_name: '',
-    reviewee_address: '',
-    reviewee_name: '',
-    order_id: null,
-    rating: 5,
-    message: 'I have done 2.4 lakh worth of transactions. Platform works great, fees are low. Will continue using Zotrust.',
-    created_at: new Date(Date.now() - 19 * 24 * 60 * 60 * 1000)
-  },
-  {
-    reviewer_address: '',
-    reviewer_name: '',
-    reviewee_address: '',
-    reviewee_name: '',
-    order_id: null,
-    rating: 5,
-    message: 'Traded 3.8 lakh, done 70+ transactions. All successful. Zotrust is the most reliable P2P platform I know.',
-    created_at: new Date(Date.now() - 16 * 24 * 60 * 60 * 1000)
-  },
-  {
-    reviewer_address: '',
-    reviewer_name: '',
-    reviewee_address: '',
-    reviewee_name: '',
-    order_id: null,
-    rating: 5,
-    message: 'Completed 35+ trades worth 2.1 lakh. Excellent experience. Platform is secure and support is helpful.',
-    created_at: new Date(Date.now() - 13 * 24 * 60 * 60 * 1000)
+function generateIndianName(index: number): string {
+  const first = indianFirstNames[index % indianFirstNames.length];
+  const last = indianLastNames[Math.floor(index / indianFirstNames.length) % indianLastNames.length];
+  return `${first} ${last}`;
+}
+
+function sanitizeMessage(raw: string): string {
+  let message = raw.trim();
+  if (message.startsWith('"') && message.endsWith('"')) {
+    message = message.slice(1, -1).replace(/""/g, '"');
   }
-];
+  return message;
+}
+
+function buildReviewsFromCsv(): Review[] {
+  if (!fs.existsSync(csvPath)) {
+    throw new Error(`CSV file not found at ${csvPath}`);
+  }
+
+  const fileContent = fs.readFileSync(csvPath, 'utf-8');
+  const lines = fileContent.split(/\r?\n/).filter(line => line.trim().length > 0);
+  const rows = lines.slice(1); // skip header
+
+  const now = Date.now();
+  const reviews: Review[] = rows.map((line, idx) => {
+    const match = line.match(/^(\d+),(.*)$/);
+    if (!match) {
+      throw new Error(`Invalid CSV row: ${line}`);
+    }
+    const id = Number(match[1]);
+    const message = sanitizeMessage(match[2]);
+    const rating = fourStarIds.has(id) ? 4 : 5;
+    const created_at = new Date(now - (rows.length - idx) * 36 * 60 * 60 * 1000);
+
+    return {
+      id,
+      reviewer_address: generateDeterministicAddress(`reviewer-${id}`),
+      reviewer_name: generateIndianName(idx),
+      reviewee_address: platformAddress,
+      reviewee_name: platformName,
+    order_id: null,
+      rating,
+      message,
+      created_at
+    };
+  });
+
+  return reviews;
+}
 
 async function insertSampleReviews() {
   try {

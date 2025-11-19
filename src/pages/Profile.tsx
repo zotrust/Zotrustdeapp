@@ -7,7 +7,7 @@ import { ProfileData } from '../types';
 import clsx from 'clsx';
 import toast from 'react-hot-toast';
 
-const Profile: React.FC = () => {
+function Profile(): React.ReactElement {
   const { user, agents, locations, isLoading, updateProfile, fetchAgents, fetchLocations, fetchUserProfile, refreshUserProfile } = useUserStore();
   const { address, isConnected, connectionError, clearError } = useWalletStore();
   const [isEditing, setIsEditing] = useState(false);
@@ -288,7 +288,7 @@ const Profile: React.FC = () => {
             <div className="flex items-center justify-between mb-1">
               <label className="block text-xs font-medium text-violet-300">
                 Filter by Location (Optional)
-              </label>
+            </label>
               {formData.locationId && isEditing && (
                 <button
                   type="button"
@@ -312,7 +312,7 @@ const Profile: React.FC = () => {
                   }
                 }}
                 onFocus={() => setShowLocationDropdown(true)}
-                disabled={!isEditing}
+              disabled={!isEditing}
                 className="w-full bg-white/10 border border-violet-500/20 rounded px-2 py-1.5 pr-8 text-white text-sm focus:outline-none focus:border-violet-500 disabled:opacity-50"
                 placeholder="Search location to filter agents..."
                 autoComplete="off"
@@ -338,7 +338,7 @@ const Profile: React.FC = () => {
                       {location.city} {location.state ? `, ${location.state}` : ''}
                     </p>
                   </button>
-                ))}
+              ))}
               </div>
             )}
 
@@ -358,13 +358,13 @@ const Profile: React.FC = () => {
                     Select Agents * (Multiple - Max 3 Locations)
             </label>
                   
-                  {filteredAgents.length === 0 ? (
+                  {!formData.locationId ? (
                     <div className="w-full bg-white/10 border border-violet-500/20 rounded px-2 py-1.5 text-violet-300 text-sm">
-                      {formData.locationId ? (
-                        <p>No agents available for selected location. Clear location filter to see all agents.</p>
-                      ) : (
-                        <p>No agents available.</p>
-                      )}
+                      <p>Select a location above to view agents.</p>
+                    </div>
+                  ) : filteredAgents.length === 0 ? (
+                    <div className="w-full bg-white/10 border border-violet-500/20 rounded px-2 py-1.5 text-violet-300 text-sm">
+                      <p>No agents available for selected location. Clear the filter to choose another location.</p>
                     </div>
                   ) : (
                     <div className="max-h-48 overflow-y-auto bg-white/10 border border-violet-500/20 rounded p-2 space-y-1">
@@ -372,29 +372,35 @@ const Profile: React.FC = () => {
                         // Check if selecting this agent would exceed 3 locations
                         const currentSelectedAgents = agents.filter(a => formData.selectedAgentIds?.includes(String(a.id)));
                         const currentLocations = new Set(currentSelectedAgents.map(a => a.locationId).filter(Boolean));
-                        const wouldExceedLimit = agent.locationId && !currentLocations.has(agent.locationId) && currentLocations.size >= 3 && !formData.selectedAgentIds?.includes(String(agent.id));
+                        const agentLocationId = agent.locationId;
+                        const wouldExceedLimit = Boolean(
+                          agentLocationId &&
+                          !currentLocations.has(agentLocationId) &&
+                          currentLocations.size >= 3 &&
+                          !formData.selectedAgentIds?.includes(String(agent.id))
+                        );
                         
                         return (
-                          <label
-                            key={agent.id}
+                        <label
+                          key={agent.id}
                             className={clsx(
                               "flex items-center space-x-2 p-1.5 rounded hover:bg-white/5 cursor-pointer transition-colors",
                               wouldExceedLimit && "opacity-50 cursor-not-allowed"
                             )}
-                          >
-                            <input
-                              type="checkbox"
-                              checked={formData.selectedAgentIds?.includes(String(agent.id)) || false}
-                              onChange={(e) => {
+                        >
+                          <input
+                            type="checkbox"
+                            checked={formData.selectedAgentIds?.includes(String(agent.id)) || false}
+                            onChange={(e) => {
                                 if (wouldExceedLimit && e.target.checked) {
                                   toast.error('Maximum 3 different locations allowed');
                                   return;
                                 }
                                 
-                                const agentId = String(agent.id);
-                                const currentIds = formData.selectedAgentIds || [];
-                                
-                                if (e.target.checked) {
+                              const agentId = String(agent.id);
+                              const currentIds = formData.selectedAgentIds || [];
+                              
+                              if (e.target.checked) {
                                   // Check location limit before adding
                                   const selectedAgents = agents.filter(a => currentIds.includes(String(a.id)));
                                   const locations = new Set(selectedAgents.map(a => a.locationId).filter(Boolean));
@@ -402,38 +408,38 @@ const Profile: React.FC = () => {
                                     toast.error('You can select agents from maximum 3 different locations');
                                     return;
                                   }
-                                  // Add agent to selection
-                                  handleInputChange('selectedAgentIds', [...currentIds, agentId]);
-                                } else {
-                                  // Remove agent from selection
-                                  handleInputChange('selectedAgentIds', currentIds.filter(id => id !== agentId));
-                                }
-                              }}
+                                // Add agent to selection
+                                handleInputChange('selectedAgentIds', [...currentIds, agentId]);
+                              } else {
+                                // Remove agent from selection
+                                handleInputChange('selectedAgentIds', currentIds.filter(id => id !== agentId));
+                              }
+                            }}
                               disabled={!isEditing || wouldExceedLimit}
-                              className="w-3 h-3 text-violet-600 bg-white/10 border-violet-500/20 rounded focus:ring-violet-500 focus:ring-1 disabled:opacity-50"
-                            />
-                            <div className="flex-1 min-w-0">
-                              <p className="text-white font-medium text-sm truncate">{agent.branchName}</p>
+                            className="w-3 h-3 text-violet-600 bg-white/10 border-violet-500/20 rounded focus:ring-violet-500 focus:ring-1 disabled:opacity-50"
+                          />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-white font-medium text-sm truncate">{agent.branchName}</p>
                               <p className="text-violet-300 text-xs break-words">{agent.address}</p>
                               <div className="flex items-center space-x-2 mt-0.5">
-                                <p className="text-violet-400 text-xs truncate">{agent.mobile}</p>
+                            <p className="text-violet-400 text-xs truncate">{agent.mobile}</p>
                                 {agent.locationName && (
                                   <span className="text-violet-500/70 text-xs">• {agent.locationName}</span>
                                 )}
                               </div>
-                            </div>
-                            <div className="flex-shrink-0">
-                              {agent.verified ? (
-                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-green-500/20 text-green-400">
-                                  ✓
-                                </span>
-                              ) : (
-                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-yellow-500/20 text-yellow-400">
-                                  ⚠
-                                </span>
-                              )}
-                            </div>
-                          </label>
+                          </div>
+                          <div className="flex-shrink-0">
+                            {agent.verified ? (
+                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-green-500/20 text-green-400">
+                                ✓
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-yellow-500/20 text-yellow-400">
+                                ⚠
+                              </span>
+                            )}
+                          </div>
+                        </label>
                         );
                       })}
                     </div>

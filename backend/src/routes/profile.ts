@@ -43,17 +43,17 @@ router.put('/', authenticateToken, async (req: any, res) => {
       }
 
       // Check if agents are from maximum 3 different locations
-      const locationResult = await pool.query(
-        'SELECT DISTINCT location_id FROM agents WHERE id = ANY($1)',
-        [profileData.selected_agent_ids]
-      );
+        const locationResult = await pool.query(
+          'SELECT DISTINCT location_id FROM agents WHERE id = ANY($1)',
+          [profileData.selected_agent_ids]
+        );
 
       const uniqueLocations = locationResult.rows.length;
       if (uniqueLocations > 3) {
-        return res.status(400).json({
-          success: false,
+          return res.status(400).json({
+            success: false,
           error: 'You can select agents from maximum 3 different locations'
-        });
+          });
       }
     }
 
