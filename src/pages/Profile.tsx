@@ -59,14 +59,10 @@ const Profile: React.FC = () => {
     fetchLocations();
   }, [fetchLocations]);
 
-  // Fetch agents when location changes
+  // Fetch all agents (to allow selection from multiple locations)
   useEffect(() => {
-    if (formData.locationId) {
-      fetchAgents(formData.locationId);
-    } else {
-      fetchAgents(); // Fetch all agents if no location selected
-    }
-  }, [formData.locationId, fetchAgents]);
+    fetchAgents(); // Always fetch all agents to allow multi-location selection
+  }, [fetchAgents]);
 
   // Close location dropdown when clicking outside
   useEffect(() => {
@@ -91,6 +87,11 @@ const Profile: React.FC = () => {
     location.city?.toLowerCase().includes(locationSearchQuery.toLowerCase()) ||
     location.state?.toLowerCase().includes(locationSearchQuery.toLowerCase())
   );
+  
+  // Filter agents by selected location (if location is selected)
+  const filteredAgents = formData.locationId 
+    ? agents.filter(agent => agent.locationId === formData.locationId)
+    : agents;
 
   // Handle location selection
   const handleLocationSelect = (locationId: string, locationName: string) => {
@@ -98,10 +99,25 @@ const Profile: React.FC = () => {
     setLocationSearchQuery(locationName);
     setShowLocationDropdown(false);
   };
+  
+  // Clear location filter
+  const clearLocationFilter = () => {
+    handleInputChange('locationId', '');
+    setLocationSearchQuery('');
+    setShowLocationDropdown(false);
+  };
 
   const handleSaveProfile = async () => {
-    if (!formData.name.trim() || !formData.phone.trim() || !formData.locationId || formData.selectedAgentIds.length === 0) {
+    if (!formData.name.trim() || !formData.phone.trim() || formData.selectedAgentIds.length === 0) {
       setSaveError('Please fill in all required fields and select at least one agent');
+      return;
+    }
+    
+    // Check if agents are from maximum 3 locations
+    const selectedAgentsData = agents.filter(a => formData.selectedAgentIds?.includes(String(a.id)));
+    const uniqueLocations = new Set(selectedAgentsData.map(a => a.locationId));
+    if (uniqueLocations.size > 3) {
+      setSaveError('You can select agents from maximum 3 different locations');
       return;
     }
 
@@ -267,11 +283,22 @@ const Profile: React.FC = () => {
             />
           </div>
 
-                {/* Location Search */}
+                {/* Location Search - Optional (for filtering agents) */}
           <div className="relative location-search-container">
-            <label className="block text-xs font-medium text-violet-300 mb-1">
-              Location *
-            </label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-xs font-medium text-violet-300">
+                Filter by Location (Optional)
+              </label>
+              {formData.locationId && isEditing && (
+                <button
+                  type="button"
+                  onClick={clearLocationFilter}
+                  className="text-xs text-violet-400 hover:text-violet-300 underline"
+                >
+                  Clear Filter
+                </button>
+              )}
+            </div>
             <div className="relative">
               <input
                 type="text"
@@ -279,12 +306,15 @@ const Profile: React.FC = () => {
                 onChange={(e) => {
                   setLocationSearchQuery(e.target.value);
                   setShowLocationDropdown(true);
+                  // Clear location filter if search is cleared
+                  if (!e.target.value) {
+                    handleInputChange('locationId', '');
+                  }
                 }}
                 onFocus={() => setShowLocationDropdown(true)}
                 disabled={!isEditing}
                 className="w-full bg-white/10 border border-violet-500/20 rounded px-2 py-1.5 pr-8 text-white text-sm focus:outline-none focus:border-violet-500 disabled:opacity-50"
-                placeholder="Search location..."
-                required
+                placeholder="Search location to filter agents..."
                 autoComplete="off"
               />
               <Search size={16} className="absolute right-2 top-1/2 -translate-y-1/2 text-violet-400 pointer-events-none" />
@@ -322,63 +352,90 @@ const Profile: React.FC = () => {
             )}
           </div>
 
-                {/* Agent Selection - Multiple Selection with Checkboxes */}
+                {/* Agent Selection - Multiple Selection with Checkboxes (from multiple locations) */}
           <div>
             <label className="block text-xs font-medium text-violet-300 mb-1">
-                    Select Agents * (Multiple)
+                    Select Agents * (Multiple - Max 3 Locations)
             </label>
                   
-                  {!formData.locationId ? (
+                  {filteredAgents.length === 0 ? (
                     <div className="w-full bg-white/10 border border-violet-500/20 rounded px-2 py-1.5 text-violet-300 text-sm">
-                      <p>Select location first</p>
-                    </div>
-                  ) : agents.length === 0 ? (
-                    <div className="w-full bg-white/10 border border-violet-500/20 rounded px-2 py-1.5 text-violet-300 text-sm">
-                      <p>No agents available</p>
+                      {formData.locationId ? (
+                        <p>No agents available for selected location. Clear location filter to see all agents.</p>
+                      ) : (
+                        <p>No agents available.</p>
+                      )}
                     </div>
                   ) : (
-                    <div className="max-h-32 overflow-y-auto bg-white/10 border border-violet-500/20 rounded p-2 space-y-1">
-                      {agents.map((agent) => (
-                        <label
-                          key={agent.id}
-                          className="flex items-center space-x-2 p-1.5 rounded hover:bg-white/5 cursor-pointer transition-colors"
-                        >
-                          <input
-                            type="checkbox"
-                            checked={formData.selectedAgentIds?.includes(String(agent.id)) || false}
-                            onChange={(e) => {
-                              const agentId = String(agent.id);
-                              const currentIds = formData.selectedAgentIds || [];
-                              
-                              if (e.target.checked) {
-                                // Add agent to selection
-                                handleInputChange('selectedAgentIds', [...currentIds, agentId]);
-                              } else {
-                                // Remove agent from selection
-                                handleInputChange('selectedAgentIds', currentIds.filter(id => id !== agentId));
-                              }
-                            }}
-                            disabled={!isEditing}
-                            className="w-3 h-3 text-violet-600 bg-white/10 border-violet-500/20 rounded focus:ring-violet-500 focus:ring-1 disabled:opacity-50"
-                          />
-                          <div className="flex-1 min-w-0">
-                            <p className="text-white font-medium text-sm truncate">{agent.branchName}</p>
-                            <p className="text-violet-300 text-xs break-words">{agent.address}</p>
-                            <p className="text-violet-400 text-xs truncate">{agent.mobile}</p>
-                          </div>
-                          <div className="flex-shrink-0">
-                            {agent.verified ? (
-                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-green-500/20 text-green-400">
-                                ✓
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-yellow-500/20 text-yellow-400">
-                                ⚠
-                              </span>
+                    <div className="max-h-48 overflow-y-auto bg-white/10 border border-violet-500/20 rounded p-2 space-y-1">
+                      {filteredAgents.map((agent) => {
+                        // Check if selecting this agent would exceed 3 locations
+                        const currentSelectedAgents = agents.filter(a => formData.selectedAgentIds?.includes(String(a.id)));
+                        const currentLocations = new Set(currentSelectedAgents.map(a => a.locationId).filter(Boolean));
+                        const wouldExceedLimit = agent.locationId && !currentLocations.has(agent.locationId) && currentLocations.size >= 3 && !formData.selectedAgentIds?.includes(String(agent.id));
+                        
+                        return (
+                          <label
+                            key={agent.id}
+                            className={clsx(
+                              "flex items-center space-x-2 p-1.5 rounded hover:bg-white/5 cursor-pointer transition-colors",
+                              wouldExceedLimit && "opacity-50 cursor-not-allowed"
                             )}
-                          </div>
-                        </label>
-                      ))}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={formData.selectedAgentIds?.includes(String(agent.id)) || false}
+                              onChange={(e) => {
+                                if (wouldExceedLimit && e.target.checked) {
+                                  toast.error('Maximum 3 different locations allowed');
+                                  return;
+                                }
+                                
+                                const agentId = String(agent.id);
+                                const currentIds = formData.selectedAgentIds || [];
+                                
+                                if (e.target.checked) {
+                                  // Check location limit before adding
+                                  const selectedAgents = agents.filter(a => currentIds.includes(String(a.id)));
+                                  const locations = new Set(selectedAgents.map(a => a.locationId).filter(Boolean));
+                                  if (agent.locationId && !locations.has(agent.locationId) && locations.size >= 3) {
+                                    toast.error('You can select agents from maximum 3 different locations');
+                                    return;
+                                  }
+                                  // Add agent to selection
+                                  handleInputChange('selectedAgentIds', [...currentIds, agentId]);
+                                } else {
+                                  // Remove agent from selection
+                                  handleInputChange('selectedAgentIds', currentIds.filter(id => id !== agentId));
+                                }
+                              }}
+                              disabled={!isEditing || wouldExceedLimit}
+                              className="w-3 h-3 text-violet-600 bg-white/10 border-violet-500/20 rounded focus:ring-violet-500 focus:ring-1 disabled:opacity-50"
+                            />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-white font-medium text-sm truncate">{agent.branchName}</p>
+                              <p className="text-violet-300 text-xs break-words">{agent.address}</p>
+                              <div className="flex items-center space-x-2 mt-0.5">
+                                <p className="text-violet-400 text-xs truncate">{agent.mobile}</p>
+                                {agent.locationName && (
+                                  <span className="text-violet-500/70 text-xs">• {agent.locationName}</span>
+                                )}
+                              </div>
+                            </div>
+                            <div className="flex-shrink-0">
+                              {agent.verified ? (
+                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-green-500/20 text-green-400">
+                                  ✓
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-yellow-500/20 text-yellow-400">
+                                  ⚠
+                                </span>
+                              )}
+                            </div>
+                          </label>
+                        );
+                      })}
                     </div>
                   )}
                   
@@ -391,10 +448,18 @@ const Profile: React.FC = () => {
                       <div className="mt-1 space-y-0.5">
                         {selectedAgents.map((agent) => (
                           <p key={agent.id} className="text-violet-200 text-xs">
-                            • {agent.branchName}
+                            • {agent.branchName} {agent.locationName && <span className="text-violet-400">({agent.locationName})</span>}
                           </p>
                         ))}
                       </div>
+                      {(() => {
+                        const uniqueLocations = new Set(selectedAgents.map(a => a.locationId));
+                        return (
+                          <p className="text-violet-400 text-xs mt-1">
+                            Locations: {uniqueLocations.size}/3
+                          </p>
+                        );
+                      })()}
                     </div>
                   )}
           </div>
@@ -433,7 +498,12 @@ const Profile: React.FC = () => {
                           const selectedLocation = locations.find(loc => loc.id === user.locationId);
                           if (selectedLocation) {
                             setLocationSearchQuery(selectedLocation.name);
+                          } else {
+                            setLocationSearchQuery('');
                           }
+                        } else {
+                          // Clear everything if no user
+                          setLocationSearchQuery('');
                         }
                       }}
                       className="px-3 py-2 border border-violet-500/20 text-white rounded hover:bg-white/10 transition-colors text-sm"

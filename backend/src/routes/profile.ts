@@ -42,20 +42,18 @@ router.put('/', authenticateToken, async (req: any, res) => {
         });
       }
 
-      // Check if all agents are from the same location (if location is being updated)
-      if (profileData.location_id) {
-        const locationResult = await pool.query(
-          'SELECT DISTINCT location_id FROM agents WHERE id = ANY($1)',
-          [profileData.selected_agent_ids]
-        );
+      // Check if agents are from maximum 3 different locations
+      const locationResult = await pool.query(
+        'SELECT DISTINCT location_id FROM agents WHERE id = ANY($1)',
+        [profileData.selected_agent_ids]
+      );
 
-        if (locationResult.rows.length > 1 || 
-            (locationResult.rows.length === 1 && locationResult.rows[0].location_id !== profileData.location_id)) {
-          return res.status(400).json({
-            success: false,
-            error: 'All selected agents must be from the same location'
-          });
-        }
+      const uniqueLocations = locationResult.rows.length;
+      if (uniqueLocations > 3) {
+        return res.status(400).json({
+          success: false,
+          error: 'You can select agents from maximum 3 different locations'
+        });
       }
     }
 
@@ -76,11 +74,14 @@ router.put('/', authenticateToken, async (req: any, res) => {
       paramIndex++;
     }
 
-    if (profileData.location_id !== undefined) {
+    if (profileData.location_id !== undefined && profileData.location_id !== null && profileData.location_id !== '') {
       updates.push(`location_id = $${paramIndex}`);
       // Convert string to integer for PostgreSQL
       values.push(parseInt(profileData.location_id.toString(), 10));
       paramIndex++;
+    } else if (profileData.location_id === '' || profileData.location_id === null) {
+      // Allow clearing location_id
+      updates.push(`location_id = NULL`);
     }
 
     if (profileData.selected_agent_ids !== undefined) {
@@ -93,8 +94,8 @@ router.put('/', authenticateToken, async (req: any, res) => {
       paramIndex++;
     }
 
-    // Set verified to true if location and agents are selected
-    if (profileData.location_id && profileData.selected_agent_ids && profileData.selected_agent_ids.length > 0) {
+    // Set verified to true if agents are selected (location_id is now optional)
+    if (profileData.selected_agent_ids && profileData.selected_agent_ids.length > 0) {
       updates.push(`verified = true`);
       updates.push(`verified_at = NOW()`);
     }

@@ -755,7 +755,7 @@ router.get('/dashboard', auth_1.authenticateAdmin, async (req, res) => {
 // Get all locations (Admin)
 router.get('/locations', auth_1.authenticateAdmin, async (req, res) => {
     try {
-        const { city, state, country, limit = 100, offset = 0 } = req.query;
+        const { city, state, country, limit = 400, offset = 0 } = req.query;
         let query = `
       SELECT l.*, 
              COUNT(ag.id) as agent_count,

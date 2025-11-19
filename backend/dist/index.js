@@ -106,12 +106,7 @@ const io = new socket_io_1.Server(server, {
 exports.io = io;
 const PORT = process.env.PORT || 5000;
 // Middleware
-app.use((0, cors_1.default)({
-    origin: true,
-    credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
-}));
+app.use((0, cors_1.default)());
 app.use(express_1.default.json({ limit: '10mb' }));
 app.use(express_1.default.urlencoded({ extended: true, limit: '10mb' }));
 // Request logging with better debugging
