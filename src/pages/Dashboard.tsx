@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import {ArrowUpRight, ArrowDownLeft, RefreshCw, CheckCircle, Loader2, AlertCircle, X, Star, MessageSquare, Plus, VideoIcon, Phone, FileText} from 'lucide-react';
+import { ArrowUpRight, ArrowDownLeft, RefreshCw, CheckCircle, Loader2, AlertCircle, X, Star, MessageSquare, Plus, VideoIcon, Phone, FileText } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useWalletStore } from '../stores/walletStore';
 import { useUserStore } from '../stores/userStore';
@@ -44,22 +44,22 @@ const Dashboard: React.FC = () => {
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [showOnlyApproved, setShowOnlyApproved] = useState(false);
   const [showDemoVideo, setShowDemoVideo] = useState(false);
-  const [showSupportCallModal, setShowSupportCallModal] = useState<{isOpen: boolean, supportUrl: string}>({isOpen: false, supportUrl: ''});
-  
+  const [showSupportCallModal, setShowSupportCallModal] = useState<{ isOpen: boolean, supportUrl: string }>({ isOpen: false, supportUrl: '' });
+
   // Refs to prevent infinite loops
   const hasFetchedReviewsRef = useRef(false);
   const lastAddressRef = useRef<string | null>(null);
-  
-  const { 
-    address, 
-    isConnected, 
-    balance, 
-    chainId, 
+
+  const {
+    address,
+    isConnected,
+    balance,
+    chainId,
     isConnecting,
     isUpdatingBalances,
     connectionError,
-    connect, 
-    disconnect, 
+    connect,
+    disconnect,
     updateBalances,
     clearError,
     switchToNetwork,
@@ -67,7 +67,7 @@ const Dashboard: React.FC = () => {
     connectMetaMask,
     connectTrustWallet
   } = useWalletStore();
-  
+
   const { user, refreshUserProfile } = useUserStore();
   const navigate = useNavigate();
 
@@ -81,7 +81,7 @@ const Dashboard: React.FC = () => {
         const data = await response.json();
         setReviews(data.data);
       }
-      
+
       // Fetch total stats (all reviews) instead of user-specific stats
       const statsResponse = await fetch(`/api/reviews/stats/total`);
       if (statsResponse.ok) {
@@ -99,7 +99,7 @@ const Dashboard: React.FC = () => {
   useEffect(() => {
     if (isConnected && address) {
       setIsRestoringWallet(false);
-      
+
       // Only update balances if address changed
       const currentAddress = lastAddressRef.current;
       if (currentAddress !== address && !isUpdatingBalances) {
@@ -144,9 +144,9 @@ const Dashboard: React.FC = () => {
       // Auto-detect and connect to available wallet
       if ((window as any).ethereum) {
         const isMetaMask = (window as any).ethereum.isMetaMask;
-        const isTrustWallet = (window as any).ethereum.isTrust || 
-                             (window as any).ethereum.isTrustWallet;
-        
+        const isTrustWallet = (window as any).ethereum.isTrust ||
+          (window as any).ethereum.isTrustWallet;
+
         try {
           if (isTrustWallet) {
             await handleConnectTrustWallet();
@@ -317,7 +317,7 @@ const Dashboard: React.FC = () => {
             >
               Read Guide
             </Link>
-            <p 
+            <p
               onClick={() => setShowDemoVideo(true)}
               className="px-3 py-1 rounded-lg text-center text-xs cursor-pointer bg-white/10 hover:bg-white/20 text-violet-100 border border-white/10 transition-colors"
             >
@@ -373,11 +373,10 @@ const Dashboard: React.FC = () => {
         <motion.div
           initial={{ y: 20, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
-          className={`p-3 rounded-lg border flex items-center space-x-2 ${
-            user.verified
+          className={`p-3 rounded-lg border flex items-center space-x-2 ${user.verified
               ? 'bg-violet-500/20 border-violet-500/30'
               : 'bg-yellow-500/20 border-yellow-500/30'
-          }`}
+            }`}
         >
           {user.verified ? (
             <CheckCircle size={16} className="text-violet-400" />
@@ -385,15 +384,13 @@ const Dashboard: React.FC = () => {
             <AlertCircle size={16} className="text-yellow-400" />
           )}
           <div className="flex-1">
-            <p className={`font-medium text-sm ${
-              user.verified ? 'text-violet-300' : 'text-yellow-300'
-            }`}>
+            <p className={`font-medium text-sm ${user.verified ? 'text-violet-300' : 'text-yellow-300'
+              }`}>
               {user.verified ? 'Verified' : 'Not Verified'}
             </p>
-            <p className={`text-xs ${
-              user.verified ? 'text-violet-400' : 'text-yellow-400'
-            }`}>
-              {user.verified 
+            <p className={`text-xs ${user.verified ? 'text-violet-400' : 'text-yellow-400'
+              }`}>
+              {user.verified
                 ? 'Can access P2P trading'
                 : 'Complete profile to trade'
               }
@@ -420,27 +417,25 @@ const Dashboard: React.FC = () => {
       )}
 
       {/* Wallet Connection Status */}
-      <div className={`backdrop-blur-lg rounded-lg p-4 border ${
-        isConnected 
-          ? 'bg-gradient-to-r from-violet-500/20 to-purple-500/20 border-violet-500/30' 
+      <div className={`backdrop-blur-lg rounded-lg p-4 border ${isConnected
+          ? 'bg-gradient-to-r from-violet-500/20 to-purple-500/20 border-violet-500/30'
           : 'bg-gradient-to-r from-orange-500/20 to-red-500/20 border-orange-500/30'
-      }`}>
+        }`}>
         <div className="flex items-center justify-between mb-2">
           <h2 className="text-base font-bold text-white">
             {isConnected ? 'Wallet Connected' : 'Connect Wallet'}
           </h2>
           {isConnected && (
-            <span className={`text-xs px-2 py-1 rounded-full ${
-              isCorrectNetwork() 
-                ? 'bg-violet-500/20 text-violet-300' 
+            <span className={`text-xs px-2 py-1 rounded-full ${isCorrectNetwork()
+                ? 'bg-violet-500/20 text-violet-300'
                 : 'bg-red-500/20 text-red-300'
-            }`}>
+              }`}>
               {getNetworkName()}
               {!isCorrectNetwork() && ' (Switch to BSC Mainnet)'}
             </span>
           )}
         </div>
-        
+
         {isConnected ? (
           <div className="space-y-2">
             <p className="text-gray-300 text-sm">
@@ -451,9 +446,9 @@ const Dashboard: React.FC = () => {
                 <div className="bg-red-500/20 border border-red-500/30 rounded-lg p-3">
                   <p className="text-red-300 text-sm font-medium">⚠️ Wrong Network</p>
                   <p className="text-red-400 text-xs">
-                    {chainId === 1 ? 'Connected to Ethereum Mainnet' : 
-                     chainId === 56 ? 'Connected to BSC Mainnet' : 
-                     `Connected to Network ${chainId}`}
+                    {chainId === 1 ? 'Connected to Ethereum Mainnet' :
+                      chainId === 56 ? 'Connected to BSC Mainnet' :
+                        `Connected to Network ${chainId}`}
                   </p>
                   <p className="text-red-400 text-xs mt-1">Please switch to BSC Mainnet</p>
                 </div>
@@ -477,7 +472,7 @@ const Dashboard: React.FC = () => {
             <p className="text-gray-300 text-sm">
               Connect your wallet to start trading
             </p>
-            
+
             {/* Direct wallet connection buttons */}
             {(window as any).ethereum && (
               <div className="space-y-2">
@@ -500,7 +495,7 @@ const Dashboard: React.FC = () => {
                     )}
                   </button>
                 )}
-                
+
                 {((window as any).ethereum.isTrust || (window as any).ethereum.isTrustWallet) && (
                   <button
                     onClick={handleConnectTrustWallet}
@@ -522,7 +517,7 @@ const Dashboard: React.FC = () => {
                 )}
               </div>
             )}
-            
+
             {/* Fallback: Generic connect button or modal trigger */}
             <button
               onClick={handleConnectWallet}
@@ -538,7 +533,7 @@ const Dashboard: React.FC = () => {
                 <span>Connect Wallet</span>
               )}
             </button>
-            
+
             {/* Debug button for mobile wallet issues */}
             <button
               onClick={() => {
@@ -558,7 +553,7 @@ const Dashboard: React.FC = () => {
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <h3 className="text-base font-semibold text-white">Balances</h3>
-          <button 
+          <button
             onClick={handleRefreshBalances}
             disabled={!isConnected || isUpdatingBalances}
             className="p-1.5 rounded-lg bg-violet-500/20 text-violet-300 hover:bg-violet-500/30 transition-colors disabled:opacity-50"
@@ -606,81 +601,80 @@ const Dashboard: React.FC = () => {
         )}
       </div>
 
- 
+
       {/* Reviews Section */}
-        <div className="bg-white rounded-xl p-4 shadow-lg space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-lg font-bold text-gray-800 flex items-center space-x-2">
-              <Star className="w-5 h-5 text-yellow-500 fill-yellow-500" />
-              <span>Reviews</span>
-            </h3>
-            <div className="flex items-center space-x-2">
-              <button
-                onClick={() => setShowOnlyApproved(!showOnlyApproved)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                  showOnlyApproved 
-                    ? 'bg-violet-600 text-white' 
-                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+      <div className="bg-white rounded-xl p-4 shadow-lg space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-bold text-gray-800 flex items-center space-x-2">
+            <Star className="w-5 h-5 text-yellow-500 fill-yellow-500" />
+            <span>Reviews</span>
+          </h3>
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={() => setShowOnlyApproved(!showOnlyApproved)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${showOnlyApproved
+                  ? 'bg-violet-600 text-white'
+                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                 }`}
-              >
-                {showOnlyApproved ? 'Approved' : 'All'}
-              </button>
-              <button
-                onClick={() => {
-                  if (!address) {
-                    toast.error('Please connect your wallet first');
-                    return;
-                  }
-                  setShowReviewModal(true);
-                }}
-                className="bg-violet-600 hover:bg-violet-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center space-x-1.5"
-              >
-                <Plus size={14} />
-                <span>Add Review</span>
-              </button>
+            >
+              {showOnlyApproved ? 'Approved' : 'All'}
+            </button>
+            <button
+              onClick={() => {
+                if (!address) {
+                  toast.error('Please connect your wallet first');
+                  return;
+                }
+                setShowReviewModal(true);
+              }}
+              className="bg-violet-600 hover:bg-violet-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center space-x-1.5"
+            >
+              <Plus size={14} />
+              <span>Add Review</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Review Stats */}
+        {reviewStats && (
+          <div className="bg-gradient-to-r from-violet-50 to-purple-50 rounded-lg p-4 border border-violet-200">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="text-center">
+                <div className="text-2xl font-bold text-gray-800">{reviewStats.total_reviews}</div>
+                <div className="text-xs text-gray-600 font-medium">Total Reviews</div>
+              </div>
+              <div className="text-center">
+                <div className="flex justify-center items-center space-x-1 mb-1">
+                  {Array.from({ length: 5 }, (_, i) => (
+                    <Star
+                      key={i}
+                      size={16}
+                      className={i < Math.round(parseFloat(reviewStats.average_rating)) ? 'text-yellow-500 fill-yellow-500' : 'text-gray-300'}
+                    />
+                  ))}
+                </div>
+                <div className="text-sm font-semibold text-gray-800">
+                  {reviewStats.average_rating} / 5.0
+                </div>
+                <div className="text-xs text-gray-600">Average Rating</div>
+              </div>
             </div>
           </div>
+        )}
 
-          {/* Review Stats */}
-          {reviewStats && (
-            <div className="bg-gradient-to-r from-violet-50 to-purple-50 rounded-lg p-4 border border-violet-200">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-gray-800">{reviewStats.total_reviews}</div>
-                  <div className="text-xs text-gray-600 font-medium">Total Reviews</div>
-                </div>
-                <div className="text-center">
-                  <div className="flex justify-center items-center space-x-1 mb-1">
-                    {Array.from({ length: 5 }, (_, i) => (
-                      <Star
-                        key={i}
-                        size={16}
-                        className={i < Math.round(parseFloat(reviewStats.average_rating)) ? 'text-yellow-500 fill-yellow-500' : 'text-gray-300'}
-                      />
-                    ))}
-                  </div>
-                  <div className="text-sm font-semibold text-gray-800">
-                    {reviewStats.average_rating} / 5.0
-                  </div>
-                  <div className="text-xs text-gray-600">Average Rating</div>
-                </div>
-              </div>
+        {/* Reviews List */}
+        <div className="max-h-96 overflow-y-auto space-y-3 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
+          {isLoadingReviews ? (
+            <div className="text-center py-8">
+              <Loader2 className="w-6 h-6 animate-spin mx-auto mb-3 text-violet-600" />
+              <p className="text-gray-600 text-sm">Loading reviews...</p>
             </div>
-          )}
-
-          {/* Reviews List */}
-          <div className="max-h-96 overflow-y-auto space-y-3 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
-            {isLoadingReviews ? (
-              <div className="text-center py-8">
-                <Loader2 className="w-6 h-6 animate-spin mx-auto mb-3 text-violet-600" />
-                <p className="text-gray-600 text-sm">Loading reviews...</p>
-              </div>
-            ) : reviews.length > 0 ? (
-              reviews
-                .filter(review => showOnlyApproved ? review.is_approved : true)
-                .map((review) => (
-                <motion.div 
-                  key={review.id} 
+          ) : reviews.length > 0 ? (
+            reviews
+              .filter(review => showOnlyApproved ? review.is_approved : true)
+              .map((review) => (
+                <motion.div
+                  key={review.id}
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow"
@@ -713,8 +707,8 @@ const Dashboard: React.FC = () => {
                       </div>
                     </div>
                     <span className="text-xs text-gray-500 whitespace-nowrap ml-2">
-                      {new Date(review.created_at).toLocaleDateString('en-US', { 
-                        month: 'short', 
+                      {new Date(review.created_at).toLocaleDateString('en-US', {
+                        month: 'short',
                         day: 'numeric',
                         year: 'numeric'
                       })}
@@ -725,22 +719,22 @@ const Dashboard: React.FC = () => {
                   )}
                 </motion.div>
               ))
-            ) : (
-              <div className="text-center py-8">
-                <MessageSquare className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                <p className="text-gray-700 font-medium text-sm">
-                  {showOnlyApproved ? 'No approved reviews yet' : 'No reviews yet'}
-                </p>
-                <p className="text-gray-500 text-xs mt-1">
-                  {showOnlyApproved 
-                    ? 'Reviews are pending admin approval' 
-                    : 'Be the first to share your experience!'
-                  }
-                </p>
-              </div>
-            )}
-          </div>
+          ) : (
+            <div className="text-center py-8">
+              <MessageSquare className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+              <p className="text-gray-700 font-medium text-sm">
+                {showOnlyApproved ? 'No approved reviews yet' : 'No reviews yet'}
+              </p>
+              <p className="text-gray-500 text-xs mt-1">
+                {showOnlyApproved
+                  ? 'Reviews are pending admin approval'
+                  : 'Be the first to share your experience!'
+                }
+              </p>
+            </div>
+          )}
         </div>
+      </div>
 
       {/* Status Card */}
       <div className="bg-violet-500/20 border-violet-500/30 text-violet-300 p-3 rounded-lg border flex items-center space-x-2">
@@ -751,13 +745,20 @@ const Dashboard: React.FC = () => {
         </div>
       </div>
 
- <a
-        href="https://t.me/919574761704"
-        target="_blank"
-        rel="noopener noreferrer"
+      <div className="w-full">
+      <button
+        className="w-full bg-gradient-to-r from-green-500/20 to-emerald-500/20 border border-green-500/30 rounded-lg p-3 text-white font-semibold"
       >
-        Chat on Telegram
-      </a>
+        WhatsApp Now
+      </button>
+
+      <div className="mt-2 bg-white/10 border border-white/10 rounded-lg p-3 text-center">
+        <p className="text-white font-medium">
+          +91 9574761704
+        </p>
+      </div>
+    </div>
+
       {/* Support Call Button */}
       <button
         onClick={() => {
@@ -784,7 +785,7 @@ const Dashboard: React.FC = () => {
           // Construct support call URL with wallet address
           const currentUrl = window.location.origin;
           const supportUrl = `${currentUrl}/support-call/${address}`;
-          
+
           // Always show modal (no redirect)
           setShowSupportCallModal({
             isOpen: true,
@@ -800,11 +801,11 @@ const Dashboard: React.FC = () => {
           <div>
             <p className="text-white font-semibold text-sm">Support Call</p>
             <p className="text-green-300 text-xs">
-              {!isConnected || !address 
-                ? 'Connect wallet to call' 
-                : !user || !user.verified 
-                ? 'Verify profile to call' 
-                : 'Get help from admin'}
+              {!isConnected || !address
+                ? 'Connect wallet to call'
+                : !user || !user.verified
+                  ? 'Verify profile to call'
+                  : 'Get help from admin'}
             </p>
           </div>
         </div>
@@ -833,8 +834,8 @@ const Dashboard: React.FC = () => {
           <div>
             <p className="text-white font-semibold text-sm">Chat Support</p>
             <p className="text-blue-300 text-xs">
-              {!isConnected || !address 
-                ? 'Connect wallet to chat' 
+              {!isConnected || !address
+                ? 'Connect wallet to chat'
                 : 'Chat with admin support'}
             </p>
           </div>
@@ -842,8 +843,8 @@ const Dashboard: React.FC = () => {
         <ArrowUpRight size={16} className="text-blue-400 group-hover:text-blue-300 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
       </button>
 
-    
-      
+
+
       {/* Wallet Selection Modal */}
       <WalletSelectionModal
         isOpen={showWalletModal}
@@ -909,7 +910,7 @@ const Dashboard: React.FC = () => {
               {/* URL Display - Selectable */}
               <div className="bg-white/10 rounded-lg p-4 border border-white/10">
                 <p className="text-sm text-gray-400 mb-2">Support Call URL</p>
-                <p 
+                <p
                   id="support-url-display"
                   className="text-sm font-mono text-white break-all bg-black/20 p-3 rounded border border-white/10 select-all cursor-text"
                   style={{ userSelect: 'all', WebkitUserSelect: 'all' }}
@@ -946,7 +947,7 @@ const Dashboard: React.FC = () => {
                           const selection = window.getSelection();
                           selection?.removeAllRanges();
                           selection?.addRange(range);
-                          toast('URL selected! Long press to copy', { 
+                          toast('URL selected! Long press to copy', {
                             icon: '📋',
                             duration: 3000
                           });
@@ -962,7 +963,7 @@ const Dashboard: React.FC = () => {
                         const selection = window.getSelection();
                         selection?.removeAllRanges();
                         selection?.addRange(range);
-                        toast('URL selected! Long press to copy', { 
+                        toast('URL selected! Long press to copy', {
                           icon: '📋',
                           duration: 4000
                         });
@@ -988,7 +989,7 @@ const Dashboard: React.FC = () => {
                       const selection = window.getSelection();
                       selection?.removeAllRanges();
                       selection?.addRange(range);
-                      toast('URL selected! Long press to copy', { 
+                      toast('URL selected! Long press to copy', {
                         icon: '📋',
                         duration: 3000
                       });
