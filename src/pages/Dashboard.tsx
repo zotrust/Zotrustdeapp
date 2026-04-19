@@ -751,6 +751,13 @@ const Dashboard: React.FC = () => {
         </div>
       </div>
 
+ <a
+        href="https://t.me/919574761704"
+        target="_blank"
+        rel="noopener noreferrer"
+      >
+        Chat on Telegram
+      </a>
       {/* Support Call Button */}
       <button
         onClick={() => {
