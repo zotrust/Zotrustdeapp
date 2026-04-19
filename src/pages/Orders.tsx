@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import {Clock, CheckCircle, XCircle, Phone, Plus, Edit, Trash2, AlertCircle, X, PhoneCall, Lock, FileText, Gavel} from 'lucide-react';
+import {Clock, CheckCircle, XCircle, Phone, Plus, Edit, Trash2, AlertCircle, X, PhoneCall, Lock, FileText, Gavel, Loader2} from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Order, Ad } from '../types';
 import { useWalletStore } from '../stores/walletStore';
@@ -12,6 +12,7 @@ import clsx from 'clsx';
 import toast from 'react-hot-toast';
 import io from 'socket.io-client';
 import { blockchainService } from '../services/blockchainService';
+import { walletConnectService } from '../services/walletConnectService';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { TOKENS, ERC20_ABI } from '../config/contracts';
 import { ethers } from 'ethers';
@@ -61,19 +62,29 @@ const Orders: React.FC = () => {
   const [showPhoneCallModal, setShowPhoneCallModal] = useState<{isOpen: boolean, phoneNumber: string, userName: string}>({isOpen: false, phoneNumber: '', userName: ''});
   const [showAppealRedirectModal, setShowAppealRedirectModal] = useState<{isOpen: boolean, appealUrl: string, orderId: string}>({isOpen: false, appealUrl: '', orderId: ''});
   const [showLockAlertModal, setShowLockAlertModal] = useState<{isOpen: boolean, orderId: string, userRole: 'buyer' | 'seller'}>({isOpen: false, orderId: '', userRole: 'buyer'});
-  const { address, isConnected,connectionError, clearError } = useWalletStore();
+  const [isRestoringWallet, setIsRestoringWallet] = useState(true);
+  const {
+    address,
+    isConnected,
+    walletType,
+    connectionError,
+    clearError,
+    restoreWalletState
+  } = useWalletStore();
   const { user } = useUserStore();
   const { setUnreadOrdersCount, clearUnreadOrdersCount } = useNotificationStore();
- 
+  
   // Track ongoing user info requests to prevent duplicates
   const fetchingUsers = useRef(new Set<string>());
   const fetchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const hasAttemptedWalletRestoreRef = useRef(false);
   
   const socketRef = useRef<any>(null);
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
   const currentTargetRef = useRef<string | null>(null);
   const heartbeatIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const supportedOrderTokens = useMemo(() => Object.keys(TOKENS).join(', '), []);
 
   // ICE servers configuration
   const iceServers = {
@@ -83,6 +94,127 @@ const Orders: React.FC = () => {
       { urls: 'stun:stun2.l.google.com:19302' }
     ]
   };
+
+  const getTokenConfig = useCallback((tokenSymbol?: string) => {
+    if (!tokenSymbol?.trim()) {
+      return TOKENS.BNB;
+    }
+
+    const normalizedSymbol = tokenSymbol.trim().toUpperCase();
+    return (TOKENS as Record<string, (typeof TOKENS)[keyof typeof TOKENS]>)[normalizedSymbol] ?? null;
+  }, []);
+
+  const getConnectedProvider = useCallback(async (): Promise<ethers.BrowserProvider> => {
+    if (!address || !isConnected) {
+      throw new Error('Wallet not connected');
+    }
+
+    if (walletType === 'walletconnect') {
+      await walletConnectService.initialize();
+
+      let provider = walletConnectService.getProvider();
+      if (!provider && walletConnectService.isConnected()) {
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        provider = walletConnectService.getProvider();
+      }
+
+      if (!provider) {
+        throw new Error('WalletConnect provider not available. Please reconnect your wallet.');
+      }
+
+      return provider;
+    }
+
+    if (!window.ethereum) {
+      throw new Error('Wallet provider not available. Please reconnect your wallet.');
+    }
+
+    return new ethers.BrowserProvider(window.ethereum as any);
+  }, [address, isConnected, walletType]);
+
+  const signAuthMessage = useCallback(async (message: string, walletAddress: string): Promise<string> => {
+    if (walletType === 'walletconnect') {
+      await walletConnectService.initialize();
+      return walletConnectService.signMessage(message);
+    }
+
+    if (!window.ethereum) {
+      throw new Error('Wallet provider not available. Please reconnect your wallet.');
+    }
+
+    return await (window.ethereum as any).request({
+      method: 'personal_sign',
+      params: [message, walletAddress],
+    });
+  }, [walletType]);
+
+  const ensureAuthToken = useCallback(async () => {
+    let token = localStorage.getItem('authToken') || '';
+
+    if (token || !address || !isConnected) {
+      return token;
+    }
+
+    console.log('🔄 Orders: No token but wallet connected, attempting auto-login...');
+
+    try {
+      const message = 'Sign this message to authenticate with Zotrust';
+      const signature = await signAuthMessage(message, address);
+
+      const { loginWithWallet } = useUserStore.getState();
+      const success = await loginWithWallet(address, signature, message);
+
+      if (success) {
+        token = localStorage.getItem('authToken') || '';
+        console.log('✅ Orders: Auto-login successful, token:', !!token);
+      }
+    } catch (loginError) {
+      console.error('❌ Orders: Auto-login failed:', loginError);
+    }
+
+    return token;
+  }, [address, isConnected, signAuthMessage]);
+
+  useEffect(() => {
+    if (address && isConnected) {
+      setIsRestoringWallet(false);
+      return;
+    }
+
+    if (hasAttemptedWalletRestoreRef.current) {
+      const timer = setTimeout(() => {
+        setIsRestoringWallet(false);
+      }, 1500);
+
+      return () => clearTimeout(timer);
+    }
+
+    hasAttemptedWalletRestoreRef.current = true;
+
+    let isCancelled = false;
+    const fallbackTimer = setTimeout(() => {
+      if (!isCancelled) {
+        setIsRestoringWallet(false);
+      }
+    }, 2000);
+
+    const restoreWallet = async () => {
+      try {
+        await restoreWalletState();
+      } finally {
+        if (!isCancelled) {
+          setIsRestoringWallet(false);
+        }
+      }
+    };
+
+    restoreWallet();
+
+    return () => {
+      isCancelled = true;
+      clearTimeout(fallbackTimer);
+    };
+  }, [address, isConnected, restoreWalletState]);
 
   // WebRTC functions for incoming calls - MUST BE DEFINED BEFORE useEffect
   const createPeerConnection = useCallback(() => {
@@ -489,29 +621,8 @@ const Orders: React.FC = () => {
     const previousOrders = orders;
     
     try {
-      let token = localStorage.getItem('authToken') || '';
+      let token = await ensureAuthToken();
       console.log('🔑 fetchOrders: Token exists:', !!token);
-      
-      // If no token but wallet is connected, try auto-login
-      if (!token && address) {
-        console.log('🔄 Orders: No token but wallet connected, attempting auto-login...');
-        try {
-          const message = 'Sign this message to authenticate with Zotrust';
-          const signature = await (window as any).ethereum.request({
-            method: 'personal_sign',
-            params: [message, address],
-          });
-          
-          const { loginWithWallet } = useUserStore.getState();
-          const success = await loginWithWallet(address, signature, message);
-          if (success) {
-            token = localStorage.getItem('authToken') || '';
-            console.log('✅ Orders: Auto-login successful, token:', !!token);
-          }
-        } catch (loginError) {
-          console.error('❌ Orders: Auto-login failed:', loginError);
-        }
-      }
       
       // Fetch all orders for the current user
       const response = await fetch(`/api/orders/my-orders`, {
@@ -638,29 +749,7 @@ const Orders: React.FC = () => {
     setIsLoadingAds(true);
     setAdsError(null);
     try {
-      let token = localStorage.getItem('authToken') || '';
-      // console.log('🔑 fetchMyAds: Token exists:', !!token);
-      
-      // If no token but wallet is connected, try auto-login
-      if (!token && address) {
-        // console.log('🔄 Orders: No token but wallet connected, attempting auto-login...');
-        try {
-          const message = 'Sign this message to authenticate with Zotrust';
-          const signature = await (window as any).ethereum.request({
-            method: 'personal_sign',
-            params: [message, address],
-          });
-          
-          const { loginWithWallet } = useUserStore.getState();
-          const success = await loginWithWallet(address, signature, message);
-          if (success) {
-            token = localStorage.getItem('authToken') || '';
-            // console.log('✅ Orders: Auto-login successful, token:', !!token);
-          }
-        } catch (loginError) {
-          console.error('❌ Orders: Auto-login failed:', loginError);
-        }
-      }
+      const token = await ensureAuthToken();
       
       // Fetch my ads
       const response = await fetch(`/api/ads/my-ads`, {
@@ -786,13 +875,21 @@ const Orders: React.FC = () => {
   // Helper function to check balance before locking
   const checkBalanceBeforeLock = async (order: Order): Promise<{ hasEnoughBalance: boolean; message: string }> => {
     try {
-      if (!isConnected) {
+      if (!address || !isConnected) {
         return { hasEnoughBalance: false, message: 'Wallet not connected' };
       }
 
-      const provider = new ethers.BrowserProvider(window.ethereum as any);
+      const provider = await getConnectedProvider();
       const tokenSymbol = order?.token || 'BNB';
-      const tokenConfig = ((TOKENS as any)[tokenSymbol]) || TOKENS.BNB;
+      const tokenConfig = getTokenConfig(tokenSymbol);
+
+      if (!tokenConfig) {
+        return {
+          hasEnoughBalance: false,
+          message: `Unsupported token "${tokenSymbol}". Orders page currently supports ${supportedOrderTokens} on BNB Smart Chain only.`
+        };
+      }
+
       const tokenAddress = tokenConfig.address;
       const isNativeBNB = tokenConfig.isNative || false;
       const requiredAmount = order?.amount || 0;
@@ -949,7 +1046,16 @@ const Orders: React.FC = () => {
       
       // Get token config
       const tokenSymbol = order?.token || 'BNB';
-      const tokenConfig = ((TOKENS as any)[tokenSymbol]) || TOKENS.BNB;
+      const tokenConfig = getTokenConfig(tokenSymbol);
+
+      if (!tokenConfig) {
+        toast.error(`Unsupported token "${tokenSymbol}". Supported tokens: ${supportedOrderTokens}`, {
+          id: 'lock-flow',
+          duration: 8000
+        });
+        return;
+      }
+
       const tokenAddress = tokenConfig.address;
       const isNativeBNB = tokenConfig.isNative || false;
       
@@ -2122,6 +2228,17 @@ const Orders: React.FC = () => {
       toast.error(`Failed to verify: ${error.message}`, { id: 'verify-status' });
     }
   };
+
+  if (isRestoringWallet) {
+    return (
+      <div className="min-h-[60vh] flex items-center justify-center px-6">
+        <div className="flex items-center space-x-3 text-white">
+          <Loader2 size={24} className="animate-spin text-blue-400" />
+          <span className="text-sm text-gray-300">Restoring wallet connection...</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="px-6 space-y-6">
